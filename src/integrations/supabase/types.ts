@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.12 (cd3cf9e)"
@@ -347,6 +347,33 @@ export type Database = {
         }
         Relationships: []
       }
+      visit_states: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       visits: {
         Row: {
           approval_date: string | null
@@ -368,6 +395,7 @@ export type Database = {
           status: Database["public"]["Enums"]["visit_status"]
           updated_at: string
           visit_date: string
+          visit_state_code: string | null
         }
         Insert: {
           approval_date?: string | null
@@ -389,6 +417,7 @@ export type Database = {
           status: Database["public"]["Enums"]["visit_status"]
           updated_at?: string
           visit_date?: string
+          visit_state_code?: string | null
         }
         Update: {
           approval_date?: string | null
@@ -410,6 +439,7 @@ export type Database = {
           status?: Database["public"]["Enums"]["visit_status"]
           updated_at?: string
           visit_date?: string
+          visit_state_code?: string | null
         }
         Relationships: [
           {
@@ -433,6 +463,13 @@ export type Database = {
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "visits_visit_state_code_fkey"
+            columns: ["visit_state_code"]
+            isOneToOne: false
+            referencedRelation: "visit_states"
+            referencedColumns: ["code"]
+          },
         ]
       }
     }
@@ -450,8 +487,8 @@ export type Database = {
       }
       has_role: {
         Args: {
-          _user_id: string
           _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
         }
         Returns: boolean
       }
