@@ -1,0 +1,130 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import VisitSalesSection from './VisitSalesSection';
+
+interface Visit {
+  id: string;
+  visit_date: string;
+  status: 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed';
+  notes?: string;
+  commercial?: {
+    first_name: string | null;
+    last_name: string | null;
+    email: string;
+  };
+  client?: {
+    nombre_apellidos: string;
+    dni: string;
+  };
+  company?: {
+    name: string;
+  };
+}
+
+interface Sale {
+  id: string;
+  amount: number;
+  sale_date: string;
+  sale_lines?: {
+    product_name: string;
+    quantity: number;
+    unit_price: number;
+    paid_cash: boolean;
+    is_paid: boolean;
+    is_delivered: boolean;
+  }[];
+}
+
+interface VisitDetailsDialogProps {
+  selectedVisit: Visit | null;
+  visitSales: Sale[];
+  onClose: () => void;
+  showClientInfo?: boolean;
+}
+
+const statusLabels = {
+  in_progress: 'En progreso',
+  completed: 'Completada',
+  no_answer: 'Sin respuesta',
+  not_interested: 'No interesado',
+  postponed: 'Aplazada'
+};
+
+const statusColors = {
+  in_progress: 'bg-blue-100 text-blue-800 hover:bg-blue-100',
+  completed: 'bg-green-100 text-green-800 hover:bg-green-100',
+  no_answer: 'bg-gray-100 text-gray-800 hover:bg-gray-100',
+  not_interested: 'bg-red-100 text-red-800 hover:bg-red-100',
+  postponed: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'
+};
+
+export default function VisitDetailsDialog({ 
+  selectedVisit, 
+  visitSales, 
+  onClose, 
+  showClientInfo = false 
+}: VisitDetailsDialogProps) {
+  if (!selectedVisit) return null;
+
+  return (
+    <Dialog open={!!selectedVisit} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Detalles de la Visita</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            {showClientInfo && (
+              <>
+                <div>
+                  <label className="text-sm font-medium">Cliente</label>
+                  <p className="font-medium">{selectedVisit.client?.nombre_apellidos || 'Sin nombre'}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">DNI</label>
+                  <p>{selectedVisit.client?.dni || 'Sin DNI'}</p>
+                </div>
+              </>
+            )}
+            <div>
+              <label className="text-sm font-medium">Comercial</label>
+              <p className="font-medium">
+                {selectedVisit.commercial?.first_name || selectedVisit.commercial?.last_name 
+                  ? `${selectedVisit.commercial.first_name || ''} ${selectedVisit.commercial.last_name || ''}`.trim()
+                  : selectedVisit.commercial?.email || 'Sin comercial'
+                }
+              </p>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Empresa</label>
+              <p>{selectedVisit.company?.name || 'N/A'}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Fecha</label>
+              <p>{format(new Date(selectedVisit.visit_date), "dd/MM/yyyy HH:mm", { locale: es })}</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Resultado de la visita</label>
+              <div>
+                <Badge className={statusColors[selectedVisit.status]}>
+                  {statusLabels[selectedVisit.status]}
+                </Badge>
+              </div>
+            </div>
+          </div>
+          
+          <div>
+            <label className="text-sm font-medium">Notas</label>
+            <p className="mt-1 p-2 border rounded-md bg-muted">
+              {selectedVisit.notes || 'Sin notas'}
+            </p>
+          </div>
+
+          <VisitSalesSection visitSales={visitSales} />
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
