@@ -170,7 +170,13 @@ export default function AdminVisitsView() {
       // Fetch visits first
       let query = supabase
         .from('visits')
-        .select('*')
+        .select(`
+          *,
+          visit_states (
+            name,
+            description
+          )
+        `)
         .order('visit_date', { ascending: false });
 
       // Apply filters

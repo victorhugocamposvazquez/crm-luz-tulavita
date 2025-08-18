@@ -84,7 +84,8 @@ export default function UnifiedVisitsManagement() {
     notes: '',
     status: 'in_progress' as 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed',
     company_id: '',
-    permission: 'pending'
+    permission: 'pending',
+    visitStateCode: ''
   });
   const [saleLines, setSaleLines] = useState<SaleLine[]>([]);
   const [clientComment, setClientComment] = useState('');
@@ -154,7 +155,8 @@ export default function UnifiedVisitsManagement() {
             notes: visitData.notes || '',
             status: visitData.status,
             company_id: visitData.company_id || '',
-            permission: visitData.permission || 'pending'
+            permission: visitData.permission || 'pending',
+            visitStateCode: visitData.visit_state_code || ''
           });
 
           // Store current visit status for read-only checking
@@ -717,7 +719,8 @@ export default function UnifiedVisitsManagement() {
         const updatePayload = {
           company_id: visitData.company_id,
           notes: visitData.notes || null,
-          status: isComplete ? 'completed' as const : 'in_progress' as const
+          status: isComplete ? 'completed' as const : 'in_progress' as const,
+          visit_state_code: visitData.visitStateCode || null
         };
         console.log('Update payload:', updatePayload);
         const {
@@ -758,7 +761,8 @@ export default function UnifiedVisitsManagement() {
           location_accuracy: location?.accuracy || null,
           visit_date: new Date().toISOString(),
           approval_status: 'pending' as 'pending' | 'approved' | 'rejected' | 'waiting_admin',
-          permission: 'pending'
+          permission: 'pending',
+          visit_state_code: visitData.visitStateCode || null
         };
         const {
           data: newVisit,
@@ -871,7 +875,8 @@ export default function UnifiedVisitsManagement() {
           notes: '',
           status: 'in_progress',
           company_id: '',
-          permission: 'pending'
+          permission: 'pending',
+          visitStateCode: ''
         });
         setSaleLines([]);
         setClientComment('');

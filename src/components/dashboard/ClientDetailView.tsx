@@ -158,7 +158,13 @@ const fetchVisits = async () => {
   // Fetch visits first
   const { data, error } = await supabase
     .from('visits')
-    .select('*')
+    .select(`
+      *,
+      visit_states (
+        name,
+        description
+      )
+    `)
     .eq('client_id', clientId)
     .order('visit_date', { ascending: false });
 

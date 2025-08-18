@@ -188,6 +188,11 @@ export default function CommercialVisitsManager() {
           permission,
           client_id,
           company_id,
+          visit_state_code,
+          visit_states (
+            name,
+            description
+          ),
           approved_by,
           client:clients(nombre_apellidos, dni),
           company:companies(name)

@@ -9,6 +9,7 @@ interface Visit {
   visit_date: string;
   status: 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed';
   notes?: string;
+  visit_state_code?: string;
   commercial?: {
     first_name: string | null;
     last_name: string | null;
@@ -20,6 +21,10 @@ interface Visit {
   };
   company?: {
     name: string;
+  };
+  visit_states?: {
+    name: string;
+    description: string | null;
   };
 }
 
@@ -106,13 +111,22 @@ export default function VisitDetailsDialog({
               <p>{format(new Date(selectedVisit.visit_date), "dd/MM/yyyy HH:mm", { locale: es })}</p>
             </div>
             <div>
-              <label className="text-sm font-medium">Estado de la visita</label>
+              <label className="text-sm font-medium">Estado</label>
               <div>
                 <Badge className={statusColors[selectedVisit.status]}>
                   {statusLabels[selectedVisit.status]}
                 </Badge>
               </div>
             </div>
+            {selectedVisit.visit_states && (
+              <div>
+                <label className="text-sm font-medium">Resultado de la visita</label>
+                <p className="font-medium">{selectedVisit.visit_states.name}</p>
+                {selectedVisit.visit_states.description && (
+                  <p className="text-sm text-muted-foreground">{selectedVisit.visit_states.description}</p>
+                )}
+              </div>
+            )}
           </div>
           
           <div>
