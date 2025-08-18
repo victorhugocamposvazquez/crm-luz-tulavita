@@ -1173,7 +1173,7 @@ export default function UnifiedVisitsManagement() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="status">Resultado de la Visita *</Label>
+            <Label htmlFor="status">Estado de la Visita *</Label>
             <select 
               id="status" 
               value={visitData.status} 

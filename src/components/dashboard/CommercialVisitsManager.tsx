@@ -469,7 +469,7 @@ export default function CommercialVisitsManager() {
                   <p>{formatDate(selectedVisit.visit_date)}</p>
                 </div>
                 <div>
-                  <Label>Resultado de la visita</Label>
+                  <Label>Estado de la visita</Label>
                   <div>{getStatusBadge(selectedVisit)}</div>
                 </div>
               </div>

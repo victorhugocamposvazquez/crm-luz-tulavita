@@ -358,11 +358,34 @@ export default function AdminDashboard() {
   const inProgressVisits = visits.filter(visit => visit.status === 'in_progress');
   const rejectedVisits = visits.filter(visit => visit.approval_status === 'rejected');
   
-  const visitDistributionData = [
-    { name: 'Completadas', value: completedVisits.length, color: '#22c55e' },
-    { name: 'En Progreso', value: inProgressVisits.length, color: '#f59e0b' },
-    { name: 'Rechazadas', value: rejectedVisits.length, color: '#ef4444' }
-  ].filter(item => item.value > 0);
+  // Status distribution data for all visit statuses
+  const statusLabels = {
+    'in_progress': 'En Progreso',
+    'completed': 'Completada',
+    'no_answer': 'Sin Respuesta',
+    'not_interested': 'No Interesado',
+    'postponed': 'Aplazada'
+  };
+
+  const statusColors = {
+    'in_progress': '#3b82f6',
+    'completed': '#22c55e',
+    'no_answer': '#f59e0b',
+    'not_interested': '#ef4444',
+    'postponed': '#8b5cf6'
+  };
+
+  // Create visit distribution by actual status
+  const visitStatusCounts = visits.reduce((acc, visit) => {
+    acc[visit.status] = (acc[visit.status] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const visitDistributionData = Object.entries(visitStatusCounts).map(([status, count]) => ({
+    name: statusLabels[status as keyof typeof statusLabels] || status,
+    value: count,
+    color: statusColors[status as keyof typeof statusColors] || '#6b7280'
+  })).filter(item => item.value > 0);
 
   const totalNotifications = pendingTasks.length + pendingApprovals.length;
 

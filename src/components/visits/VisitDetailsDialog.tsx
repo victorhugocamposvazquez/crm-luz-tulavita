@@ -106,7 +106,7 @@ export default function VisitDetailsDialog({
               <p>{format(new Date(selectedVisit.visit_date), "dd/MM/yyyy HH:mm", { locale: es })}</p>
             </div>
             <div>
-              <label className="text-sm font-medium">Resultado de la visita</label>
+              <label className="text-sm font-medium">Estado de la visita</label>
               <div>
                 <Badge className={statusColors[selectedVisit.status]}>
                   {statusLabels[selectedVisit.status]}

@@ -91,7 +91,7 @@ export default function VisitsTable({
           <TableHead>Comercial</TableHead>
           <TableHead>Empresa</TableHead>
           <TableHead>Fecha</TableHead>
-          <TableHead>Resultado</TableHead>
+          <TableHead>Estado</TableHead>
           <TableHead>Ventas</TableHead>
           <TableHead>Comisión</TableHead>
           <TableHead>Acciones</TableHead>
