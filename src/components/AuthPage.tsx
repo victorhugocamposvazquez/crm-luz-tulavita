@@ -38,7 +38,7 @@ export default function AuthPage() {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Backend</CardTitle>
+          <CardTitle className="text-2xl">Backoffice</CardTitle>
           <CardDescription>
             Accede a tu panel de control
           </CardDescription>
