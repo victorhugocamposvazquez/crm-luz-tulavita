@@ -6,11 +6,10 @@ const getAllowedOrigin = (requestOrigin: string | null) => {
   const allowedOrigins = [
     'http://localhost:3000',
     'https://lovable.dev',
+    'https://crm.ilustracioneslarum.com', // Tu dominio personalizado
     /^https:\/\/.*\.lovable\.dev$/,
     /^https:\/\/.*\.sandbox\.lovable\.dev$/,
     /^https:\/\/.*\.vercel\.app$/,
-    // Add your custom Vercel domain here if you have one
-    // 'https://your-custom-domain.com'
   ];
   
   if (!requestOrigin) return null;
