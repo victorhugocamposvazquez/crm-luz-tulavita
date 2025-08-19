@@ -53,6 +53,7 @@ export default function CommercialVisitsManager() {
   const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
   const [editMode, setEditMode] = useState(false);
   const [visitSales, setVisitSales] = useState<any[]>([]);
+  const [localGeolocationObtained, setLocalGeolocationObtained] = useState(false);
   const [stats, setStats] = useState({
     total: 0,
     pending: 0,
@@ -285,6 +286,7 @@ export default function CommercialVisitsManager() {
   const handleViewVisit = async (visit: Visit) => {
     setSelectedVisit(visit);
     setEditMode(false);
+    setLocalGeolocationObtained(false); // Reset geolocation state for new popup
     await fetchVisitSales(visit.id);
   };
   const handleEditVisit = async (visit: Visit) => {
@@ -294,6 +296,7 @@ export default function CommercialVisitsManager() {
     // Open popup with visit details and edit option
     setSelectedVisit(visit);
     setEditMode(true);
+    setLocalGeolocationObtained(false); // Reset geolocation state for new popup
     await fetchVisitSales(visit.id);
   };
   const fetchVisitSales = async (visitId: string) => {
@@ -529,20 +532,31 @@ export default function CommercialVisitsManager() {
                     Esta visita puede ser editada.
                   </p>
                   <Button 
+                    disabled={!hasPermission && !location && !localGeolocationObtained}
                     onClick={async () => {
               console.log('=== CONTINUAR VISITA BUTTON CLICKED ===');
               console.log('selectedVisit:', selectedVisit);
+              console.log('Current location:', location);
+              console.log('hasPermission:', hasPermission);
+              console.log('localGeolocationObtained:', localGeolocationObtained);
               
-              // First request location to ensure we have it
-              const currentLocation = await requestLocation();
-              
+              // If we don't have location, try to get it
+              let currentLocation = location;
               if (!currentLocation) {
-                toast({
-                  title: "Geolocalización requerida",
-                  description: "Por favor, permite el acceso a tu ubicación para continuar la visita",
-                  variant: "destructive"
-                });
-                return;
+                console.log('Requesting location...');
+                currentLocation = await requestLocation();
+                if (currentLocation) {
+                  setLocalGeolocationObtained(true);
+                  console.log('Location obtained:', currentLocation);
+                } else {
+                  console.log('Failed to obtain location');
+                  toast({
+                    title: "Geolocalización requerida",
+                    description: "Por favor, permite el acceso a tu ubicación para continuar la visita",
+                    variant: "destructive"
+                  });
+                  return;
+                }
               }
 
               // Store visit data in sessionStorage for cross-component communication
@@ -559,6 +573,11 @@ export default function CommercialVisitsManager() {
                     <Edit className="h-4 w-4 mr-2" />
                     Continuar Visita
                   </Button>
+                  {!hasPermission && !location && !localGeolocationObtained && (
+                    <p className="text-sm text-amber-600">
+                      ⚠️ Necesitas activar la geolocalización para continuar la visita
+                    </p>
+                  )}
                 </div>}
 
               {/* Resumen de Ventas */}
