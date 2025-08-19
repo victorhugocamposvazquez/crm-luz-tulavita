@@ -771,7 +771,13 @@ export default function UnifiedVisitsManagement() {
           company_id: visitData.company_id,
           notes: visitData.notes || null,
           status: isComplete ? 'completed' as const : 'in_progress' as const,
-          visit_state_code: visitData.visitStateCode || null
+          visit_state_code: visitData.visitStateCode || null,
+          // Solo actualizar coordenadas si la visita no está completada o si se está completando ahora
+          ...(currentVisitStatus !== 'completed' && location ? {
+            latitude: location.latitude,
+            longitude: location.longitude, 
+            location_accuracy: location.accuracy
+          } : {})
         };
         
         console.log('Update payload:', updatePayload);

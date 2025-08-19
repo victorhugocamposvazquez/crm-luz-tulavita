@@ -10,6 +10,9 @@ interface Visit {
   status: 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed';
   notes?: string;
   visit_state_code?: string;
+  latitude?: number;
+  longitude?: number;
+  location_accuracy?: number;
   commercial?: {
     first_name: string | null;
     last_name: string | null;
@@ -124,6 +127,19 @@ export default function VisitDetailsDialog({
                 <div>
                   <Badge variant="outline">{selectedVisit.visit_states.name}</Badge>
                 </div>
+              </div>
+            )}
+            {(selectedVisit.latitude && selectedVisit.longitude) && (
+              <div>
+                <label className="text-sm font-medium">Ubicación</label>
+                <p className="text-sm text-muted-foreground">
+                  {selectedVisit.latitude.toFixed(6)}, {selectedVisit.longitude.toFixed(6)}
+                  {selectedVisit.location_accuracy && (
+                    <span className="ml-2 text-xs">
+                      (±{selectedVisit.location_accuracy.toFixed(0)}m)
+                    </span>
+                  )}
+                </p>
               </div>
             )}
           </div>

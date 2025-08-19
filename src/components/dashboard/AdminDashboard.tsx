@@ -40,6 +40,9 @@ interface Visit {
   status: string;
   approval_status: string;
   client_id: string;
+  latitude?: number;
+  longitude?: number;
+  location_accuracy?: number;
   client: {
     nombre_apellidos: string;
     dni: string;
@@ -202,6 +205,9 @@ export default function AdminDashboard() {
           client_id,
           commercial_id,
           visit_state_code,
+          latitude,
+          longitude,
+          location_accuracy,
           visit_states (
             name,
             description
@@ -699,6 +705,19 @@ export default function AdminDashboard() {
                     <div>
                       <Badge variant="outline">{selectedVisit.visit_states.name}</Badge>
                     </div>
+                  </div>
+                )}
+                {(selectedVisit.latitude && selectedVisit.longitude) && (
+                  <div>
+                    <Label>Ubicación</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedVisit.latitude.toFixed(6)}, {selectedVisit.longitude.toFixed(6)}
+                      {selectedVisit.location_accuracy && (
+                        <span className="ml-2 text-xs">
+                          (±{selectedVisit.location_accuracy.toFixed(0)}m)
+                        </span>
+                      )}
+                    </p>
                   </div>
                 )}
               </div>
