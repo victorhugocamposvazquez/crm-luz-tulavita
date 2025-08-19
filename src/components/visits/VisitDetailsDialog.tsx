@@ -121,10 +121,9 @@ export default function VisitDetailsDialog({
             {selectedVisit.visit_states && (
               <div>
                 <label className="text-sm font-medium">Resultado de la visita</label>
-                <p className="font-medium">{selectedVisit.visit_states.name}</p>
-                {selectedVisit.visit_states.description && (
-                  <p className="text-sm text-muted-foreground">{selectedVisit.visit_states.description}</p>
-                )}
+                <div>
+                  <Badge variant="outline">{selectedVisit.visit_states.name}</Badge>
+                </div>
               </div>
             )}
           </div>

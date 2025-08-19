@@ -516,9 +516,6 @@ export default function CommercialStatistics() {
                     <div>
                       <Badge variant="outline">{selectedVisit.visit_states.name}</Badge>
                     </div>
-                    {selectedVisit.visit_states.description && (
-                      <p className="text-sm text-muted-foreground mt-1">{selectedVisit.visit_states.description}</p>
-                    )}
                   </div>
                 )}
               </div>
