@@ -24,7 +24,7 @@ export default function VisitSalesSection({ visitSales }: VisitSalesSectionProps
 
   return (
     <div>
-      <label className="text-sm font-medium">Ventas Realizadas</label>
+      <label className="text-sm font-medium">Ventas</label>
       <div className="mt-2 space-y-2">
         {visitSales.map((sale) => (
           <div key={sale.id} className="p-3 border rounded-lg bg-muted/50">

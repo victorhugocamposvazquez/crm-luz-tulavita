@@ -759,11 +759,19 @@ export default function AdminDashboard() {
                               {sale.sale_lines.map((line: any) => (
                                 <div key={line.id} className="text-xs bg-muted/50 p-2 rounded">
                                   <div className="flex justify-between">
-                                    <span>{line.product_name}</span>
+                                    <span>{line.quantity}x {line.product_name} - {formatCurrency(line.unit_price)}</span>
                                     <span>{formatCurrency(line.line_total || (line.quantity * line.unit_price))}</span>
                                   </div>
-                                  <div className="text-muted-foreground">
-                                    Cantidad: {line.quantity} × {formatCurrency(line.unit_price)}
+                                  <div className="flex gap-2 mt-1 text-xs">
+                                    <span className={`px-2 py-1 rounded ${line.paid_cash ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                      {line.paid_cash ? '✓' : '✗'} Efectivo
+                                    </span>
+                                    <span className={`px-2 py-1 rounded ${line.is_paid ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                      {line.is_paid ? '✓' : '✗'} Pagado
+                                    </span>
+                                    <span className={`px-2 py-1 rounded ${line.is_delivered ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                      {line.is_delivered ? '✓' : '✗'} Entregado
+                                    </span>
                                   </div>
                                 </div>
                               ))}

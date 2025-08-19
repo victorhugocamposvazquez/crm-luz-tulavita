@@ -578,11 +578,25 @@ export default function CommercialStatistics() {
                           </div>
                           {sale.sale_lines && sale.sale_lines.length > 0 && (
                             <div className="mt-2 pt-2 border-t">
-                              <p className="text-xs text-muted-foreground">Productos:</p>
+                              <p className="text-xs text-muted-foreground mb-2">Productos:</p>
                               {sale.sale_lines.slice(0, 3).map((line: any) => (
-                                <p key={line.id} className="text-xs">
-                                  {line.quantity}x {line.product_name} - {formatCurrency(line.line_total)}
-                                </p>
+                                <div key={line.id} className="text-xs space-y-1 mb-2">
+                                  <div className="flex justify-between">
+                                    <span>{line.quantity}x {line.product_name} - {formatCurrency(line.unit_price)}</span>
+                                    <span>{formatCurrency(line.line_total)}</span>
+                                  </div>
+                                  <div className="flex gap-2 text-xs">
+                                    <span className={`px-2 py-1 rounded ${line.paid_cash ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                      {line.paid_cash ? '✓' : '✗'} Efectivo
+                                    </span>
+                                    <span className={`px-2 py-1 rounded ${line.is_paid ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                      {line.is_paid ? '✓' : '✗'} Pagado
+                                    </span>
+                                    <span className={`px-2 py-1 rounded ${line.is_delivered ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                      {line.is_delivered ? '✓' : '✗'} Entregado
+                                    </span>
+                                  </div>
+                                </div>
                               ))}
                               {sale.sale_lines.length > 3 && (
                                 <p className="text-xs text-muted-foreground">
