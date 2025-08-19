@@ -13,7 +13,8 @@ serve(async (req) => {
   }
 
   try {
-    const { action, id, email, new_password, user_id } = await req.json()
+    const requestBody = await req.json();
+    const { action, id, email, new_password, user_id, first_name, last_name, password, role, company_id } = requestBody;
     
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -117,6 +118,253 @@ serve(async (req) => {
 
         result = { data: { success: true }, error: null }
         break
+      
+      case 'create_user':
+        {
+          console.log('Creating user');
+          
+          // Verify caller is admin
+          const supabaseRLS = createClient(
+            Deno.env.get('SUPABASE_URL') ?? '',
+            Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+            { global: { headers: { Authorization: req.headers.get('Authorization') || '' } } }
+          );
+          
+          const { data: authUser } = await supabaseRLS.auth.getUser();
+          const callerId = authUser?.user?.id;
+          if (!callerId) throw new Error('Unauthorized');
+          
+          const { data: roleData, error: roleErr } = await supabaseClient
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', callerId)
+            .single();
+            
+          if (roleErr || roleData?.role !== 'admin') {
+            throw new Error('not_admin');
+          }
+
+          // Validate required fields
+          if (!email || !password) {
+            throw new Error('Email y contraseña son requeridos');
+          }
+          
+          if (password.length < 6) {
+            throw new Error('La contraseña debe tener al menos 6 caracteres');
+          }
+
+          if (!role || !['admin', 'commercial'].includes(role)) {
+            throw new Error('Rol inválido');
+          }
+
+          // Create the user
+          const { data: newUser, error: createError } = await supabaseClient.auth.admin.createUser({
+            email,
+            password,
+            email_confirm: true,
+            user_metadata: {
+              first_name: first_name || '',
+              last_name: last_name || ''
+            }
+          });
+
+          if (createError) {
+            console.error('Error creating user:', createError);
+            throw createError;
+          }
+
+          if (!newUser.user?.id) {
+            throw new Error('Error al crear el usuario');
+          }
+
+          // Create profile
+          const { error: profileError } = await supabaseClient
+            .from('profiles')
+            .insert({
+              id: newUser.user.id,
+              email: newUser.user.email,
+              first_name: first_name || '',
+              last_name: last_name || '',
+              company_id: company_id === 'none' ? null : company_id
+            });
+
+          if (profileError) {
+            console.error('Error creating profile:', profileError);
+            // If profile creation fails, delete the user
+            await supabaseClient.auth.admin.deleteUser(newUser.user.id);
+            throw profileError;
+          }
+
+          // Assign role
+          const { error: roleError } = await supabaseClient
+            .from('user_roles')
+            .insert({
+              user_id: newUser.user.id,
+              role: role
+            });
+
+          if (roleError) {
+            console.error('Error assigning role:', roleError);
+            // If role assignment fails, delete the user and profile
+            await supabaseClient.auth.admin.deleteUser(newUser.user.id);
+            throw roleError;
+          }
+
+          result = { 
+            data: { 
+              success: true, 
+              user: {
+                id: newUser.user.id,
+                email: newUser.user.email
+              }
+            }, 
+            error: null 
+          };
+          break;
+        }
+      
+      case 'create_admin_user':
+        {
+          console.log('Creating admin user');
+          
+          // Verify caller is admin
+          const supabaseRLS = createClient(
+            Deno.env.get('SUPABASE_URL') ?? '',
+            Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+            { global: { headers: { Authorization: req.headers.get('Authorization') || '' } } }
+          );
+          
+          const { data: authUser } = await supabaseRLS.auth.getUser();
+          const callerId = authUser?.user?.id;
+          if (!callerId) throw new Error('Unauthorized');
+          
+          const { data: roleData, error: roleErr } = await supabaseClient
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', callerId)
+            .single();
+            
+          if (roleErr || roleData?.role !== 'admin') {
+            throw new Error('not_admin');
+          }
+
+          // Validate required fields
+          if (!email || !password) {
+            throw new Error('Email y contraseña son requeridos');
+          }
+          
+          if (password.length < 6) {
+            throw new Error('La contraseña debe tener al menos 6 caracteres');
+          }
+
+          // Create the user
+          const { data: newUser, error: createError } = await supabaseClient.auth.admin.createUser({
+            email,
+            password,
+            email_confirm: true,
+            user_metadata: {
+              first_name: first_name || '',
+              last_name: last_name || ''
+            }
+          });
+
+          if (createError) {
+            console.error('Error creating user:', createError);
+            throw createError;
+          }
+
+          if (!newUser.user?.id) {
+            throw new Error('Error al crear el usuario');
+          }
+
+          // Create profile
+          const { error: profileError } = await supabaseClient
+            .from('profiles')
+            .insert({
+              id: newUser.user.id,
+              email: newUser.user.email,
+              first_name: first_name || '',
+              last_name: last_name || ''
+            });
+
+          if (profileError) {
+            console.error('Error creating profile:', profileError);
+            // If profile creation fails, delete the user
+            await supabaseClient.auth.admin.deleteUser(newUser.user.id);
+            throw profileError;
+          }
+
+          // Assign admin role
+          const { error: roleError } = await supabaseClient
+            .from('user_roles')
+            .insert({
+              user_id: newUser.user.id,
+              role: 'admin'
+            });
+
+          if (roleError) {
+            console.error('Error assigning role:', roleError);
+            // If role assignment fails, delete the user and profile
+            await supabaseClient.auth.admin.deleteUser(newUser.user.id);
+            throw roleError;
+          }
+
+          result = { 
+            data: { 
+              success: true, 
+              user: {
+                id: newUser.user.id,
+                email: newUser.user.email
+              }
+            }, 
+            error: null 
+          };
+          break;
+        }
+      
+      case 'delete_user':
+        {
+          console.log('Deleting user');
+          
+          // Verify caller is admin
+          const supabaseRLS = createClient(
+            Deno.env.get('SUPABASE_URL') ?? '',
+            Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+            { global: { headers: { Authorization: req.headers.get('Authorization') || '' } } }
+          );
+          
+          const { data: authUser } = await supabaseRLS.auth.getUser();
+          const callerId = authUser?.user?.id;
+          if (!callerId) throw new Error('Unauthorized');
+          
+          const { data: roleData, error: roleErr } = await supabaseClient
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', callerId)
+            .single();
+            
+          if (roleErr || roleData?.role !== 'admin') {
+            throw new Error('not_admin');
+          }
+
+          if (!user_id) {
+            throw new Error('user_id es requerido');
+          }
+
+          // Delete the user
+          const { error: deleteError } = await supabaseClient.auth.admin.deleteUser(user_id);
+          
+          if (deleteError) {
+            console.error('Error deleting user:', deleteError);
+            throw deleteError;
+          }
+
+          result = { 
+            data: { success: true }, 
+            error: null 
+          };
+          break;
+        }
       
       case 'change_user_password':
         {

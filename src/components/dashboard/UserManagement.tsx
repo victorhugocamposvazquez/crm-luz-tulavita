@@ -103,38 +103,20 @@ export default function UserManagement() {
     const role = formData.get('role') as 'admin' | 'commercial';
 
     try {
-      // Create user in Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: true,
-        user_metadata: {
+      // Use edge function to create user
+      const { data, error } = await supabase.functions.invoke('admin-actions', {
+        body: {
+          action: 'create_user',
+          email,
+          password,
           first_name: firstName,
           last_name: lastName,
+          company_id: companyId,
+          role
         }
       });
 
-      if (authError) throw authError;
-
-      // Update profile with company
-      if (authData.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .update({ company_id: companyId === 'none' ? null : companyId })
-          .eq('id', authData.user.id);
-
-        if (profileError) throw profileError;
-
-        // Assign role
-        const { error: roleError } = await supabase
-          .from('user_roles')
-          .insert({
-            user_id: authData.user.id,
-            role: role
-          });
-
-        if (roleError) throw roleError;
-      }
+      if (error) throw error;
 
       toast({
         title: "Usuario creado",
@@ -206,7 +188,13 @@ export default function UserManagement() {
     if (!confirm('¿Estás seguro de que quieres eliminar este usuario?')) return;
 
     try {
-      const { error } = await supabase.auth.admin.deleteUser(userId);
+      const { data, error } = await supabase.functions.invoke('admin-actions', {
+        body: {
+          action: 'delete_user',
+          user_id: userId
+        }
+      });
+
       if (error) throw error;
 
       toast({
