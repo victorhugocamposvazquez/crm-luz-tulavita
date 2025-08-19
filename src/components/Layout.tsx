@@ -32,7 +32,9 @@ export default function Layout({ children, currentView, onViewChange }: LayoutPr
   const isAdmin = userRole?.role === 'admin';
   const isCommercial = userRole?.role === 'commercial';
   const totalNotifications = pendingTasks.length + pendingApprovals.length;
-  const showGpsButton = isCommercial && !location && !hasPermission;
+  
+  // El botón GPS solo debe aparecer para comerciales cuando no hay geolocalización
+  const showGpsButton = isCommercial && !location && !geoLoading;
 
   const navigation = isAdmin ? [
     { name: 'Dashboard', icon: TrendingUp, view: 'dashboard' },
@@ -65,7 +67,8 @@ export default function Layout({ children, currentView, onViewChange }: LayoutPr
                 size="sm"
                 onClick={requestLocation}
                 disabled={geoLoading}
-                className="relative animate-pulse hover:animate-none h-6 w-6 p-0"
+                className="relative animate-gps-pulse hover:animate-none h-6 w-6 p-0"
+                title="Activar geolocalización"
               >
                 <Navigation className="h-4 w-4 text-amber-500" />
               </Button>
@@ -125,7 +128,8 @@ export default function Layout({ children, currentView, onViewChange }: LayoutPr
                       size="sm"
                       onClick={requestLocation}
                       disabled={geoLoading}
-                      className="relative animate-pulse hover:animate-none"
+                      className="relative animate-gps-pulse hover:animate-none"
+                      title="Activar geolocalización"
                     >
                       <Navigation className="h-4 w-4 text-amber-500" />
                     </Button>
