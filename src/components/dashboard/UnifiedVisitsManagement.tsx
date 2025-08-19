@@ -1000,10 +1000,15 @@ export default function UnifiedVisitsManagement() {
           </p>
         </div>
         
-        <Button onClick={handleNIFSubmit} disabled={loading || !selectedCompany}>
+        <Button onClick={handleNIFSubmit} disabled={loading || !selectedCompany || !location}>
           {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
           Verificar Cliente(s)
         </Button>
+        {!location && (
+          <p className="text-sm text-amber-600 mt-2">
+            ⚠️ Necesitas activar la geolocalización para crear visitas
+          </p>
+        )}
       </CardContent>
     </Card>;
 

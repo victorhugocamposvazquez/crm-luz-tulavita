@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useGeolocation } from '@/hooks/useGeolocation';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -37,10 +38,8 @@ interface Visit {
   };
 }
 export default function CommercialVisitsManager() {
-  const {
-    user,
-    userRole
-  } = useAuth();
+  const { user, userRole } = useAuth();
+  const { location } = useGeolocation();
   const [currentView, setCurrentView] = useState<'list' | 'create-single'>('list');
   const [visits, setVisits] = useState<Visit[]>([]);
   const [companies, setCompanies] = useState<Array<{
@@ -510,7 +509,9 @@ export default function CommercialVisitsManager() {
                   <p className="text-sm text-muted-foreground">
                     Esta visita puede ser editada.
                   </p>
-                  <Button onClick={() => {
+                  <Button 
+                    disabled={!location}
+                    onClick={() => {
               console.log('=== CONTINUAR VISITA BUTTON CLICKED ===');
               console.log('selectedVisit:', selectedVisit);
 
@@ -528,6 +529,11 @@ export default function CommercialVisitsManager() {
                     <Edit className="h-4 w-4 mr-2" />
                     Continuar Visita
                   </Button>
+                  {!location && (
+                    <p className="text-sm text-amber-600">
+                      ⚠️ Necesitas activar la geolocalización para continuar la visita
+                    </p>
+                  )}
                 </div>}
 
               {/* Resumen de Ventas */}

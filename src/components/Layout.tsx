@@ -1,11 +1,12 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { Users, Building2, MapPin, TrendingUp, LogOut, Menu, User, ChevronDown, Key, Bell } from 'lucide-react';
+import { Users, Building2, MapPin, TrendingUp, LogOut, Menu, User, ChevronDown, Key, Bell, Navigation } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import AdminPasswordDialog from '@/components/AdminPasswordDialog';
 import AdminNotifications from '@/components/dashboard/AdminNotifications';
 import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
+import { useGeolocation } from '@/hooks/useGeolocation';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -25,6 +26,7 @@ interface LayoutProps {
 export default function Layout({ children, currentView, onViewChange }: LayoutProps) {
   const { signOut, profile, userRole } = useAuth();
   const { pendingTasks, pendingApprovals } = useRealtimeNotifications();
+  const { location, loading: geoLoading, hasPermission, requestLocation } = useGeolocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const isAdmin = userRole?.role === 'admin';
@@ -53,7 +55,21 @@ export default function Layout({ children, currentView, onViewChange }: LayoutPr
           >
             <Menu className="h-6 w-6" />
           </Button>
-          <h1 className="text-lg font-semibold">Backoffice</h1>
+          <h1 className="text-lg font-semibold flex items-center space-x-2">
+            <span>Backoffice</span>
+            {!location && !hasPermission && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={requestLocation}
+                disabled={geoLoading}
+                className="text-xs h-6 px-2"
+              >
+                <Navigation className="h-3 w-3 mr-1" />
+                {geoLoading ? 'Activando...' : 'GPS'}
+              </Button>
+            )}
+          </h1>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon">
@@ -100,7 +116,21 @@ export default function Layout({ children, currentView, onViewChange }: LayoutPr
           <div className="flex flex-col h-full">
             <div className="p-6 border-b">
               <div className="flex items-center justify-between">
-                <h1 className="text-xl font-bold">Backoffice</h1>
+                <div className="flex items-center space-x-2">
+                  <h1 className="text-xl font-bold">Backoffice</h1>
+                  {!location && !hasPermission && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={requestLocation}
+                      disabled={geoLoading}
+                      className="text-xs h-7 px-2"
+                    >
+                      <Navigation className="h-3 w-3 mr-1" />
+                      {geoLoading ? 'Activando...' : 'Activar GPS'}
+                    </Button>
+                  )}
+                </div>
                 {isAdmin && totalNotifications > 0 && (
                   <Popover>
                     <PopoverTrigger asChild>
