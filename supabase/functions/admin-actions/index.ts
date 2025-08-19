@@ -1,15 +1,47 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// Get the allowed origins for CORS
+const getAllowedOrigin = (requestOrigin: string | null) => {
+  const allowedOrigins = [
+    'http://localhost:3000',
+    'https://lovable.dev',
+    'https://crm.ilustracioneslarum.com', // Tu dominio personalizado
+    /^https:\/\/.*\.lovable\.dev$/,
+    /^https:\/\/.*\.sandbox\.lovable\.dev$/,
+    /^https:\/\/.*\.vercel\.app$/,
+  ];
+  
+  if (!requestOrigin) return null;
+  
+  for (const origin of allowedOrigins) {
+    if (typeof origin === 'string') {
+      if (requestOrigin === origin) return requestOrigin;
+    } else if (origin instanceof RegExp) {
+      if (origin.test(requestOrigin)) return requestOrigin;
+    }
+  }
+  
+  return null;
+};
+
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
 serve(async (req) => {
+  // Get the origin for CORS
+  const origin = req.headers.get('origin');
+  const allowedOrigin = getAllowedOrigin(origin);
+  
+  const dynamicCorsHeaders = {
+    ...corsHeaders,
+    'Access-Control-Allow-Origin': allowedOrigin || 'null'
+  };
+  
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers: dynamicCorsHeaders })
   }
 
   try {
@@ -417,7 +449,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ success: true }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...dynamicCorsHeaders, 'Content-Type': 'application/json' },
         status: 200 
       }
     )
@@ -426,7 +458,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...dynamicCorsHeaders, 'Content-Type': 'application/json' },
         status: 400 
       }
     )
