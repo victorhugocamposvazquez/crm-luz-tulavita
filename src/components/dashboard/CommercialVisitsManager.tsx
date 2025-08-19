@@ -42,7 +42,7 @@ interface Visit {
 }
 export default function CommercialVisitsManager() {
   const { user, userRole } = useAuth();
-  const { location, hasPermission } = useGeolocation();
+  const { location, hasPermission, requestLocation } = useGeolocation();
   const [currentView, setCurrentView] = useState<'list' | 'create-single'>('list');
   const [visits, setVisits] = useState<Visit[]>([]);
   const [companies, setCompanies] = useState<Array<{
@@ -529,10 +529,21 @@ export default function CommercialVisitsManager() {
                     Esta visita puede ser editada.
                   </p>
                   <Button 
-                    disabled={!hasPermission && !location}
-                    onClick={() => {
+                    onClick={async () => {
               console.log('=== CONTINUAR VISITA BUTTON CLICKED ===');
               console.log('selectedVisit:', selectedVisit);
+              
+              // First request location to ensure we have it
+              const currentLocation = await requestLocation();
+              
+              if (!currentLocation) {
+                toast({
+                  title: "Geolocalización requerida",
+                  description: "Por favor, permite el acceso a tu ubicación para continuar la visita",
+                  variant: "destructive"
+                });
+                return;
+              }
 
               // Store visit data in sessionStorage for cross-component communication
               const visitData = {
@@ -548,11 +559,6 @@ export default function CommercialVisitsManager() {
                     <Edit className="h-4 w-4 mr-2" />
                     Continuar Visita
                   </Button>
-                  {!hasPermission && !location && (
-                    <p className="text-sm text-amber-600">
-                      ⚠️ Necesitas activar la geolocalización para continuar la visita
-                    </p>
-                  )}
                 </div>}
 
               {/* Resumen de Ventas */}
