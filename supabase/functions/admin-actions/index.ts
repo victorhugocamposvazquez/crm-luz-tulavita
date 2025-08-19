@@ -177,16 +177,15 @@ serve(async (req) => {
             throw new Error('Error al crear el usuario');
           }
 
-          // Create profile
+          // Update profile (created by trigger)
           const { error: profileError } = await supabaseClient
             .from('profiles')
-            .insert({
-              id: newUser.user.id,
-              email: newUser.user.email,
+            .update({
               first_name: first_name || '',
               last_name: last_name || '',
               company_id: company_id === 'none' ? null : company_id
-            });
+            })
+            .eq('id', newUser.user.id);
 
           if (profileError) {
             console.error('Error creating profile:', profileError);
@@ -277,15 +276,14 @@ serve(async (req) => {
             throw new Error('Error al crear el usuario');
           }
 
-          // Create profile
+          // Update profile (created by trigger)
           const { error: profileError } = await supabaseClient
             .from('profiles')
-            .insert({
-              id: newUser.user.id,
-              email: newUser.user.email,
+            .update({
               first_name: first_name || '',
               last_name: last_name || ''
-            });
+            })
+            .eq('id', newUser.user.id);
 
           if (profileError) {
             console.error('Error creating profile:', profileError);
