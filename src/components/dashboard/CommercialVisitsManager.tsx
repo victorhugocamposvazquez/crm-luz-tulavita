@@ -425,15 +425,20 @@ export default function CommercialVisitsManager() {
                          </Badge>
                        </TableCell>
                         <TableCell className="max-w-[200px] truncate">{visit.notes}</TableCell>
-                      <TableCell>
-                        <div className="flex gap-2">
-                          {visit.status === 'in_progress' && visit.approval_status !== 'rejected' ? <Button size="sm" variant="outline" onClick={() => handleEditVisit(visit)}>
-                              <Edit className="h-4 w-4" />
-                            </Button> : <Button size="sm" variant="outline" onClick={() => handleViewVisit(visit)}>
-                              <Eye className="h-4 w-4" />
-                            </Button>}
-                        </div>
-                      </TableCell>
+                       <TableCell>
+                         <div className="flex gap-2">
+                           {visit.status === 'in_progress' && visit.approval_status !== 'rejected' ? 
+                             <Button size="sm" variant="outline" onClick={() => handleEditVisit(visit)}>
+                               <Edit className="h-4 w-4 mr-2" />
+                               Continuar visita
+                             </Button> : 
+                             <Button size="sm" variant="outline" onClick={() => handleViewVisit(visit)}>
+                               <Eye className="h-4 w-4 mr-2" />
+                               Ver detalles
+                             </Button>
+                           }
+                         </div>
+                       </TableCell>
                     </TableRow>)}
                 </TableBody>
               </Table>
