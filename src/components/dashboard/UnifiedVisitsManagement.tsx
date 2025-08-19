@@ -99,15 +99,17 @@ export default function UnifiedVisitsManagement() {
   const [clientPurchases, setClientPurchases] = useState<ClientPurchase[]>([]);
   const [clientVisits, setClientVisits] = useState<ClientVisit[]>([]);
 
-  // Loading states
   const [loading, setLoading] = useState(false);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [visitStates, setVisitStates] = useState<{code: string, name: string}[]>([]);
   const [hasApproval, setHasApproval] = useState(false);
   const [editingVisitId, setEditingVisitId] = useState<string | null>(null);
   const [currentVisitStatus, setCurrentVisitStatus] = useState<string | null>(null);
+  const [isReadOnly, setIsReadOnly] = useState(false);
 
   useEffect(() => {
     fetchCompanies();
+    fetchVisitStates();
     // Auto-request location when component loads
     if (location === null) {
       requestLocation();
@@ -273,6 +275,29 @@ export default function UnifiedVisitsManagement() {
       toast({
         title: "Error",
         description: "Error al cargar empresas",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const fetchVisitStates = async () => {
+    try {
+      console.log('Fetching visit states...');
+      const {
+        data,
+        error
+      } = await supabase.from('visit_states').select('code, name').order('name');
+      if (error) {
+        console.error('Visit states fetch error:', error);
+        throw error;
+      }
+      console.log('Visit states fetched:', data);
+      setVisitStates(data || []);
+    } catch (error) {
+      console.error('Error fetching visit states:', error);
+      toast({
+        title: "Error",
+        description: "Error al cargar estados de visita",
         variant: "destructive"
       });
     }
@@ -1219,31 +1244,22 @@ export default function UnifiedVisitsManagement() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="status">Estado de la Visita *</Label>
+              <Label htmlFor="visitStateCode">Estado de la Visita *</Label>
               <select 
-                id="status" 
-                value={visitData.status} 
-                onChange={(e) => setVisitData(prev => ({ ...prev, status: e.target.value as any }))} 
+                id="visitStateCode" 
+                value={visitData.visitStateCode} 
+                onChange={(e) => setVisitData(prev => ({ ...prev, visitStateCode: e.target.value }))} 
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" 
                 disabled={isReadOnly}
                 required
               >
-                <option value="completed">Completada</option>
-                <option value="no_answer">Sin respuesta</option>
-                <option value="not_interested">No interesado</option>
-                <option value="postponed">Pospuesta</option>
+                <option value="">Selecciona un estado</option>
+                {visitStates.map(state => (
+                  <option key={state.code} value={state.code}>
+                    {state.name}
+                  </option>
+                ))}
               </select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="visitStateCode">Resultado de la Visita</Label>
-              <Input 
-                id="visitStateCode" 
-                value={visitData.visitStateCode} 
-                onChange={(e) => setVisitData(prev => ({ ...prev, visitStateCode: e.target.value }))} 
-                placeholder="Código del resultado (ej: VENTA, NO_VENTA, etc.)" 
-                disabled={isReadOnly}
-              />
             </div>
 
             {location && (
@@ -1321,9 +1337,9 @@ export default function UnifiedVisitsManagement() {
         </Card>
 
         {!isReadOnly && <div className="flex gap-4">
-          <Button 
+            <Button 
               onClick={() => handleSaveVisit(false)} 
-              disabled={loading || !visitData.company_id || !visitData.notes.trim()} 
+              disabled={loading || !visitData.company_id || !visitData.notes.trim() || !visitData.visitStateCode} 
               variant="outline" 
               className="flex-1"
             >
@@ -1332,7 +1348,7 @@ export default function UnifiedVisitsManagement() {
             </Button>
           <Button 
             onClick={() => handleSaveVisit(true)} 
-            disabled={loading || !visitData.company_id || !visitData.notes.trim()} 
+            disabled={loading || !visitData.company_id || !visitData.notes.trim() || !visitData.visitStateCode} 
             className="flex-1"
           >
             {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
