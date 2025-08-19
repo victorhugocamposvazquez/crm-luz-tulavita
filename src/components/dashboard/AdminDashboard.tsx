@@ -403,14 +403,19 @@ export default function AdminDashboard() {
 
   // Create visit distribution by actual status
   const visitStatusCounts = visits.reduce((acc, visit) => {
-    acc[visit.status] = (acc[visit.status] || 0) + 1;
+    // Priority: show rejection status first
+    if (visit.approval_status === 'rejected') {
+      acc['rejected'] = (acc['rejected'] || 0) + 1;
+    } else {
+      acc[visit.status] = (acc[visit.status] || 0) + 1;
+    }
     return acc;
   }, {} as Record<string, number>);
 
   const visitDistributionData = Object.entries(visitStatusCounts).map(([status, count]) => ({
-    name: statusLabels[status as keyof typeof statusLabels] || status,
+    name: status === 'rejected' ? 'Rechazada' : statusLabels[status as keyof typeof statusLabels] || status,
     value: count,
-    color: statusColors[status as keyof typeof statusColors] || '#6b7280'
+    color: status === 'rejected' ? '#dc2626' : statusColors[status as keyof typeof statusColors] || '#6b7280'
   })).filter(item => item.value > 0);
 
   const totalNotifications = pendingTasks.length + pendingApprovals.length;

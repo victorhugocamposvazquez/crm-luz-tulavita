@@ -303,11 +303,16 @@ const fetchVisits = async () => {
   // Datos para gráficas
   const visitStatusData = Object.entries(
     visits.reduce((acc, visit) => {
-      acc[visit.status] = (acc[visit.status] || 0) + 1;
+      // Priority: show rejection status first
+      if (visit.approval_status === 'rejected') {
+        acc['rejected'] = (acc['rejected'] || 0) + 1;
+      } else {
+        acc[visit.status] = (acc[visit.status] || 0) + 1;
+      }
       return acc;
     }, {} as Record<string, number>)
   ).map(([status, count]) => ({
-    name: statusLabels[status as keyof typeof statusLabels],
+    name: status === 'rejected' ? 'Rechazada' : statusLabels[status as keyof typeof statusLabels] || status,
     value: count,
     status
   }));

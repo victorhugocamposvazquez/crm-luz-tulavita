@@ -10,6 +10,7 @@ interface Visit {
   id: string;
   visit_date: string;
   status: 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed';
+  approval_status?: 'pending' | 'approved' | 'rejected' | 'waiting_admin';
   notes?: string;
   visit_state_code?: string;
   latitude?: number;
@@ -70,6 +71,19 @@ const statusColors = {
   postponed: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'
 };
 
+const getStatusDisplay = (status: string, approvalStatus?: string) => {
+  // Priority: show rejection status first
+  if (approvalStatus === 'rejected') {
+    return { label: 'Rechazada', color: 'bg-red-500 text-white hover:bg-red-500' };
+  }
+  
+  // Then show normal status
+  const label = statusLabels[status as keyof typeof statusLabels] || status;
+  const color = statusColors[status as keyof typeof statusColors] || 'bg-gray-100 text-gray-800 hover:bg-gray-100';
+  
+  return { label, color };
+};
+
 export default function VisitDetailsDialog({ 
   selectedVisit, 
   visitSales, 
@@ -118,9 +132,10 @@ export default function VisitDetailsDialog({
             <div>
               <label className="text-sm font-medium">Estado</label>
               <div>
-                <Badge className={statusColors[selectedVisit.status]}>
-                  {statusLabels[selectedVisit.status]}
-                </Badge>
+                {(() => {
+                  const statusDisplay = getStatusDisplay(selectedVisit.status, selectedVisit.approval_status);
+                  return <Badge className={statusDisplay.color}>{statusDisplay.label}</Badge>;
+                })()}
               </div>
             </div>
             {selectedVisit.visit_states && (
