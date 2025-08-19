@@ -648,16 +648,24 @@ export default function UnifiedVisitsManagement() {
       window.dispatchEvent(new CustomEvent('visitCreated', {
         detail: visit
       }));
-      console.log('=== SETTING APPROVAL STATE ===');
-      console.log('Setting approval request ID:', approvalRequest.id);
-      console.log('Setting current step to pending-approval');
+      
+      // Reset form and navigate directly to visits list
       setApprovalRequestId(approvalRequest.id);
-      setCurrentStep('pending-approval');
-      console.log('=== STATE SET COMPLETE ===');
+      setClientNIF('');
+      setSelectedCompany('');
+      setCurrentStep('nif-input');
+      
       toast({
         title: "✅ Visita creada exitosamente",
-        description: "La visita está guardada. Esperando aprobación para información histórica..."
+        description: "La visita se ha guardado correctamente"
       });
+      
+      // Navigate to visits list and trigger refresh
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('navigateToVisitsList'));
+        // Trigger visits list refresh
+        window.dispatchEvent(new CustomEvent('refreshVisitsList'));
+      }, 1000);
     } catch (error) {
       console.error('Error requesting approval:', error);
       toast({
@@ -1003,36 +1011,6 @@ export default function UnifiedVisitsManagement() {
       </CardContent>
     </Card>;
 
-  const renderPendingApproval = () => <Card>
-      <CardHeader>
-        <CardTitle>Visita Creada</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="text-center space-y-4">
-          <p className="font-medium">Verificando aprobación para acceder a información histórica del cliente...</p>
-          <Loader2 className="w-8 h-8 mx-auto animate-spin text-blue-500" />
-          <p className="text-sm text-muted-foreground">
-            Cliente: {existingClient?.nombre_apellidos} ({existingClient?.dni})
-          </p>
-          <p className="text-xs text-blue-600">
-            El administrador puede aprobar el acceso en tiempo real
-          </p>
-          
-          <div className="pt-4 border-t">
-            <Button variant="outline" onClick={() => {
-            setCurrentStep('visit-form');
-            setHasApproval(false);
-            toast({
-              title: "Continuando sin aprobación",
-              description: "Podrás añadir información adicional sin datos históricos"
-            });
-          }}>
-              Continuar añadiendo información a la visita
-            </Button>
-          </div>
-        </div>
-      </CardContent>
-    </Card>;
 
   const renderClientForm = () => <Card>
       <CardHeader>
@@ -1381,7 +1359,6 @@ export default function UnifiedVisitsManagement() {
       </div>
 
       {currentStep === 'nif-input' && renderNIFInput()}
-      {currentStep === 'pending-approval' && renderPendingApproval()}
       {currentStep === 'client-form' && renderClientForm()}
       {currentStep === 'visit-form' && renderVisitForm()}
     </div>;
