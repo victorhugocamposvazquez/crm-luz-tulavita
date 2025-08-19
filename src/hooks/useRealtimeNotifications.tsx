@@ -43,11 +43,65 @@ export function useRealtimeNotifications() {
   const [pendingTasks, setPendingTasks] = useState<AdminTask[]>([]);
   const [pendingApprovals, setPendingApprovals] = useState<ApprovalRequest[]>([]);
 
+  const isAdmin = userRole?.role === 'admin';
+  const isCommercial = userRole?.role === 'commercial';
+
+  const loadInitialData = async () => {
+    if (!isAdmin) return;
+    
+    // Load pending admin tasks (only new_client type)
+    const { data: tasks } = await supabase
+      .from('admin_tasks')
+      .select(`
+        *,
+        client:clients(nombre_apellidos),
+        commercial:profiles!admin_tasks_commercial_id_fkey(first_name, last_name, email)
+      `)
+      .eq('status', 'pending')
+      .eq('type', 'new_client')
+      .order('created_at', { ascending: false });
+
+    if (tasks) {
+      setPendingTasks(tasks as AdminTask[]);
+    }
+
+    loadPendingApprovals();
+  };
+
+  const loadPendingApprovals = async () => {
+    if (!isAdmin) return;
+
+    const { data: approvals } = await supabase
+      .from('client_approval_requests')
+      .select(`
+        *,
+        client:clients(nombre_apellidos),
+        commercial:profiles!client_approval_requests_commercial_id_fkey(first_name, last_name, email)
+      `)
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false });
+
+    if (approvals) {
+      setPendingApprovals(approvals as ApprovalRequest[]);
+    }
+  };
+
+  const loadCommercialApprovals = async () => {
+    if (!isCommercial) return;
+
+    const { data: approvals } = await supabase
+      .from('client_approval_requests')
+      .select('*')
+      .eq('commercial_id', user?.id)
+      .order('created_at', { ascending: false });
+
+    if (approvals) {
+      setPendingApprovals(approvals as ApprovalRequest[]);
+    }
+  };
+
   useEffect(() => {
     if (!user) return;
-
-    const isAdmin = userRole?.role === 'admin';
-    const isCommercial = userRole?.role === 'commercial';
 
     let tasksChannel: any = null;
     let approvalsChannel: any = null;
@@ -137,60 +191,6 @@ export function useRealtimeNotifications() {
         .subscribe();
     }
 
-    async function loadInitialData() {
-      if (!isAdmin) return;
-      
-      // Load pending admin tasks (only new_client type)
-      const { data: tasks } = await supabase
-        .from('admin_tasks')
-        .select(`
-          *,
-          client:clients(nombre_apellidos),
-          commercial:profiles!admin_tasks_commercial_id_fkey(first_name, last_name, email)
-        `)
-        .eq('status', 'pending')
-        .eq('type', 'new_client')
-        .order('created_at', { ascending: false });
-
-      if (tasks) {
-        setPendingTasks(tasks as AdminTask[]);
-      }
-
-      loadPendingApprovals();
-    }
-
-    async function loadPendingApprovals() {
-      if (!isAdmin) return;
-
-      const { data: approvals } = await supabase
-        .from('client_approval_requests')
-        .select(`
-          *,
-          client:clients(nombre_apellidos),
-          commercial:profiles!client_approval_requests_commercial_id_fkey(first_name, last_name, email)
-        `)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false });
-
-      if (approvals) {
-        setPendingApprovals(approvals as ApprovalRequest[]);
-      }
-    }
-
-    async function loadCommercialApprovals() {
-      if (!isCommercial) return;
-
-      const { data: approvals } = await supabase
-        .from('client_approval_requests')
-        .select('*')
-        .eq('commercial_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (approvals) {
-        setPendingApprovals(approvals as ApprovalRequest[]);
-      }
-    }
-
     // Cleanup function
     return () => {
       if (tasksChannel) {
@@ -206,6 +206,9 @@ export function useRealtimeNotifications() {
     try {
       console.log('Attempting to approve request via Edge Function:', requestId);
       
+      // Actualizar estado local inmediatamente para UI responsiva
+      setPendingApprovals(prev => prev.filter(req => req.id !== requestId));
+      
       const { data, error } = await supabase.functions.invoke('admin-actions', {
         body: {
           action: 'approve_request',
@@ -216,6 +219,8 @@ export function useRealtimeNotifications() {
       console.log('Edge Function response:', { data, error });
 
       if (error) {
+        // Revertir cambio local si hay error
+        loadPendingApprovals();
         throw error;
       }
 
@@ -237,6 +242,9 @@ export function useRealtimeNotifications() {
     try {
       console.log('Attempting to reject request via Edge Function:', requestId);
       
+      // Actualizar estado local inmediatamente para UI responsiva
+      setPendingApprovals(prev => prev.filter(req => req.id !== requestId));
+      
       const { data, error } = await supabase.functions.invoke('admin-actions', {
         body: {
           action: 'reject_request',
@@ -245,6 +253,8 @@ export function useRealtimeNotifications() {
       });
 
       if (error) {
+        // Revertir cambio local si hay error
+        loadPendingApprovals();
         throw error;
       }
 
@@ -266,6 +276,9 @@ export function useRealtimeNotifications() {
     try {
       console.log('Attempting to mark task completed via Edge Function:', taskId);
       
+      // Actualizar estado local inmediatamente para UI responsiva
+      setPendingTasks(prev => prev.filter(task => task.id !== taskId));
+      
       const { data, error } = await supabase.functions.invoke('admin-actions', {
         body: {
           action: 'complete_task',
@@ -276,6 +289,8 @@ export function useRealtimeNotifications() {
       console.log('Edge Function response:', { data, error });
 
       if (error) {
+        // Revertir cambio local si hay error
+        loadInitialData();
         throw error;
       }
 
@@ -294,6 +309,11 @@ export function useRealtimeNotifications() {
     if (pendingApprovals.length === 0) return;
 
     try {
+      const requestCount = pendingApprovals.length;
+      
+      // Actualizar estado local inmediatamente para UI responsiva
+      setPendingApprovals([]);
+      
       const promises = pendingApprovals.map(request => 
         supabase.functions.invoke('admin-actions', {
           body: {
@@ -307,10 +327,12 @@ export function useRealtimeNotifications() {
 
       toast({
         title: "Todas las solicitudes aprobadas",
-        description: `Se aprobaron ${pendingApprovals.length} solicitudes de acceso`,
+        description: `Se aprobaron ${requestCount} solicitudes de acceso`,
       });
     } catch (error) {
       console.error('Error approving all requests:', error);
+      // Recargar en caso de error
+      loadPendingApprovals();
       toast({
         title: "Error",
         description: "No se pudieron aprobar todas las solicitudes",
@@ -323,6 +345,11 @@ export function useRealtimeNotifications() {
     if (pendingApprovals.length === 0) return;
 
     try {
+      const requestCount = pendingApprovals.length;
+      
+      // Actualizar estado local inmediatamente para UI responsiva
+      setPendingApprovals([]);
+      
       const promises = pendingApprovals.map(request => 
         supabase.functions.invoke('admin-actions', {
           body: {
@@ -336,10 +363,12 @@ export function useRealtimeNotifications() {
 
       toast({
         title: "Todas las solicitudes rechazadas",
-        description: `Se rechazaron ${pendingApprovals.length} solicitudes de acceso`,
+        description: `Se rechazaron ${requestCount} solicitudes de acceso`,
       });
     } catch (error) {
       console.error('Error rejecting all requests:', error);
+      // Recargar en caso de error
+      loadPendingApprovals();
       toast({
         title: "Error",
         description: "No se pudieron rechazar todas las solicitudes",
