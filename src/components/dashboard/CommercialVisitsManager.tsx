@@ -54,6 +54,29 @@ export default function CommercialVisitsManager() {
   const [editMode, setEditMode] = useState(false);
   const [visitSales, setVisitSales] = useState<any[]>([]);
   const [localGeolocationObtained, setLocalGeolocationObtained] = useState(false);
+  
+  // Check geolocation status whenever the popup opens
+  useEffect(() => {
+    const checkGeolocationInPopup = async () => {
+      if (selectedVisit && editMode) {
+        console.log('=== CHECKING GEOLOCATION STATUS FOR POPUP ===');
+        
+        // Try to get current location to check if permissions are granted
+        try {
+          const currentLocation = await requestLocation();
+          console.log('Geolocation check result:', currentLocation);
+          setLocalGeolocationObtained(!!currentLocation);
+        } catch (error) {
+          console.log('Geolocation check failed:', error);
+          setLocalGeolocationObtained(false);
+        }
+      }
+    };
+    
+    if (selectedVisit && editMode) {
+      checkGeolocationInPopup();
+    }
+  }, [selectedVisit, editMode, requestLocation]);
   const [stats, setStats] = useState({
     total: 0,
     pending: 0,
@@ -532,7 +555,7 @@ export default function CommercialVisitsManager() {
                     Esta visita puede ser editada.
                   </p>
                   <Button 
-                    disabled={!hasPermission && !location && !localGeolocationObtained}
+                    disabled={!localGeolocationObtained && !location}
                     onClick={async () => {
               console.log('=== CONTINUAR VISITA BUTTON CLICKED ===');
               console.log('selectedVisit:', selectedVisit);
@@ -573,7 +596,7 @@ export default function CommercialVisitsManager() {
                     <Edit className="h-4 w-4 mr-2" />
                     Continuar Visita
                   </Button>
-                  {!hasPermission && !location && !localGeolocationObtained && (
+                  {!localGeolocationObtained && !location && (
                     <p className="text-sm text-amber-600">
                       ⚠️ Necesitas activar la geolocalización para continuar la visita
                     </p>
