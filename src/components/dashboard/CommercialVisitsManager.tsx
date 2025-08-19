@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { Plus, MapPin, Calendar, User, Building, Users, List, Eye, Edit, CheckCircle } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import VisitDetailsDialog from '@/components/visits/VisitDetailsDialog';
 
 import UnifiedVisitsManagement from './UnifiedVisitsManagement';
 interface Visit {
@@ -446,137 +446,12 @@ export default function CommercialVisitsManager() {
 
       {currentView === 'create-single' && <UnifiedVisitsManagement />}
 
-
-      {/* Visit Detail Dialog */}
-      {selectedVisit && <Dialog open={!!selectedVisit} onOpenChange={() => setSelectedVisit(null)}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>
-                {editMode ? 'Editar Visita' : 'Detalles de la Visita'}
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Cliente</Label>
-                  <p className="font-medium">{selectedVisit.client.nombre_apellidos}</p>
-                </div>
-                <div>
-                  <Label>DNI</Label>
-                  <p>{selectedVisit.client.dni}</p>
-                </div>
-                <div>
-                  <Label>Empresa</Label>
-                  <p>{selectedVisit.company.name}</p>
-                </div>
-                <div>
-                  <Label>Fecha</Label>
-                  <p>{formatDate(selectedVisit.visit_date)}</p>
-                </div>
-                <div>
-                  <Label>Estado de la visita</Label>
-                  <div>{getStatusBadge(selectedVisit)}</div>
-                </div>
-              </div>
-              
-              <div>
-                <Label>Notas</Label>
-                <p className="mt-1 p-2 border rounded-md bg-muted">
-                  {selectedVisit.notes || 'Sin notas'}
-                </p>
-              </div>
-
-              {selectedVisit.approval_date && selectedVisit.approved_by && <div>
-                  <Label>Aprobado por</Label>
-                  <p>{selectedVisit.approved_by.first_name} {selectedVisit.approved_by.last_name}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {formatDate(selectedVisit.approval_date)}
-                  </p>
-                </div>}
-
-              {editMode && canEditVisit(selectedVisit) && <div className="border-t pt-4 flex flex-col items-start space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    Esta visita puede ser editada.
-                  </p>
-                  <Button onClick={() => {
-              console.log('=== CONTINUAR VISITA BUTTON CLICKED ===');
-              console.log('selectedVisit:', selectedVisit);
-
-              // Store visit data in sessionStorage for cross-component communication
-              const visitData = {
-                visitId: selectedVisit.id,
-                clientId: selectedVisit.client_id,
-                approvalStatus: selectedVisit.approval_status,
-                hasApproval: selectedVisit.approval_status === 'approved'
-              };
-              sessionStorage.setItem('continueVisitData', JSON.stringify(visitData));
-              setSelectedVisit(null);
-              setCurrentView('create-single');
-            }}>
-                    <Edit className="h-4 w-4 mr-2" />
-                    Continuar Visita
-                  </Button>
-                </div>}
-
-              {/* Resumen de Ventas */}
-              <div className="border-t pt-4">
-                <Label>Ventas</Label>
-                {visitSales.length > 0 ? (
-                  <div className="mt-2 space-y-3">
-                    <div className="max-h-48 overflow-y-auto">
-                      {visitSales.map(sale => (
-                        <div key={sale.id} className="border rounded-lg p-3 mb-2">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-medium">€{sale.amount}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {new Date(sale.sale_date).toLocaleDateString('es-ES')}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-sm text-muted-foreground">
-                                {sale.sale_lines?.length || 0} productos
-                              </p>
-                            </div>
-                          </div>
-                          {sale.sale_lines && sale.sale_lines.length > 0 && (
-                            <div className="mt-2 pt-2 border-t">
-                              <p className="text-xs text-muted-foreground">Productos:</p>
-                              {sale.sale_lines.slice(0, 3).map((line: any) => (
-                                <div key={line.id} className="text-xs space-y-1">
-                                  <p>{line.quantity}x {line.product_name} - €{line.line_total}</p>
-                                  <div className="flex gap-2 text-xs">
-                                    <span className={`px-1 py-0.5 rounded ${line.paid_cash ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                                      {line.paid_cash ? '✓' : '✗'} Efectivo
-                                    </span>
-                                    <span className={`px-1 py-0.5 rounded ${line.is_paid ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                                      {line.is_paid ? '✓' : '✗'} Pagado
-                                    </span>
-                                    <span className={`px-1 py-0.5 rounded ${line.is_delivered ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                                      {line.is_delivered ? '✓' : '✗'} Entregado
-                                    </span>
-                                  </div>
-                                </div>
-                              ))}
-                              {sale.sale_lines.length > 3 && (
-                                <p className="text-xs text-muted-foreground">
-                                  +{sale.sale_lines.length - 3} productos más
-                                </p>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="mt-2 text-muted-foreground">
-                    No hay ventas registradas para esta visita.
-                  </p>
-                )}
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>}
+      {/* Visit Detail Dialog - USANDO COMPONENTE COMÚN */}
+      <VisitDetailsDialog
+        selectedVisit={selectedVisit}
+        visitSales={visitSales}
+        onClose={() => setSelectedVisit(null)}
+        showClientInfo={true}
+      />
     </div>;
 }

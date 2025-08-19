@@ -2,17 +2,16 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import VisitDetailsDialog from '@/components/visits/VisitDetailsDialog';
+import { DollarSign, TrendingUp, Users, MapPin, Eye } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { toast } from '@/hooks/use-toast';
 import { format, subDays, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Eye } from 'lucide-react';
 
 interface SaleInVisit {
   id: string;
@@ -37,12 +36,17 @@ interface Sale {
   };
 }
 
-interface Visit {
+interface CommercialVisit {
   id: string;
   visit_date: string;
-  status: string;
-  approval_status: string;
+  status: 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed';
+  approval_status: 'pending' | 'approved' | 'rejected' | 'waiting_admin';
   client_id: string;
+  visit_state_code?: string;
+  visit_states?: {
+    name: string;
+    description: string;
+  };
   client: {
     nombre_apellidos: string;
     dni: string;
@@ -58,10 +62,10 @@ export default function CommercialStatistics() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [sales, setSales] = useState<Sale[]>([]);
-  const [visits, setVisits] = useState<Visit[]>([]);
+  const [visits, setVisits] = useState<CommercialVisit[]>([]);
   const [loading, setLoading] = useState(true);
   const [monthlySalesData, setMonthlySalesData] = useState<any[]>([]);
-  const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
+  const [selectedVisit, setSelectedVisit] = useState<CommercialVisit | null>(null);
   const [visitSales, setVisitSales] = useState<any[]>([]);
 
   useEffect(() => {
@@ -112,6 +116,11 @@ export default function CommercialStatistics() {
           approval_status,
           notes,
           client_id,
+          visit_state_code,
+          visit_states (
+            name,
+            description
+          ),
           client:clients(nombre_apellidos, dni),
           company:companies(name)
         `)
@@ -186,7 +195,7 @@ export default function CommercialStatistics() {
     }
   };
 
-  const handleViewVisit = async (visit: Visit) => {
+  const handleViewVisit = async (visit: CommercialVisit) => {
     setSelectedVisit(visit);
     await fetchVisitSales(visit.id);
   };
@@ -472,92 +481,13 @@ export default function CommercialStatistics() {
         </CardContent>
       </Card>
 
-      {/* Visit Detail Dialog */}
-      {selectedVisit && (
-        <Dialog open={!!selectedVisit} onOpenChange={() => setSelectedVisit(null)}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Detalles de la Visita</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Cliente</Label>
-                  <p className="font-medium">{selectedVisit.client.nombre_apellidos}</p>
-                </div>
-                <div>
-                  <Label>DNI</Label>
-                  <p>{selectedVisit.client.dni}</p>
-                </div>
-                <div>
-                  <Label>Empresa</Label>
-                  <p>{selectedVisit.company.name}</p>
-                </div>
-                <div>
-                  <Label>Fecha</Label>
-                  <p>{formatDate(selectedVisit.visit_date)}</p>
-                </div>
-                <div>
-                  <Label>Estado</Label>
-                  <div>{getStatusBadge(selectedVisit.status, selectedVisit.approval_status)}</div>
-                </div>
-              </div>
-              
-              <div>
-                <Label>Notas</Label>
-                <p className="mt-1 p-2 border rounded-md bg-muted">
-                  {selectedVisit.notes || 'Sin notas'}
-                </p>
-              </div>
-
-              {/* Resumen de Ventas */}
-              <div className="border-t pt-4">
-                <Label>Ventas</Label>
-                {visitSales.length > 0 ? (
-                  <div className="mt-2 space-y-3">
-                    <div className="max-h-48 overflow-y-auto">
-                      {visitSales.map(sale => (
-                        <div key={sale.id} className="border rounded-lg p-3 mb-2">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-medium">{formatCurrency(sale.amount)}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {new Date(sale.sale_date).toLocaleDateString('es-ES')}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-sm text-muted-foreground">
-                                {sale.sale_lines?.length || 0} productos
-                              </p>
-                            </div>
-                          </div>
-                          {sale.sale_lines && sale.sale_lines.length > 0 && (
-                            <div className="mt-2 pt-2 border-t">
-                              <p className="text-xs text-muted-foreground">Productos:</p>
-                              {sale.sale_lines.slice(0, 3).map((line: any) => (
-                                <p key={line.id} className="text-xs">
-                                  {line.quantity}x {line.product_name} - {formatCurrency(line.line_total)}
-                                </p>
-                              ))}
-                              {sale.sale_lines.length > 3 && (
-                                <p className="text-xs text-muted-foreground">
-                                  +{sale.sale_lines.length - 3} productos más
-                                </p>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="mt-2 text-muted-foreground">No hay ventas registradas para esta visita</p>
-                )}
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+      {/* Visit Detail Dialog - USANDO COMPONENTE COMÚN */}
+      <VisitDetailsDialog
+        selectedVisit={selectedVisit}
+        visitSales={visitSales}
+        onClose={() => setSelectedVisit(null)}
+        showClientInfo={false}
+      />
     </div>
   );
 }

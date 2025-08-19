@@ -2,17 +2,18 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import AdminNotifications from '@/components/dashboard/AdminNotifications';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import VisitDetailsDialog from '@/components/visits/VisitDetailsDialog';
+import { Eye, Users, DollarSign, TrendingUp, MapPin, Building, Target, Euro } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Users, Euro, MapPin, TrendingUp, Eye } from 'lucide-react';
 import { format, subDays, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths, startOfDay, endOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
+
 import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
 
 interface Sale {
@@ -34,12 +35,17 @@ interface Sale {
   } | null;
 }
 
-interface Visit {
+interface AdminVisit {
   id: string;
   visit_date: string;
-  status: string;
-  approval_status: string;
+  status: 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed';
+  approval_status: 'pending' | 'approved' | 'rejected' | 'waiting_admin';
   client_id: string;
+  visit_state_code?: string;
+  visit_states?: {
+    name: string;
+    description: string;
+  };
   client: {
     nombre_apellidos: string;
     dni: string;
@@ -50,6 +56,7 @@ interface Visit {
   commercial?: {
     first_name: string;
     last_name: string;
+    email?: string;
   } | null;
   notes: string;
   sales?: any[];
@@ -66,9 +73,9 @@ export default function AdminDashboard() {
     monthSales: 0
   });
   const [sales, setSales] = useState<Sale[]>([]);
-  const [visits, setVisits] = useState<Visit[]>([]);
+  const [visits, setVisits] = useState<AdminVisit[]>([]);
   const [monthlySalesData, setMonthlySalesData] = useState<any[]>([]);
-  const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
+  const [selectedVisit, setSelectedVisit] = useState<AdminVisit | null>(null);
   const [visitSales, setVisitSales] = useState<any[]>([]);
   const [selectedCommercial, setSelectedCommercial] = useState<string>('all');
   const [commercials, setCommercials] = useState<any[]>([]);
@@ -197,6 +204,11 @@ export default function AdminDashboard() {
           notes,
           client_id,
           commercial_id,
+          visit_state_code,
+          visit_states (
+            name,
+            description
+          ),
           client:clients(nombre_apellidos, dni),
           company:companies(name)
         `)
@@ -287,7 +299,7 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleViewVisit = async (visit: Visit) => {
+  const handleViewVisit = async (visit: AdminVisit) => {
     setSelectedVisit(visit);
     await fetchVisitSales(visit.id);
   };
@@ -651,89 +663,13 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      {/* Visit Detail Dialog */}
-      {selectedVisit && (
-        <Dialog open={!!selectedVisit} onOpenChange={() => setSelectedVisit(null)}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Detalles de la Visita</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Cliente</Label>
-                  <p className="font-medium">{selectedVisit.client.nombre_apellidos}</p>
-                </div>
-                <div>
-                  <Label>DNI</Label>
-                  <p>{selectedVisit.client.dni}</p>
-                </div>
-                <div>
-                  <Label>Comercial</Label>
-                  <p>{selectedVisit.commercial ? `${selectedVisit.commercial.first_name} ${selectedVisit.commercial.last_name}` : 'N/A'}</p>
-                </div>
-                <div>
-                  <Label>Empresa</Label>
-                  <p>{selectedVisit.company.name}</p>
-                </div>
-                <div>
-                  <Label>Fecha</Label>
-                  <p>{formatDate(selectedVisit.visit_date)}</p>
-                </div>
-                <div>
-                  <Label>Estado</Label>
-                  {getStatusBadge(selectedVisit.status, selectedVisit.approval_status)}
-                </div>
-              </div>
-
-              {selectedVisit.notes && (
-                <div>
-                  <Label>Notas</Label>
-                  <p className="text-sm bg-muted p-2 rounded">{selectedVisit.notes}</p>
-                </div>
-              )}
-
-              {visitSales.length > 0 && (
-                <div>
-                  <Label>Ventas Asociadas</Label>
-                  <div className="mt-2 space-y-4">
-                    {visitSales.map((sale) => (
-                      <div key={sale.id} className="border rounded p-3">
-                        <div className="flex justify-between items-start mb-2">
-                          <div>
-                            <p className="font-medium">Venta #{sale.id.slice(-8)}</p>
-                            <p className="text-sm text-muted-foreground">{formatDate(sale.sale_date)}</p>
-                          </div>
-                          <p className="font-bold text-green-600">{formatCurrency(sale.amount)}</p>
-                        </div>
-                        
-                        {sale.sale_lines && sale.sale_lines.length > 0 && (
-                          <div className="mt-2">
-                            <p className="text-sm font-medium mb-1">Productos:</p>
-                            <div className="space-y-1">
-                              {sale.sale_lines.map((line: any) => (
-                                <div key={line.id} className="text-xs bg-muted/50 p-2 rounded">
-                                  <div className="flex justify-between">
-                                    <span>{line.product_name}</span>
-                                    <span>{formatCurrency(line.line_total || (line.quantity * line.unit_price))}</span>
-                                  </div>
-                                  <div className="text-muted-foreground">
-                                    Cantidad: {line.quantity} × {formatCurrency(line.unit_price)}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+      {/* Visit Detail Dialog - USANDO COMPONENTE COMÚN */}
+      <VisitDetailsDialog
+        selectedVisit={selectedVisit}
+        visitSales={visitSales}
+        onClose={() => setSelectedVisit(null)}
+        showClientInfo={true}
+      />
     </div>
   );
 }
