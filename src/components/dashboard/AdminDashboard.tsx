@@ -425,7 +425,7 @@ export default function AdminDashboard() {
       {/* Main Content - Full Width */}
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Dashboard Administrativo</h1>
+          <h1 className="text-3xl font-bold">Dashboard administrativo</h1>
           <p className="text-muted-foreground">
             Resumen general y estadísticas del sistema
           </p>
@@ -435,7 +435,7 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Clientes</CardTitle>
+              <CardTitle className="text-sm font-medium">Total clientes</CardTitle>
               <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -446,7 +446,7 @@ export default function AdminDashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Ventas</CardTitle>
+              <CardTitle className="text-sm font-medium">Total ventas</CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -457,7 +457,7 @@ export default function AdminDashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Ventas Hoy</CardTitle>
+              <CardTitle className="text-sm font-medium">Ventas hoy</CardTitle>
               <Euro className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -468,7 +468,7 @@ export default function AdminDashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Visitas Hoy</CardTitle>
+              <CardTitle className="text-sm font-medium">Visitas hoy</CardTitle>
               <MapPin className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
@@ -481,7 +481,7 @@ export default function AdminDashboard() {
         {/* Filter Section */}
         <Card>
           <CardHeader>
-            <CardTitle>Filtros de Estadísticas</CardTitle>
+            <CardTitle>Filtros de estadísticas</CardTitle>
             <CardDescription>Filtra los datos por comercial para análisis específicos</CardDescription>
           </CardHeader>
           <CardContent>
@@ -538,7 +538,7 @@ export default function AdminDashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Visitas Completadas</CardTitle>
+              <CardTitle className="text-sm font-medium">Visitas completadas</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{completedVisits.length}</div>
@@ -551,7 +551,7 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
             <CardHeader>
-              <CardTitle>Evolución de Ventas (6 meses)</CardTitle>
+              <CardTitle>Evolución de ventas (6 meses)</CardTitle>
               <CardDescription>Ventas y comisiones por mes</CardDescription>
             </CardHeader>
             <CardContent>
@@ -570,7 +570,7 @@ export default function AdminDashboard() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Distribución de Visitas</CardTitle>
+              <CardTitle>Distribución de visitas</CardTitle>
               <CardDescription>Análisis de actividad comercial</CardDescription>
             </CardHeader>
             <CardContent>
@@ -600,7 +600,7 @@ export default function AdminDashboard() {
         {/* Completed Visits with Sales Table */}
         <Card>
           <CardHeader>
-            <CardTitle>Visitas Completadas - Últimos 30 Días</CardTitle>
+            <CardTitle>Visitas completadas - últimos 30 días</CardTitle>
             <CardDescription>Visitas finalizadas con información de ventas asociadas</CardDescription>
           </CardHeader>
           <CardContent>

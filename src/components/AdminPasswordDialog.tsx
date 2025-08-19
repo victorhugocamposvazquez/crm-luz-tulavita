@@ -119,7 +119,7 @@ export default function AdminPasswordDialog({ userEmail, userName, userId, trigg
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="newPassword">Nueva Contraseña</Label>
+            <Label htmlFor="newPassword">Nueva contraseña</Label>
             <div className="relative">
               <Input
                 id="newPassword"
@@ -146,7 +146,7 @@ export default function AdminPasswordDialog({ userEmail, userName, userId, trigg
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="confirmPassword">Confirmar Contraseña</Label>
+            <Label htmlFor="confirmPassword">Confirmar contraseña</Label>
             <div className="relative">
               <Input
                 id="confirmPassword"

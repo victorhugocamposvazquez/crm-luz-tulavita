@@ -124,7 +124,7 @@ export function MapboxMapSelector({ latitude, longitude, onCoordinatesSelect, ch
       </DialogTrigger>
       <DialogContent className="max-w-4xl max-h-[90vh]">
         <DialogHeader>
-          <DialogTitle>Seleccionar Ubicación</DialogTitle>
+          <DialogTitle>Seleccionar ubicación</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           {isLoading ? (

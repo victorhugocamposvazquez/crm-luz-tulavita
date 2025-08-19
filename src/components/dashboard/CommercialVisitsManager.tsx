@@ -391,7 +391,7 @@ export default function CommercialVisitsManager() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Visitas</CardTitle>
+                <CardTitle className="text-sm font-medium">Total visitas</CardTitle>
                 <MapPin className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -430,7 +430,7 @@ export default function CommercialVisitsManager() {
           {/* Visits Table */}
           <Card>
             <CardHeader>
-              <CardTitle>Mis Visitas</CardTitle>
+              <CardTitle>Mis visitas</CardTitle>
             </CardHeader>
             <CardContent>
               <Table>

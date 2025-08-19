@@ -966,7 +966,7 @@ export default function UnifiedVisitsManagement() {
 
   const renderNIFInput = () => <Card>
       <CardHeader>
-        <CardTitle>Verificación de Cliente</CardTitle>
+        <CardTitle>Verificación de cliente</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="space-y-2">
@@ -1021,7 +1021,7 @@ export default function UnifiedVisitsManagement() {
 
   const renderClientForm = () => <Card>
       <CardHeader>
-        <CardTitle>Nuevo Cliente</CardTitle>
+        <CardTitle>Nuevo cliente</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
@@ -1120,7 +1120,7 @@ export default function UnifiedVisitsManagement() {
         {/* Client Info */}
         {existingClient && hasApproval && <div className="space-y-4">
             <Card className="p-4 bg-green-50 border-green-200">
-              <h3 className="font-semibold text-green-800 mb-2">Cliente Seleccionado</h3>
+              <h3 className="font-semibold text-green-800 mb-2">Cliente seleccionado</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <p className="text-green-700 font-medium">{existingClient.nombre_apellidos}</p>
@@ -1135,7 +1135,7 @@ export default function UnifiedVisitsManagement() {
 
             {/* Client Purchase History */}
             {clientPurchases.length > 0 && <Card className="p-4">
-                <h4 className="font-semibold mb-3">Últimas Compras</h4>
+                <h4 className="font-semibold mb-3">Últimas compras</h4>
                 <div className="space-y-3">
                   {clientPurchases.map(purchase => <div key={purchase.id} className="border-l-2 border-blue-200 pl-3">
                       <div className="flex justify-between items-start">
@@ -1159,7 +1159,7 @@ export default function UnifiedVisitsManagement() {
 
             {/* Client Visit History */}
             {clientVisits.length > 0 && <Card className="p-4">
-                <h4 className="font-semibold mb-3">Últimas Visitas</h4>
+                <h4 className="font-semibold mb-3">Últimas visitas</h4>
                 <div className="space-y-3">
                   {clientVisits.map(visit => <div key={visit.id} className="border-l-2 border-purple-200 pl-3">
                       <div className="flex-1">
@@ -1179,7 +1179,7 @@ export default function UnifiedVisitsManagement() {
         </div>}
 
         {existingClient && !hasApproval && <Card className="p-4 bg-yellow-50 border-yellow-200">
-            <h3 className="font-semibold text-yellow-800 mb-2">Cliente Identificado</h3>
+            <h3 className="font-semibold text-yellow-800 mb-2">Cliente identificado</h3>
             <p className="text-yellow-700">
               {existingClient.nombre_apellidos} - {existingClient.dni}
             </p>
@@ -1190,7 +1190,7 @@ export default function UnifiedVisitsManagement() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Información de la Visita</CardTitle>
+            <CardTitle>Información de la visita</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -1358,7 +1358,7 @@ export default function UnifiedVisitsManagement() {
   console.log('userRole:', userRole);
   return <div className="container mx-auto p-6 max-w-4xl">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold">Gestión de Visitas</h1>
+        <h1 className="text-3xl font-bold">Gestión de visitas</h1>
         <p className="text-muted-foreground">
           Registra las visitas a clientes y las ventas realizadas
         </p>

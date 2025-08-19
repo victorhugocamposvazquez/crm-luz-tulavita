@@ -420,7 +420,7 @@ export default function ClientManagement() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold">Gestión de Clientes</h2>
+          <h2 className="text-2xl font-bold">Gestión de clientes</h2>
           <p className="text-muted-foreground">Administra los clientes de las empresas</p>
         </div>
         <div className="flex space-x-2">
@@ -563,7 +563,7 @@ export default function ClientManagement() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Clientes Registrados</CardTitle>
+          <CardTitle>Clientes registrados</CardTitle>
           <CardDescription>
             Lista de todos los clientes {!isAdmin && 'de tu empresa'}
           </CardDescription>

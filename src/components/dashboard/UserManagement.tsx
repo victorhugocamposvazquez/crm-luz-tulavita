@@ -233,7 +233,7 @@ export default function UserManagement() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold">Gestión de Usuarios</h2>
+          <h2 className="text-2xl font-bold">Gestión de usuarios</h2>
           <p className="text-muted-foreground">Administra los usuarios del sistema</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -330,7 +330,7 @@ export default function UserManagement() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Usuarios Registrados</CardTitle>
+          <CardTitle>Usuarios registrados</CardTitle>
           <CardDescription>
             Lista de todos los usuarios en el sistema
           </CardDescription>

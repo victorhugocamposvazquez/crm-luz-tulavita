@@ -370,7 +370,7 @@ export default function AdminVisitsView() {
       {/* Visits Table - USANDO COMPONENTE COMÚN */}
       <Card>
         <CardHeader>
-          <CardTitle>Lista de Visitas ({visits.length})</CardTitle>
+          <CardTitle>Lista de visitas ({visits.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <VisitsTable

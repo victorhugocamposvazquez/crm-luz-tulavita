@@ -388,7 +388,7 @@ const fetchVisits = async () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-3 text-xl">
             <Building2 className="h-6 w-6" />
-            Información del Cliente
+            Información del cliente
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -453,7 +453,7 @@ const fetchVisits = async () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Ventas</p>
+                <p className="text-sm font-medium text-muted-foreground">Total ventas</p>
                 <p className="text-2xl font-bold text-green-600">€{totalSales.toFixed(2)}</p>
               </div>
               <Euro className="h-8 w-8 text-green-600" />
@@ -505,7 +505,7 @@ const fetchVisits = async () => {
           {monthlySalesData.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle>Ventas por Mes</CardTitle>
+                <CardTitle>Ventas por mes</CardTitle>
                 <CardDescription>Evolución de las ventas a lo largo del tiempo</CardDescription>
               </CardHeader>
               <CardContent>
@@ -528,7 +528,7 @@ const fetchVisits = async () => {
           {visitStatusData.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle>Estado de Visitas</CardTitle>
+                <CardTitle>Estado de visitas</CardTitle>
                 <CardDescription>Distribución por estado de las visitas</CardDescription>
               </CardHeader>
               <CardContent>
@@ -559,7 +559,7 @@ const fetchVisits = async () => {
           {productData.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle>Productos Vendidos</CardTitle>
+                <CardTitle>Productos vendidos</CardTitle>
                 <CardDescription>Productos vendidos con su coste total</CardDescription>
               </CardHeader>
               <CardContent>
@@ -583,7 +583,7 @@ const fetchVisits = async () => {
           {/* Métricas adicionales */}
           <Card>
             <CardHeader>
-              <CardTitle>Estadísticas Adicionales</CardTitle>
+              <CardTitle>Estadísticas adicionales</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex justify-between items-center">
@@ -615,7 +615,7 @@ const fetchVisits = async () => {
       <div className="space-y-4">
         <Card>
           <CardHeader>
-            <CardTitle>Historial de Visitas</CardTitle>
+            <CardTitle>Historial de visitas</CardTitle>
             <CardDescription>Todas las visitas realizadas a este cliente</CardDescription>
           </CardHeader>
           <CardContent>

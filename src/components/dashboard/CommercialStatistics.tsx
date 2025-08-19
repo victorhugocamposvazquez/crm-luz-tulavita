@@ -360,7 +360,7 @@ export default function CommercialStatistics() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Visitas Completadas</CardTitle>
+            <CardTitle className="text-sm font-medium">Visitas completadas</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{completedVisits.length}</div>
@@ -373,7 +373,7 @@ export default function CommercialStatistics() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Evolución de Ventas (6 meses)</CardTitle>
+            <CardTitle>Evolución de ventas (6 meses)</CardTitle>
             <CardDescription>Ventas y comisiones por mes</CardDescription>
           </CardHeader>
           <CardContent>
@@ -392,7 +392,7 @@ export default function CommercialStatistics() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Distribución de Visitas</CardTitle>
+            <CardTitle>Distribución de visitas</CardTitle>
             <CardDescription>Análisis de actividad comercial</CardDescription>
           </CardHeader>
           <CardContent>
@@ -422,7 +422,7 @@ export default function CommercialStatistics() {
       {/* Completed Visits with Sales Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Visitas Completadas - Últimos 30 Días</CardTitle>
+          <CardTitle>Visitas completadas - últimos 30 días</CardTitle>
           <CardDescription>Visitas finalizadas con información de ventas asociadas</CardDescription>
         </CardHeader>
         <CardContent>

@@ -79,7 +79,7 @@ export default function AdminNotifications() {
       {pendingApprovals.map((request) => (
         <div key={request.id} className="p-3 border rounded-lg bg-orange-50 dark:bg-orange-950 space-y-2">
           <h4 className="font-medium text-orange-900 dark:text-orange-100 text-sm">
-            Solicitud de Acceso
+            Solicitud de acceso
           </h4>
           <p className="text-xs text-orange-700 dark:text-orange-300 line-clamp-2">
             {request.commercial?.first_name} {request.commercial?.last_name} solicita acceso a{' '}

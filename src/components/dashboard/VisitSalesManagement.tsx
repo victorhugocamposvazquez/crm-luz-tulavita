@@ -625,7 +625,7 @@ export default function VisitSalesManagement() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle>Gestión de Visitas</CardTitle>
+                <CardTitle>Gestión de visitas</CardTitle>
                 <CardDescription>
                   Programa y gestiona las visitas a clientes (solo cuando no hay venta)
                 </CardDescription>
@@ -781,7 +781,7 @@ export default function VisitSalesManagement() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle>Gestión de Ventas</CardTitle>
+                <CardTitle>Gestión de ventas</CardTitle>
                 <CardDescription>
                   Registra y gestiona las ventas realizadas con líneas de productos
                 </CardDescription>

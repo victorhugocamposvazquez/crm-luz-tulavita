@@ -153,7 +153,7 @@ export default function CompanyManagement() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold">Gestión de Empresas</h2>
+          <h2 className="text-2xl font-bold">Gestión de empresas</h2>
           <p className="text-muted-foreground">Administra las empresas del holding</p>
         </div>
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -200,7 +200,7 @@ export default function CompanyManagement() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Empresas Registradas</CardTitle>
+          <CardTitle>Empresas registradas</CardTitle>
           <CardDescription>
             Lista de todas las empresas del holding
           </CardDescription>
