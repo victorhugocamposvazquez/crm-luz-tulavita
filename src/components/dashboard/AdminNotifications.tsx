@@ -3,7 +3,6 @@ import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle, UserCheck, UserX, CheckSquare, XSquare } from 'lucide-react';
-import { Link } from 'react-router-dom';
 
 export default function AdminNotifications() {
   const { userRole } = useAuth();
@@ -84,12 +83,9 @@ export default function AdminNotifications() {
           </h4>
           <p className="text-xs text-orange-700 dark:text-orange-300 line-clamp-2">
             {request.commercial?.first_name} {request.commercial?.last_name} solicita acceso a{' '}
-            <Link 
-              to={`/client/${request.client_id}`}
-              className="font-medium underline hover:text-orange-900 dark:hover:text-orange-100"
-            >
+            <span className="font-medium text-orange-900 dark:text-orange-100">
               {request.client?.nombre_apellidos}
-            </Link>
+            </span>
           </p>
           <div className="flex gap-1">
             <Button
