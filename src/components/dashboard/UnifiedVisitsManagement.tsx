@@ -577,10 +577,8 @@ export default function UnifiedVisitsManagement() {
           setSelectedCompany('');
           setCurrentStep('nif-input');
           
-          // Redirect to visits list after bulk creation
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('navigateToVisitsList'));
-          }, 1500);
+          // Redirect to visits list after bulk creation immediately
+          window.dispatchEvent(new CustomEvent('navigateToVisitsList'));
         } else {
           toast({
             title: "Sin clientes encontrados",
@@ -660,12 +658,10 @@ export default function UnifiedVisitsManagement() {
         description: "La visita se ha guardado correctamente"
       });
       
-      // Navigate to visits list and trigger refresh
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('navigateToVisitsList'));
-        // Trigger visits list refresh
-        window.dispatchEvent(new CustomEvent('refreshVisitsList'));
-      }, 1000);
+      // Navigate to visits list and trigger refresh immediately
+      window.dispatchEvent(new CustomEvent('navigateToVisitsList'));
+      // Trigger visits list refresh
+      window.dispatchEvent(new CustomEvent('refreshVisitsList'));
     } catch (error) {
       console.error('Error requesting approval:', error);
       toast({
