@@ -60,6 +60,19 @@ const statusColors = {
   postponed: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'
 };
 
+const getStatusDisplay = (status: string, approvalStatus?: string) => {
+  // Priority: show rejection status first
+  if (approvalStatus === 'rejected') {
+    return { label: 'Rechazada', color: 'bg-red-500 text-white hover:bg-red-500' };
+  }
+  
+  // Then show normal status
+  const label = statusLabels[status as keyof typeof statusLabels] || status;
+  const color = statusColors[status as keyof typeof statusColors] || 'bg-gray-100 text-gray-800 hover:bg-gray-100';
+  
+  return { label, color };
+};
+
 export default function VisitsTable({ 
   visits, 
   sales, 
@@ -138,9 +151,10 @@ export default function VisitsTable({
                   {format(new Date(visit.visit_date), "dd/MM/yyyy HH:mm", { locale: es })}
                 </TableCell>
                 <TableCell>
-                  <Badge className={statusColors[visit.status]}>
-                    {statusLabels[visit.status]}
-                  </Badge>
+                  {(() => {
+                    const statusDisplay = getStatusDisplay(visit.status, visit.approval_status);
+                    return <Badge className={statusDisplay.color}>{statusDisplay.label}</Badge>;
+                  })()}
                 </TableCell>
                 <TableCell>
                   {totalSales > 0 ? `€${totalSales.toFixed(2)}` : '-'}
