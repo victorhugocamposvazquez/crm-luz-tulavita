@@ -42,7 +42,7 @@ interface Visit {
 }
 export default function CommercialVisitsManager() {
   const { user, userRole } = useAuth();
-  const { location } = useGeolocation();
+  const { location, hasPermission } = useGeolocation();
   const [currentView, setCurrentView] = useState<'list' | 'create-single'>('list');
   const [visits, setVisits] = useState<Visit[]>([]);
   const [companies, setCompanies] = useState<Array<{
@@ -529,7 +529,7 @@ export default function CommercialVisitsManager() {
                     Esta visita puede ser editada.
                   </p>
                   <Button 
-                    disabled={!location}
+                    disabled={!hasPermission && !location}
                     onClick={() => {
               console.log('=== CONTINUAR VISITA BUTTON CLICKED ===');
               console.log('selectedVisit:', selectedVisit);
@@ -548,7 +548,7 @@ export default function CommercialVisitsManager() {
                     <Edit className="h-4 w-4 mr-2" />
                     Continuar Visita
                   </Button>
-                  {!location && (
+                  {!hasPermission && !location && (
                     <p className="text-sm text-amber-600">
                       ⚠️ Necesitas activar la geolocalización para continuar la visita
                     </p>
