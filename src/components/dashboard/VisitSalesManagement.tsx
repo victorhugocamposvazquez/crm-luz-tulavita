@@ -634,13 +634,13 @@ export default function VisitSalesManagement() {
                 <DialogTrigger asChild>
                   <Button onClick={() => setEditingVisit(null)}>
                     <Plus className="mr-2 h-4 w-4" />
-                    Nueva Visita
+                    Nueva visita
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-2xl">
                   <DialogHeader>
                     <DialogTitle>
-                      {editingVisit ? 'Editar Visita' : 'Programar Nueva Visita'}
+                      {editingVisit ? 'Editar visita' : 'Programar nueva visita'}
                     </DialogTitle>
                   </DialogHeader>
                   <form onSubmit={handleVisitSubmit}>
@@ -698,7 +698,7 @@ export default function VisitSalesManagement() {
                         Cancelar
                       </Button>
                       <Button type="submit">
-                        {editingVisit ? 'Actualizar' : 'Crear Visita'}
+                        {editingVisit ? 'Actualizar' : 'Crear visita'}
                       </Button>
                     </DialogFooter>
                   </form>
@@ -790,13 +790,13 @@ export default function VisitSalesManagement() {
                 <DialogTrigger asChild>
                   <Button onClick={() => openSaleDialog()}>
                     <Plus className="mr-2 h-4 w-4" />
-                    Nueva Venta
+                     Nueva venta
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>
-                      {editingSale ? 'Editar Venta' : 'Registrar Nueva Venta'}
+                      {editingSale ? 'Editar venta' : 'Registrar nueva venta'}
                     </DialogTitle>
                   </DialogHeader>
                   <form onSubmit={handleSaleSubmit}>
@@ -956,7 +956,7 @@ export default function VisitSalesManagement() {
                         Cancelar
                       </Button>
                       <Button type="submit">
-                        {editingSale ? 'Actualizar' : 'Registrar Venta'}
+                        {editingSale ? 'Actualizar' : 'Registrar venta'}
                       </Button>
                     </DialogFooter>
                   </form>

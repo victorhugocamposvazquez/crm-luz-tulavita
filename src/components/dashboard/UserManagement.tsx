@@ -240,13 +240,13 @@ export default function UserManagement() {
           <DialogTrigger asChild>
             <Button onClick={() => setEditingUser(null)}>
               <UserPlus className="mr-2 h-4 w-4" />
-              Nuevo Usuario
+              Nuevo usuario
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>
-                {editingUser ? 'Editar Usuario' : 'Crear Nuevo Usuario'}
+                {editingUser ? 'Editar usuario' : 'Crear nuevo usuario'}
               </DialogTitle>
               <DialogDescription>
                 {editingUser ? 'Modifica los datos del usuario' : 'Crea un nuevo usuario en el sistema'}
@@ -320,7 +320,7 @@ export default function UserManagement() {
                   Cancelar
                 </Button>
                 <Button type="submit">
-                  {editingUser ? 'Actualizar' : 'Crear Usuario'}
+                  {editingUser ? 'Actualizar' : 'Crear usuario'}
                 </Button>
               </DialogFooter>
             </form>

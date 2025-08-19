@@ -97,7 +97,7 @@ export default function AdminPasswordDialog({ userEmail, userName, userId, trigg
     setLoading(false);
   };
 
-  const dialogTitle = 'Cambiar Contraseña';
+  const dialogTitle = 'Cambiar contraseña';
   const dialogDescription = 'Introduce tu nueva contraseña. Debe tener al menos 6 caracteres.';
 
   return (
@@ -106,7 +106,7 @@ export default function AdminPasswordDialog({ userEmail, userName, userId, trigg
         {trigger || (
           <Button variant="outline" size="sm">
             <Key className="h-4 w-4 mr-2" />
-            Cambiar Contraseña
+            Cambiar contraseña
           </Button>
         )}
       </DialogTrigger>
@@ -177,7 +177,7 @@ export default function AdminPasswordDialog({ userEmail, userName, userId, trigg
               Cancelar
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? 'Cambiando...' : 'Cambiar Contraseña'}
+              {loading ? 'Cambiando...' : 'Cambiar contraseña'}
             </Button>
           </div>
         </form>

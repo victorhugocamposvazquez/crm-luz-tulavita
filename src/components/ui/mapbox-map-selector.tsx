@@ -171,7 +171,7 @@ export function MapboxMapSelector({ latitude, longitude, onCoordinatesSelect, ch
               Cancelar
             </Button>
             <Button onClick={handleConfirm} className="flex-1">
-              Confirmar Ubicación
+              Confirmar ubicación
             </Button>
           </div>
         </div>

@@ -97,7 +97,7 @@ export default function Layout({ children, currentView, onViewChange }: LayoutPr
                     onSelect={(e) => e.preventDefault()}
                   >
                     <Key className="mr-2 h-4 w-4" />
-                    Cambiar Contraseña
+                    Cambiar contraseña
                   </DropdownMenuItem>
                 }
               />
@@ -190,7 +190,7 @@ export default function Layout({ children, currentView, onViewChange }: LayoutPr
                           onSelect={(e) => e.preventDefault()}
                         >
                           <Key className="mr-2 h-4 w-4" />
-                          Cambiar Contraseña
+                          Cambiar contraseña
                         </DropdownMenuItem>
                       }
                     />

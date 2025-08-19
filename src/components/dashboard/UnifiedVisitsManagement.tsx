@@ -1099,7 +1099,7 @@ export default function UnifiedVisitsManagement() {
 
         <Button onClick={handleCreateClient} disabled={loading}>
           {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-          Crear Cliente y Continuar
+          Crear cliente y continuar
         </Button>
       </CardContent>
     </Card>;
@@ -1262,7 +1262,7 @@ export default function UnifiedVisitsManagement() {
               Ventas Realizadas
               {!isReadOnly && <Button size="sm" onClick={addSaleLine}>
                   <Plus className="w-4 h-4 mr-2" />
-                  Añadir Producto
+                  Añadir producto
                 </Button>}
             </CardTitle>
           </CardHeader>

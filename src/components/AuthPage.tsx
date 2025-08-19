@@ -66,7 +66,7 @@ export default function AuthPage() {
               />
             </div>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Accediendo...' : 'Iniciar Sesión'}
+              {loading ? 'Accediendo...' : 'Iniciar sesión'}
             </Button>
           </form>
         </CardContent>

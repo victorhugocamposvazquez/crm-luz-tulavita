@@ -160,13 +160,13 @@ export default function CompanyManagement() {
           <DialogTrigger asChild>
             <Button onClick={() => setEditingCompany(null)}>
               <Building2 className="mr-2 h-4 w-4" />
-              Nueva Empresa
+              Nueva empresa
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>
-                {editingCompany ? 'Editar Empresa' : 'Crear Nueva Empresa'}
+                {editingCompany ? 'Editar empresa' : 'Crear nueva empresa'}
               </DialogTitle>
               <DialogDescription>
                 {editingCompany ? 'Modifica los datos de la empresa' : 'Crea una nueva empresa en el holding'}
@@ -190,7 +190,7 @@ export default function CompanyManagement() {
                   Cancelar
                 </Button>
                 <Button type="submit">
-                  {editingCompany ? 'Actualizar' : 'Crear Empresa'}
+                  {editingCompany ? 'Actualizar' : 'Crear empresa'}
                 </Button>
               </DialogFooter>
             </form>

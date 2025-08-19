@@ -374,7 +374,7 @@ export default function CommercialVisitsManager() {
           <div className="flex gap-2">
             <Button onClick={() => setCurrentView('create-single')}>
               <Plus className="h-4 w-4 mr-2" />
-              Nueva Visita
+              Nueva visita
             </Button>
           </div>
         )}

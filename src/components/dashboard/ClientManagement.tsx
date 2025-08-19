@@ -432,13 +432,13 @@ export default function ClientManagement() {
                 <DialogTrigger asChild>
                   <Button onClick={() => setEditingClient(null)}>
                     <UserPlus className="mr-2 h-4 w-4" />
-                    Nuevo Cliente
+                    Nuevo cliente
                   </Button>
                 </DialogTrigger>
             <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle>
-                  {editingClient ? 'Editar Cliente' : 'Crear Nuevo Cliente'}
+                  {editingClient ? 'Editar cliente' : 'Crear nuevo cliente'}
                 </DialogTitle>
                 <DialogDescription>
                   {editingClient ? 'Modifica los datos del cliente' : 'Añade un nuevo cliente al sistema'}
@@ -543,7 +543,7 @@ export default function ClientManagement() {
                     Cancelar
                   </Button>
                   <Button type="submit">
-                    {editingClient ? 'Actualizar' : 'Crear Cliente'}
+                    {editingClient ? 'Actualizar' : 'Crear cliente'}
                   </Button>
                 </DialogFooter>
               </form>
