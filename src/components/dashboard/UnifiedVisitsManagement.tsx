@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Loader2, MapPin, Plus, Minus } from 'lucide-react';
 import { formatCoordinates } from '@/lib/coordinates';
+
 interface Client {
   id: string;
   nombre_apellidos: string;
@@ -20,10 +21,12 @@ interface Client {
   telefono2?: string;
   email?: string;
 }
+
 interface Company {
   id: string;
   name: string;
 }
+
 interface SaleLine {
   product_name: string;
   quantity: number;
@@ -32,6 +35,7 @@ interface SaleLine {
   is_paid: boolean;
   is_delivered: boolean;
 }
+
 interface ClientPurchase {
   id: string;
   amount: number;
@@ -43,6 +47,7 @@ interface ClientPurchase {
     unit_price: number;
   }[];
 }
+
 interface ClientVisit {
   id: string;
   visit_date: string;
@@ -50,7 +55,9 @@ interface ClientVisit {
   notes: string;
   permission: string;
 }
+
 type WorkflowStep = 'nif-input' | 'pending-approval' | 'client-form' | 'visit-form';
+
 export default function UnifiedVisitsManagement() {
   const {
     user,
@@ -98,6 +105,7 @@ export default function UnifiedVisitsManagement() {
   const [hasApproval, setHasApproval] = useState(false);
   const [editingVisitId, setEditingVisitId] = useState<string | null>(null);
   const [currentVisitStatus, setCurrentVisitStatus] = useState<string | null>(null);
+
   useEffect(() => {
     fetchCompanies();
     // Auto-request location when component loads
@@ -246,6 +254,7 @@ export default function UnifiedVisitsManagement() {
       supabase.removeChannel(channel);
     };
   }, [approvalRequestId, existingClient]);
+
   const fetchCompanies = async () => {
     try {
       console.log('Fetching companies...');
@@ -268,6 +277,7 @@ export default function UnifiedVisitsManagement() {
       });
     }
   };
+
   const fetchClientData = async (clientId: string) => {
     try {
       console.log('Fetching client data for:', clientId);
@@ -337,6 +347,7 @@ export default function UnifiedVisitsManagement() {
       });
     }
   };
+
   const loadExistingSalesForVisit = async (clientId: string, commercialId: string, companyId: string, visitId?: string) => {
     try {
       console.log('Loading existing sales for visit...', { visitId });
@@ -391,6 +402,7 @@ export default function UnifiedVisitsManagement() {
       setSaleLines([]);
     }
   };
+
   const handleNIFSubmit = async () => {
     // Parse multiple NIFs from input
     const nifInput = clientNIF.trim();
@@ -563,6 +575,7 @@ export default function UnifiedVisitsManagement() {
       setLoading(false);
     }
   };
+
   const requestClientApproval = async (clientId: string) => {
     try {
       console.log('=== REQUESTING CLIENT APPROVAL AND CREATING VISIT ===');
@@ -629,6 +642,7 @@ export default function UnifiedVisitsManagement() {
       });
     }
   };
+
   const handleCreateClient = async () => {
     if (!clientData.nombre_apellidos || !clientData.direccion) {
       toast({
@@ -670,6 +684,7 @@ export default function UnifiedVisitsManagement() {
       setLoading(false);
     }
   };
+
   const addSaleLine = () => {
     setSaleLines([...saleLines, {
       product_name: '',
@@ -680,9 +695,11 @@ export default function UnifiedVisitsManagement() {
       is_delivered: false
     }]);
   };
+
   const removeSaleLine = (index: number) => {
     setSaleLines(saleLines.filter((_, i) => i !== index));
   };
+
   const updateSaleLine = (index: number, field: keyof SaleLine, value: any) => {
     const updated = [...saleLines];
     updated[index] = {
@@ -691,6 +708,7 @@ export default function UnifiedVisitsManagement() {
     };
     setSaleLines(updated);
   };
+
   const handleSaveVisit = async (isComplete: boolean) => {
     console.log('=== UNIFIED VISITS - STARTING VISIT SAVE ===');
     console.log('editingVisitId:', editingVisitId);
@@ -698,6 +716,7 @@ export default function UnifiedVisitsManagement() {
     console.log('existingClient:', existingClient);
     console.log('visitData:', visitData);
     console.log('user:', user);
+    
     if (!existingClient || !visitData.company_id) {
       console.log('=== VALIDATION FAILED ===');
       console.log('Missing client or company');
@@ -710,9 +729,12 @@ export default function UnifiedVisitsManagement() {
       });
       return;
     }
+    
     setLoading(true);
+    
     try {
       let visit;
+      
       if (editingVisitId) {
         // Update existing visit
         console.log('=== UPDATING EXISTING VISIT ===');
@@ -722,29 +744,33 @@ export default function UnifiedVisitsManagement() {
           status: isComplete ? 'completed' as const : 'in_progress' as const,
           visit_state_code: visitData.visitStateCode || null
         };
+        
         console.log('Update payload:', updatePayload);
-        const {
-          error: visitError
-        } = await supabase.from('visits').update(updatePayload).eq('id', editingVisitId);
+        
+        const { error: visitError } = await supabase
+          .from('visits')
+          .update(updatePayload)
+          .eq('id', editingVisitId);
+          
         if (visitError) {
           console.error('Visit update error:', visitError);
           throw visitError;
         }
 
         // Fetch updated visit to get the complete data
-        const {
-          data: fetchedVisit,
-          error: fetchError
-        } = await supabase.from('visits').select('*').eq('id', editingVisitId).single();
+        const { data: fetchedVisit, error: fetchError } = await supabase
+          .from('visits')
+          .select('*')
+          .eq('id', editingVisitId)
+          .single();
+          
         if (fetchError) {
           console.error('Error fetching updated visit:', fetchError);
-          visit = {
-            id: editingVisitId,
-            ...updatePayload
-          };
+          visit = { id: editingVisitId, ...updatePayload };
         } else {
           visit = fetchedVisit;
         }
+        
         console.log('=== VISIT UPDATED SUCCESSFULLY ===');
         console.log('Updated visit:', visit);
       } else {
@@ -764,14 +790,18 @@ export default function UnifiedVisitsManagement() {
           permission: 'pending',
           visit_state_code: visitData.visitStateCode || null
         };
-        const {
-          data: newVisit,
-          error: visitError
-        } = await supabase.from('visits').insert(visitPayload).select().single();
+        
+        const { data: newVisit, error: visitError } = await supabase
+          .from('visits')
+          .insert(visitPayload)
+          .select()
+          .single();
+          
         if (visitError) {
           console.error('Visit creation error:', visitError);
           throw visitError;
         }
+        
         visit = newVisit;
         setEditingVisitId(newVisit.id); // Set the ID for future saves
       }
@@ -848,6 +878,7 @@ export default function UnifiedVisitsManagement() {
         // This would be saved to client_comments table once types are updated
       }
       console.log('=== EMITTING CUSTOM EVENT ===');
+      
       toast({
         title: isComplete ? "Visita finalizada" : "Visita guardada",
         description: isComplete ? "La visita se ha completado y las ventas son definitivas" : "La visita se ha guardado. Las ventas son temporales hasta finalizar"
@@ -855,9 +886,7 @@ export default function UnifiedVisitsManagement() {
 
       // Emit custom event to notify parent components
       console.log('Dispatching visitCreated event with data:', visit);
-      window.dispatchEvent(new CustomEvent('visitCreated', {
-        detail: visit
-      }));
+      window.dispatchEvent(new CustomEvent('visitCreated', { detail: visit }));
       console.log('=== EVENT DISPATCHED ===');
 
       // Navigate back to visits list by dispatching navigation event
@@ -895,9 +924,11 @@ export default function UnifiedVisitsManagement() {
       setLoading(false);
     }
   };
+
   const handleSubmitVisit = async () => {
     await handleSaveVisit(true);
   };
+
   const renderNIFInput = () => <Card>
       <CardHeader>
         <CardTitle>Verificación de Cliente</CardTitle>
@@ -946,6 +977,7 @@ export default function UnifiedVisitsManagement() {
         </Button>
       </CardContent>
     </Card>;
+
   const renderPendingApproval = () => <Card>
       <CardHeader>
         <CardTitle>Visita Creada</CardTitle>
@@ -976,6 +1008,7 @@ export default function UnifiedVisitsManagement() {
         </div>
       </CardContent>
     </Card>;
+
   const renderClientForm = () => <Card>
       <CardHeader>
         <CardTitle>Nuevo Cliente</CardTitle>
@@ -1060,226 +1093,243 @@ export default function UnifiedVisitsManagement() {
         </Button>
       </CardContent>
     </Card>;
+
   const renderVisitForm = () => {
     // Check if visit is completed or rejected (read-only)
     const isReadOnly = currentVisitStatus === 'completed' || currentVisitStatus === 'no_answer' || currentVisitStatus === 'not_interested' || currentVisitStatus === 'postponed';
-    return <div className="space-y-6">{isReadOnly && <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <p className="text-blue-800 font-medium">📋 Vista de Solo Lectura</p>
-          <p className="text-blue-700 text-sm">Esta visita está finalizada y no puede editarse.</p>
-        </div>}
-      {existingClient && hasApproval && <div className="space-y-4">
-          <Card className="p-4 bg-green-50 border-green-200">
-            <h3 className="font-semibold text-green-800 mb-2">Cliente Seleccionado</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <p className="text-green-700 font-medium">{existingClient.nombre_apellidos}</p>
-                <p className="text-green-600">{existingClient.direccion}</p>
-                {existingClient.dni && <p className="text-green-600">DNI: {existingClient.dni}</p>}
-                {existingClient.telefono1 && <p className="text-green-600">Tel: {existingClient.telefono1}</p>}
-                {existingClient.telefono2 && <p className="text-green-600">Tel 2: {existingClient.telefono2}</p>}
-                {existingClient.email && <p className="text-green-600">Email: {existingClient.email}</p>}
-              </div>
-            </div>
-          </Card>
+    
+    return (
+      <div className="space-y-6">
+        {isReadOnly && (
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-blue-800 font-medium">📋 Vista de Solo Lectura</p>
+            <p className="text-blue-700 text-sm">Esta visita está finalizada y no puede editarse.</p>
+          </div>
+        )}
 
-          {/* Client Purchase History */}
-          {clientPurchases.length > 0 && <Card className="p-4">
-              <h4 className="font-semibold mb-3">Últimas Compras</h4>
-              <div className="space-y-3">
-                {clientPurchases.map(purchase => <div key={purchase.id} className="border-l-2 border-blue-200 pl-3">
+        {/* Client Info */}
+        {existingClient && hasApproval && <div className="space-y-4">
+            <Card className="p-4 bg-green-50 border-green-200">
+              <h3 className="font-semibold text-green-800 mb-2">Cliente Seleccionado</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-green-700 font-medium">{existingClient.nombre_apellidos}</p>
+                  <p className="text-green-600">{existingClient.direccion}</p>
+                  {existingClient.dni && <p className="text-green-600">DNI: {existingClient.dni}</p>}
+                  {existingClient.telefono1 && <p className="text-green-600">Tel: {existingClient.telefono1}</p>}
+                  {existingClient.telefono2 && <p className="text-green-600">Tel 2: {existingClient.telefono2}</p>}
+                  {existingClient.email && <p className="text-green-600">Email: {existingClient.email}</p>}
+                </div>
+              </div>
+            </Card>
+
+            {/* Client Purchase History */}
+            {clientPurchases.length > 0 && <Card className="p-4">
+                <h4 className="font-semibold mb-3">Últimas Compras</h4>
+                <div className="space-y-3">
+                  {clientPurchases.map(purchase => <div key={purchase.id} className="border-l-2 border-blue-200 pl-3">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <p className="font-medium">€{purchase.amount}</p>
+                          <p className="text-sm text-gray-600">
+                            {new Date(purchase.sale_date).toLocaleDateString()}
+                          </p>
+                          {purchase.product_description && <p className="text-sm text-gray-500">{purchase.product_description}</p>}
+                        </div>
+                      </div>
+                      {purchase.sale_lines && purchase.sale_lines.length > 0 && <div className="mt-2">
+                          <p className="text-xs font-medium text-gray-700">Productos:</p>
+                          {purchase.sale_lines.map((line, idx) => <p key={idx} className="text-xs text-gray-600">
+                              {line.quantity}x {line.product_name} - €{line.unit_price}
+                            </p>)}
+                        </div>}
+                    </div>)}
+                </div>
+              </Card>}
+
+            {/* Client Visit History */}
+            {clientVisits.length > 0 && <Card className="p-4">
+                <h4 className="font-semibold mb-3">Últimas Visitas</h4>
+                <div className="space-y-3">
+                  {clientVisits.map(visit => <div key={visit.id} className="border-l-2 border-purple-200 pl-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium">
+                            {new Date(visit.visit_date).toLocaleDateString()}
+                          </p>
+                          <span className={`px-2 py-1 rounded text-xs ${visit.status === 'completed' ? 'bg-green-100 text-green-800' : visit.status === 'scheduled' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>
+                            {visit.status}
+                          </span>
+                        </div>
+                        {visit.notes && <p className="text-sm text-gray-600 mt-1">{visit.notes}</p>}
+                      </div>
+                    </div>)}
+                </div>
+              </Card>}
+        </div>}
+
+        {existingClient && !hasApproval && <Card className="p-4 bg-yellow-50 border-yellow-200">
+            <h3 className="font-semibold text-yellow-800 mb-2">Cliente Identificado</h3>
+            <p className="text-yellow-700">
+              {existingClient.nombre_apellidos} - {existingClient.dni}
+            </p>
+            <p className="text-sm text-yellow-600 mt-1">
+              Información histórica no disponible sin aprobación del administrador.
+            </p>
+          </Card>}
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Información de la Visita</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="company">Empresa *</Label>
+              <select 
+                id="company" 
+                value={visitData.company_id || selectedCompany || ''} 
+                onChange={(e) => setVisitData(prev => ({ ...prev, company_id: e.target.value }))} 
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" 
+                required 
+                disabled={isReadOnly}
+              >
+                <option value="">Selecciona una empresa</option>
+                {companies && companies.length > 0 ? (
+                  companies.map(company => (
+                    <option key={company.id} value={company.id}>
+                      {company.name}
+                    </option>
+                  ))
+                ) : (
+                  <option disabled>Cargando empresas...</option>
+                )}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notas de la Visita *</Label>
+              <Textarea 
+                id="notes" 
+                value={visitData.notes} 
+                onChange={(e) => setVisitData(prev => ({ ...prev, notes: e.target.value }))} 
+                placeholder="Describe cómo fue la visita..." 
+                disabled={isReadOnly}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="status">Estado de la Visita *</Label>
+              <select 
+                id="status" 
+                value={visitData.status} 
+                onChange={(e) => setVisitData(prev => ({ ...prev, status: e.target.value as any }))} 
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" 
+                disabled={isReadOnly}
+                required
+              >
+                <option value="completed">Completada</option>
+                <option value="no_answer">Sin respuesta</option>
+                <option value="not_interested">No interesado</option>
+                <option value="postponed">Pospuesta</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="visitStateCode">Resultado de la Visita</Label>
+              <Input 
+                id="visitStateCode" 
+                value={visitData.visitStateCode} 
+                onChange={(e) => setVisitData(prev => ({ ...prev, visitStateCode: e.target.value }))} 
+                placeholder="Código del resultado (ej: VENTA, NO_VENTA, etc.)" 
+                disabled={isReadOnly}
+              />
+            </div>
+
+            {location && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <MapPin className="w-4 h-4" />
+                Ubicación registrada: {formatCoordinates(location.latitude, location.longitude)}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              Ventas Realizadas
+              {!isReadOnly && <Button size="sm" onClick={addSaleLine}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Añadir Producto
+                </Button>}
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {saleLines.length === 0 ? <p className="text-muted-foreground text-center py-4">
+                No hay productos añadidos
+              </p> : <div className="space-y-4">
+                {saleLines.map((line, index) => <div key={index} className="border rounded-lg p-4 space-y-4">
                     <div className="flex justify-between items-start">
-                      <div>
-                        <p className="font-medium">€{purchase.amount}</p>
-                        <p className="text-sm text-gray-600">
-                          {new Date(purchase.sale_date).toLocaleDateString()}
-                        </p>
-                        {purchase.product_description && <p className="text-sm text-gray-500">{purchase.product_description}</p>}
+                      <h4 className="font-medium">Producto {index + 1}</h4>
+                      {!isReadOnly && <Button size="sm" variant="outline" onClick={() => removeSaleLine(index)}>
+                          <Minus className="w-4 h-4" />
+                        </Button>}
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label>Producto</Label>
+                        <Input value={line.product_name} onChange={e => updateSaleLine(index, 'product_name', e.target.value)} placeholder="Nombre del producto" disabled={isReadOnly} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Cantidad</Label>
+                        <Input type="number" min="1" value={line.quantity} onChange={e => updateSaleLine(index, 'quantity', parseInt(e.target.value) || 1)} disabled={isReadOnly} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Precio Unitario</Label>
+                        <Input type="number" min="0" step="0.01" value={line.unit_price} onChange={e => updateSaleLine(index, 'unit_price', parseFloat(e.target.value) || 0)} disabled={isReadOnly} />
                       </div>
                     </div>
-                    {purchase.sale_lines && purchase.sale_lines.length > 0 && <div className="mt-2">
-                        <p className="text-xs font-medium text-gray-700">Productos:</p>
-                        {purchase.sale_lines.map((line, idx) => <p key={idx} className="text-xs text-gray-600">
-                            {line.quantity}x {line.product_name} - €{line.unit_price}
-                          </p>)}
-                      </div>}
+
+                    <div className="flex gap-4 text-sm">
+                      <label className="flex items-center gap-2">
+                        <input type="checkbox" checked={line.paid_cash} onChange={e => updateSaleLine(index, 'paid_cash', e.target.checked)} disabled={isReadOnly} />
+                        Pagado en efectivo
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input type="checkbox" checked={line.is_paid} onChange={e => updateSaleLine(index, 'is_paid', e.target.checked)} disabled={isReadOnly} />
+                        Pagado
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input type="checkbox" checked={line.is_delivered} onChange={e => updateSaleLine(index, 'is_delivered', e.target.checked)} disabled={isReadOnly} />
+                        Entregado
+                      </label>
+                    </div>
+
+                    <div className="text-right font-medium">
+                      Total: €{(line.quantity * line.unit_price).toFixed(2)}
+                    </div>
                   </div>)}
-              </div>
-            </Card>}
+                
+                <Separator />
+                <div className="text-right text-lg font-bold">
+                  Total General: €{saleLines.reduce((sum, line) => sum + line.quantity * line.unit_price, 0).toFixed(2)}
+                </div>
+              </div>}
+          </CardContent>
+        </Card>
 
-          {/* Client Visit History */}
-          {clientVisits.length > 0 && <Card className="p-4">
-              <h4 className="font-semibold mb-3">Últimas Visitas</h4>
-              <div className="space-y-3">
-                 {clientVisits.map(visit => <div key={visit.id} className="border-l-2 border-purple-200 pl-3">
-                     <div className="flex-1">
-                       <div className="flex items-center gap-2">
-                         <p className="text-sm font-medium">
-                           {new Date(visit.visit_date).toLocaleDateString()}
-                         </p>
-                         <span className={`px-2 py-1 rounded text-xs ${visit.status === 'completed' ? 'bg-green-100 text-green-800' : visit.status === 'scheduled' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>
-                           {visit.status}
-                         </span>
-                       </div>
-                       {visit.notes && <p className="text-sm text-gray-600 mt-1">{visit.notes}</p>}
-                     </div>
-                   </div>)}
-              </div>
-            </Card>}
-        </div>}
-
-      {existingClient && !hasApproval && <Card className="p-4 bg-yellow-50 border-yellow-200">
-          <h3 className="font-semibold text-yellow-800 mb-2">Cliente Identificado</h3>
-          <p className="text-yellow-700">
-            {existingClient.nombre_apellidos} - {existingClient.dni}
-          </p>
-          <p className="text-sm text-yellow-600 mt-1">
-            Información histórica no disponible sin aprobación del administrador.
-          </p>
-        </Card>}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Información de la Visita</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="company">Empresa *</Label>
-            <select 
-              id="company" 
-              value={visitData.company_id || selectedCompany || ''} 
-              onChange={e => setVisitData(prev => ({
-                ...prev,
-                company_id: e.target.value
-              }))} 
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" 
-              required 
-              disabled={isReadOnly}
+        {!isReadOnly && <div className="flex gap-4">
+          <Button 
+              onClick={() => handleSaveVisit(false)} 
+              disabled={loading || !visitData.company_id || !visitData.notes.trim()} 
+              variant="outline" 
+              className="flex-1"
             >
-               <option value="">Selecciona una empresa</option>
-               {companies && companies.length > 0 ? companies.map(company => <option key={company.id} value={company.id}>
-                     {company.name}
-                   </option>) : <option disabled>Cargando empresas...</option>}
-            </select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notas de la Visita *</Label>
-            <Textarea 
-              id="notes" 
-              value={visitData.notes} 
-              onChange={e => setVisitData(prev => ({
-                ...prev,
-                notes: e.target.value
-              }))} 
-              placeholder="Describe cómo fue la visita..." 
-              disabled={isReadOnly}
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="status">Estado de la Visita *</Label>
-            <select 
-              id="status" 
-              value={visitData.status} 
-              onChange={e => setVisitData(prev => ({
-                ...prev,
-                status: e.target.value as any
-              }))} 
-              className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" 
-              disabled={isReadOnly}
-              required
-            >
-              <option value="completed">Completada</option>
-              <option value="no_answer">Sin respuesta</option>
-              <option value="not_interested">No interesado</option>
-              <option value="postponed">Pospuesta</option>
-            </select>
-          </div>
-
-          {location && <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <MapPin className="w-4 h-4" />
-              Ubicación registrada: {formatCoordinates(location.latitude, location.longitude)}
-            </div>}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            Ventas Realizadas
-            {!isReadOnly && <Button size="sm" onClick={addSaleLine}>
-                <Plus className="w-4 h-4 mr-2" />
-                Añadir Producto
-              </Button>}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {saleLines.length === 0 ? <p className="text-muted-foreground text-center py-4">
-              No hay productos añadidos
-            </p> : <div className="space-y-4">
-              {saleLines.map((line, index) => <div key={index} className="border rounded-lg p-4 space-y-4">
-                  <div className="flex justify-between items-start">
-                    <h4 className="font-medium">Producto {index + 1}</h4>
-                    {!isReadOnly && <Button size="sm" variant="outline" onClick={() => removeSaleLine(index)}>
-                        <Minus className="w-4 h-4" />
-                      </Button>}
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label>Producto</Label>
-                      <Input value={line.product_name} onChange={e => updateSaleLine(index, 'product_name', e.target.value)} placeholder="Nombre del producto" disabled={isReadOnly} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Cantidad</Label>
-                      <Input type="number" min="1" value={line.quantity} onChange={e => updateSaleLine(index, 'quantity', parseInt(e.target.value) || 1)} disabled={isReadOnly} />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Precio Unitario</Label>
-                      <Input type="number" min="0" step="0.01" value={line.unit_price} onChange={e => updateSaleLine(index, 'unit_price', parseFloat(e.target.value) || 0)} disabled={isReadOnly} />
-                    </div>
-                  </div>
-
-                  <div className="flex gap-4 text-sm">
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" checked={line.paid_cash} onChange={e => updateSaleLine(index, 'paid_cash', e.target.checked)} disabled={isReadOnly} />
-                      Pagado en efectivo
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" checked={line.is_paid} onChange={e => updateSaleLine(index, 'is_paid', e.target.checked)} disabled={isReadOnly} />
-                      Pagado
-                    </label>
-                    <label className="flex items-center gap-2">
-                      <input type="checkbox" checked={line.is_delivered} onChange={e => updateSaleLine(index, 'is_delivered', e.target.checked)} disabled={isReadOnly} />
-                      Entregado
-                    </label>
-                  </div>
-
-                  <div className="text-right font-medium">
-                    Total: €{(line.quantity * line.unit_price).toFixed(2)}
-                  </div>
-                </div>)}
-              
-              <Separator />
-              <div className="text-right text-lg font-bold">
-                Total General: €{saleLines.reduce((sum, line) => sum + line.quantity * line.unit_price, 0).toFixed(2)}
-              </div>
-            </div>}
-        </CardContent>
-      </Card>
-
-
-      {!isReadOnly && <div className="flex gap-4">
-        <Button 
-            onClick={() => handleSaveVisit(false)} 
-            disabled={loading || !visitData.company_id || !visitData.notes.trim()} 
-            variant="outline" 
-            className="flex-1"
-          >
-            {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            Guardar
-          </Button>
+              {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Guardar
+            </Button>
           <Button 
             onClick={() => handleSaveVisit(true)} 
             disabled={loading || !visitData.company_id || !visitData.notes.trim()} 
@@ -1289,14 +1339,16 @@ export default function UnifiedVisitsManagement() {
             Finalizar
           </Button>
         </div>}
-      
-      {isReadOnly && <div className="text-center py-4">
-          <Button variant="outline" onClick={() => window.dispatchEvent(new CustomEvent('navigateToVisitsList'))}>
-            Volver a la Lista de Visitas
-          </Button>
-        </div>}
-    </div>;
+        
+        {isReadOnly && <div className="text-center py-4">
+            <Button variant="outline" onClick={() => window.dispatchEvent(new CustomEvent('navigateToVisitsList'))}>
+              Volver a la Lista de Visitas
+            </Button>
+          </div>}
+      </div>
+    );
   };
+
   console.log('=== COMPONENT RENDER ===');
   console.log('currentStep:', currentStep);
   console.log('existingClient:', existingClient);
