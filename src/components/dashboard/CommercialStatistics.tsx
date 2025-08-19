@@ -52,6 +52,10 @@ interface Visit {
   };
   notes: string;
   sales?: SaleInVisit[];
+  visit_states?: {
+    name: string;
+    description: string;
+  };
 }
 
 export default function CommercialStatistics() {
@@ -112,6 +116,11 @@ export default function CommercialStatistics() {
           approval_status,
           notes,
           client_id,
+          visit_state_code,
+          visit_states (
+            name,
+            description
+          ),
           client:clients(nombre_apellidos, dni),
           company:companies(name)
         `)
@@ -501,6 +510,17 @@ export default function CommercialStatistics() {
                   <Label>Estado</Label>
                   <div>{getStatusBadge(selectedVisit.status, selectedVisit.approval_status)}</div>
                 </div>
+                {selectedVisit.visit_states && (
+                  <div>
+                    <Label>Resultado de la visita</Label>
+                    <div>
+                      <Badge variant="outline">{selectedVisit.visit_states.name}</Badge>
+                    </div>
+                    {selectedVisit.visit_states.description && (
+                      <p className="text-sm text-muted-foreground mt-1">{selectedVisit.visit_states.description}</p>
+                    )}
+                  </div>
+                )}
               </div>
               
               <div>

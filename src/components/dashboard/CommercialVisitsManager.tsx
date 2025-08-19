@@ -31,6 +31,10 @@ interface Visit {
     last_name: string;
   };
   approval_date?: string;
+  visit_states?: {
+    name: string;
+    description: string;
+  };
 }
 export default function CommercialVisitsManager() {
   const {
@@ -477,6 +481,17 @@ export default function CommercialVisitsManager() {
                   <Label>Estado de la visita</Label>
                   <div>{getStatusBadge(selectedVisit)}</div>
                 </div>
+                {selectedVisit.visit_states && (
+                  <div>
+                    <Label>Resultado de la visita</Label>
+                    <div>
+                      <Badge variant="outline">{selectedVisit.visit_states.name}</Badge>
+                    </div>
+                    {selectedVisit.visit_states.description && (
+                      <p className="text-sm text-muted-foreground mt-1">{selectedVisit.visit_states.description}</p>
+                    )}
+                  </div>
+                )}
               </div>
               
               <div>

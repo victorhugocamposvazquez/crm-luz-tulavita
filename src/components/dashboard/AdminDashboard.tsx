@@ -53,6 +53,10 @@ interface Visit {
   } | null;
   notes: string;
   sales?: any[];
+  visit_states?: {
+    name: string;
+    description: string;
+  };
 }
 
 export default function AdminDashboard() {
@@ -197,6 +201,11 @@ export default function AdminDashboard() {
           notes,
           client_id,
           commercial_id,
+          visit_state_code,
+          visit_states (
+            name,
+            description
+          ),
           client:clients(nombre_apellidos, dni),
           company:companies(name)
         `)
@@ -682,8 +691,19 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                   <Label>Estado</Label>
-                  {getStatusBadge(selectedVisit.status, selectedVisit.approval_status)}
+                  <div>{getStatusBadge(selectedVisit.status, selectedVisit.approval_status)}</div>
                 </div>
+                {selectedVisit.visit_states && (
+                  <div>
+                    <Label>Resultado de la visita</Label>
+                    <div>
+                      <Badge variant="outline">{selectedVisit.visit_states.name}</Badge>
+                    </div>
+                    {selectedVisit.visit_states.description && (
+                      <p className="text-sm text-muted-foreground mt-1">{selectedVisit.visit_states.description}</p>
+                    )}
+                  </div>
+                )}
               </div>
 
               {selectedVisit.notes && (
