@@ -30,7 +30,9 @@ export default function Layout({ children, currentView, onViewChange }: LayoutPr
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const isAdmin = userRole?.role === 'admin';
+  const isCommercial = userRole?.role === 'commercial';
   const totalNotifications = pendingTasks.length + pendingApprovals.length;
+  const showGpsButton = isCommercial && !location && !hasPermission;
 
   const navigation = isAdmin ? [
     { name: 'Dashboard', icon: TrendingUp, view: 'dashboard' },
@@ -57,16 +59,15 @@ export default function Layout({ children, currentView, onViewChange }: LayoutPr
           </Button>
           <h1 className="text-lg font-semibold flex items-center space-x-2">
             <span>Backoffice</span>
-            {!location && !hasPermission && (
+            {showGpsButton && (
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
                 onClick={requestLocation}
                 disabled={geoLoading}
-                className="text-xs h-6 px-2"
+                className="relative animate-pulse hover:animate-none h-6 w-6 p-0"
               >
-                <Navigation className="h-3 w-3 mr-1" />
-                {geoLoading ? 'Activando...' : 'GPS'}
+                <Navigation className="h-4 w-4 text-amber-500" />
               </Button>
             )}
           </h1>
@@ -118,16 +119,15 @@ export default function Layout({ children, currentView, onViewChange }: LayoutPr
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <h1 className="text-xl font-bold">Backoffice</h1>
-                  {!location && !hasPermission && (
+                  {showGpsButton && (
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
                       onClick={requestLocation}
                       disabled={geoLoading}
-                      className="text-xs h-7 px-2"
+                      className="relative animate-pulse hover:animate-none"
                     >
-                      <Navigation className="h-3 w-3 mr-1" />
-                      {geoLoading ? 'Activando...' : 'Activar GPS'}
+                      <Navigation className="h-4 w-4 text-amber-500" />
                     </Button>
                   )}
                 </div>
