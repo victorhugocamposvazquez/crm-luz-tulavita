@@ -3,6 +3,8 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import VisitSalesSection from './VisitSalesSection';
+import { MapPin } from 'lucide-react';
+import { formatCoordinates } from '@/lib/coordinates';
 
 interface Visit {
   id: string;
@@ -132,14 +134,22 @@ export default function VisitDetailsDialog({
             {(selectedVisit.latitude && selectedVisit.longitude) && (
               <div>
                 <label className="text-sm font-medium">Ubicación</label>
-                <p className="text-sm text-muted-foreground">
-                  {selectedVisit.latitude.toFixed(6)}, {selectedVisit.longitude.toFixed(6)}
+                <div className="flex items-center gap-2 mt-1">
+                  <a 
+                    href={`https://maps.google.com/?q=${selectedVisit.latitude},${selectedVisit.longitude}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer hover:underline flex items-center gap-1"
+                  >
+                    {formatCoordinates(selectedVisit.latitude, selectedVisit.longitude)}
+                    <MapPin className="h-3 w-3" />
+                  </a>
                   {selectedVisit.location_accuracy && (
-                    <span className="ml-2 text-xs">
+                    <span className="text-xs text-muted-foreground">
                       (±{selectedVisit.location_accuracy.toFixed(0)}m)
                     </span>
                   )}
-                </p>
+                </div>
               </div>
             )}
           </div>

@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { Plus, MapPin, Calendar, User, Building, Users, List, Eye, Edit, CheckCircle } from 'lucide-react';
+import { formatCoordinates } from '@/lib/coordinates';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 import UnifiedVisitsManagement from './UnifiedVisitsManagement';
@@ -523,14 +524,22 @@ export default function CommercialVisitsManager() {
                 {(selectedVisit.latitude && selectedVisit.longitude) && (
                   <div>
                     <Label>Ubicación</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedVisit.latitude.toFixed(6)}, {selectedVisit.longitude.toFixed(6)}
+                    <div className="flex items-center gap-2 mt-1">
+                      <a 
+                        href={`https://maps.google.com/?q=${selectedVisit.latitude},${selectedVisit.longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer hover:underline flex items-center gap-1"
+                      >
+                        {formatCoordinates(selectedVisit.latitude, selectedVisit.longitude)}
+                        <MapPin className="h-3 w-3" />
+                      </a>
                       {selectedVisit.location_accuracy && (
-                        <span className="ml-2 text-xs">
+                        <span className="text-xs text-muted-foreground">
                           (±{selectedVisit.location_accuracy.toFixed(0)}m)
                         </span>
                       )}
-                    </p>
+                    </div>
                   </div>
                 )}
               </div>
