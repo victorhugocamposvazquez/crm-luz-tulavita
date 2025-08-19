@@ -240,17 +240,27 @@ export default function CommercialStatistics() {
     }
   };
 
-  const getStatusBadge = (status: string, approvalStatus?: string) => {
-    if (approvalStatus === 'approved') {
-      return <Badge variant="default" className="bg-green-500">Aprobada</Badge>;
-    }
-    if (approvalStatus === 'rejected') {
-      return <Badge variant="destructive">Rechazada</Badge>;
-    }
-    if (status === 'completed') {
-      return <Badge variant="secondary">Completada</Badge>;
-    }
-    return <Badge variant="outline">Pendiente</Badge>;
+  const getStatusBadge = (status: string) => {
+    const statusLabels = {
+      'in_progress': 'En progreso',
+      'completed': 'Completada',
+      'no_answer': 'Sin respuesta', 
+      'not_interested': 'No interesado',
+      'postponed': 'Aplazada'
+    };
+
+    const statusColors = {
+      'in_progress': 'bg-blue-100 text-blue-800',
+      'completed': 'bg-green-100 text-green-800',
+      'no_answer': 'bg-gray-100 text-gray-800',
+      'not_interested': 'bg-red-100 text-red-800',
+      'postponed': 'bg-yellow-100 text-yellow-800'
+    };
+
+    const label = statusLabels[status as keyof typeof statusLabels] || status;
+    const colorClass = statusColors[status as keyof typeof statusColors] || 'bg-gray-100 text-gray-800';
+
+    return <Badge className={colorClass}>{label}</Badge>;
   };
 
   const formatCurrency = (amount: number) => {
@@ -515,7 +525,7 @@ export default function CommercialStatistics() {
                 </div>
                 <div>
                   <Label>Estado</Label>
-                  <div>{getStatusBadge(selectedVisit.status, selectedVisit.approval_status)}</div>
+                  <div>{getStatusBadge(selectedVisit.status)}</div>
                 </div>
                 {selectedVisit.visit_states && (
                   <div>
