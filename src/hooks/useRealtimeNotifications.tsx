@@ -290,11 +290,71 @@ export function useRealtimeNotifications() {
     }
   };
 
+  const approveAllRequests = async () => {
+    if (pendingApprovals.length === 0) return;
+
+    try {
+      const promises = pendingApprovals.map(request => 
+        supabase.functions.invoke('admin-actions', {
+          body: {
+            action: 'approve_request',
+            id: request.id
+          }
+        })
+      );
+
+      await Promise.all(promises);
+
+      toast({
+        title: "Todas las solicitudes aprobadas",
+        description: `Se aprobaron ${pendingApprovals.length} solicitudes de acceso`,
+      });
+    } catch (error) {
+      console.error('Error approving all requests:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron aprobar todas las solicitudes",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const rejectAllRequests = async () => {
+    if (pendingApprovals.length === 0) return;
+
+    try {
+      const promises = pendingApprovals.map(request => 
+        supabase.functions.invoke('admin-actions', {
+          body: {
+            action: 'reject_request',
+            id: request.id
+          }
+        })
+      );
+
+      await Promise.all(promises);
+
+      toast({
+        title: "Todas las solicitudes rechazadas",
+        description: `Se rechazaron ${pendingApprovals.length} solicitudes de acceso`,
+      });
+    } catch (error) {
+      console.error('Error rejecting all requests:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron rechazar todas las solicitudes",
+        variant: "destructive",
+      });
+    }
+  };
+
   return {
     pendingTasks,
     pendingApprovals,
     approveClientAccess,
     rejectClientAccess,
     markTaskCompleted,
+    approveAllRequests,
+    rejectAllRequests,
   };
 }

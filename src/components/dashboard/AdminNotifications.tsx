@@ -2,12 +2,12 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle, UserCheck, UserX } from 'lucide-react';
+import { CheckCircle, UserCheck, UserX, CheckSquare, XSquare } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function AdminNotifications() {
   const { userRole } = useAuth();
-  const { pendingTasks, pendingApprovals, approveClientAccess, rejectClientAccess, markTaskCompleted } = useRealtimeNotifications();
+  const { pendingTasks, pendingApprovals, approveClientAccess, rejectClientAccess, markTaskCompleted, approveAllRequests, rejectAllRequests } = useRealtimeNotifications();
 
   if (userRole?.role !== 'admin') {
     return null;
@@ -25,6 +25,28 @@ export default function AdminNotifications() {
 
   return (
     <div className="space-y-3 p-4 max-h-[600px] overflow-y-auto">
+      {/* Bulk Actions for Approval Requests */}
+      {pendingApprovals.length > 0 && (
+        <div className="flex gap-2 p-3 bg-muted rounded-lg border-2 border-dashed">
+          <Button
+            size="sm"
+            onClick={approveAllRequests}
+            className="bg-green-600 hover:bg-green-700 text-white text-xs px-3 py-2 h-auto flex-1"
+          >
+            <CheckSquare className="h-4 w-4 mr-1" />
+            Aprobar Todas ({pendingApprovals.length})
+          </Button>
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={rejectAllRequests}
+            className="text-xs px-3 py-2 h-auto flex-1"
+          >
+            <XSquare className="h-4 w-4 mr-1" />
+            Rechazar Todas ({pendingApprovals.length})
+          </Button>
+        </div>
+      )}
       {/* New Client Tasks */}
       {pendingTasks.map((task) => (
         <div key={task.id} className="p-3 border rounded-lg bg-blue-50 dark:bg-blue-950 space-y-2">
