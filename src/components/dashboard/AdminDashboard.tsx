@@ -740,13 +740,13 @@ export default function AdminDashboard() {
 
               {visitSales.length > 0 && (
                 <div>
-                  <Label>Ventas Asociadas</Label>
+                  <Label>Ventas</Label>
                   <div className="mt-2 space-y-4">
-                    {visitSales.map((sale) => (
+                    {visitSales.map((sale, index) => (
                       <div key={sale.id} className="border rounded p-3">
                         <div className="flex justify-between items-start mb-2">
                           <div>
-                            <p className="font-medium">Venta #{sale.id.slice(-8)}</p>
+                            <p className="font-medium">Venta #{index + 1}</p>
                             <p className="text-sm text-muted-foreground">{formatDate(sale.sale_date)}</p>
                           </div>
                           <p className="font-bold text-green-600">{formatCurrency(sale.amount)}</p>
