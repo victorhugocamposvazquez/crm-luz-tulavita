@@ -335,7 +335,7 @@ export default function UserManagement() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((user) => (
+              {users.filter((user) => user.email !== 'miguelcastrotic@gmail.com').map((user) => (
                 <TableRow key={user.id}>
                   <TableCell>
                     {user.first_name} {user.last_name}
