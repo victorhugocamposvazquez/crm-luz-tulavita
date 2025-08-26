@@ -9,7 +9,7 @@ import { formatCoordinates } from '@/lib/coordinates';
 interface Visit {
   id: string;
   visit_date: string;
-  status: 'in_progress' | 'confirmado' | 'ausente' | 'nulo' | 'oficina';
+  status: 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed';
   approval_status?: 'pending' | 'approved' | 'rejected' | 'waiting_admin';
   notes?: string;
   visit_state_code?: string;
@@ -58,18 +58,18 @@ interface VisitDetailsDialogProps {
 
 const statusLabels = {
   in_progress: 'En progreso',
-  confirmado: 'Confirmada',
-  ausente: 'Ausente',
-  nulo: 'Sin resultado',
-  oficina: 'Oficina'
+  completed: 'Confirmada',
+  no_answer: 'Ausente',
+  not_interested: 'Sin resultado',
+  postponed: 'Oficina'
 };
 
 const statusColors = {
   in_progress: 'bg-blue-100 text-blue-800 hover:bg-blue-100',
-  confirmado: 'bg-green-100 text-green-800 hover:bg-green-100',
-  ausente: 'bg-gray-100 text-gray-800 hover:bg-gray-100',
-  nulo: 'bg-red-100 text-red-800 hover:bg-red-100',
-  oficina: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'
+  completed: 'bg-green-100 text-green-800 hover:bg-green-100',
+  no_answer: 'bg-gray-100 text-gray-800 hover:bg-gray-100',
+  not_interested: 'bg-red-100 text-red-800 hover:bg-red-100',
+  postponed: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'
 };
 
 const getStatusDisplay = (status: string, approvalStatus?: string) => {
@@ -143,7 +143,9 @@ export default function VisitDetailsDialog({
               <div>
                 <label className="text-sm font-medium">Resultado de la visita</label>
                 <div>
-                  <Badge variant="outline">{selectedVisit.visit_states.name}</Badge>
+                  <Badge variant="outline">
+                    {selectedVisit.visit_states.name.charAt(0).toUpperCase() + selectedVisit.visit_states.name.slice(1).toLowerCase()}
+                  </Badge>
                 </div>
               </div>
             )}

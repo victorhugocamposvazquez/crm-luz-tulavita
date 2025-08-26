@@ -32,7 +32,7 @@ interface Client {
 interface Visit {
   id: string;
   visit_date: string;
-  status: 'in_progress' | 'confirmado' | 'ausente' | 'nulo' | 'oficina';
+  status: 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed';
   approval_status: 'pending' | 'approved' | 'rejected' | 'waiting_admin';
   notes?: string;
   commercial_id: string;
@@ -75,18 +75,18 @@ interface Sale {
 
 const statusLabels = {
   in_progress: 'En Progreso',
-  confirmado: 'Confirmada',
-  ausente: 'Ausente',
-  nulo: 'Sin resultado',
-  oficina: 'Oficina'
+  completed: 'Confirmada',
+  no_answer: 'Ausente',
+  not_interested: 'Sin resultado',
+  postponed: 'Oficina'
 };
 
 const statusColors = {
   in_progress: 'bg-blue-100 text-blue-800',
-  confirmado: 'bg-green-100 text-green-800',
-  ausente: 'bg-yellow-100 text-yellow-800',
-  nulo: 'bg-red-100 text-red-800',
-  oficina: 'bg-blue-100 text-blue-800'
+  completed: 'bg-green-100 text-green-800',
+  no_answer: 'bg-yellow-100 text-yellow-800',
+  not_interested: 'bg-red-100 text-red-800',
+  postponed: 'bg-blue-100 text-blue-800'
 };
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
@@ -597,7 +597,7 @@ const fetchVisits = async () => {
               <div className="flex justify-between items-center">
                 <span className="text-sm font-medium">Visitas Completadas:</span>
                 <span className="font-bold text-green-600">
-                  {visits.filter(v => v.status === 'confirmado').length}
+                  {visits.filter(v => v.status === 'completed').length}
                 </span>
               </div>
               <div className="flex justify-between items-center">
