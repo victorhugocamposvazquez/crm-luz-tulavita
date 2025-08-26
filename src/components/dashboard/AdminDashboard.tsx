@@ -789,7 +789,9 @@ export default function AdminDashboard() {
                   <div>
                     <Label>Resultado de la visita</Label>
                     <div>
-                      <Badge variant="outline">{selectedVisit.visit_states.name}</Badge>
+                      <Badge variant="outline">
+                        {selectedVisit.visit_states.name.charAt(0).toUpperCase() + selectedVisit.visit_states.name.slice(1).toLowerCase()}
+                      </Badge>
                     </div>
                   </div>
                 )}
