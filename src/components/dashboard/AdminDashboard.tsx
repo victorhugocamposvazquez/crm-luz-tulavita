@@ -386,6 +386,29 @@ export default function AdminDashboard() {
     return format(new Date(dateString), 'dd/MM/yyyy HH:mm', { locale: es });
   };
 
+  const renderNotesCell = (visit: Visit) => {
+    if (!visit.notes) {
+      return <span className="text-muted-foreground">-</span>;
+    }
+    
+    if (visit.notes.length <= 50) {
+      return <span>{visit.notes}</span>;
+    }
+    
+    return (
+      <span>
+        {visit.notes.substring(0, 50)}
+        <Button
+          variant="link"
+          className="p-0 h-auto text-primary hover:text-primary/80"
+          onClick={() => handleViewVisit(visit)}
+        >
+          ...
+        </Button>
+      </span>
+    );
+  };
+
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">Cargando dashboard...</div>;
   }
@@ -624,6 +647,7 @@ export default function AdminDashboard() {
                   <TableHead>Cliente</TableHead>
                   <TableHead>Comercial</TableHead>
                   <TableHead>Empresa</TableHead>
+                  <TableHead>Notas</TableHead>
                   <TableHead>Ventas Generadas</TableHead>
                   <TableHead>Comisión Total</TableHead>
                   <TableHead>Acciones</TableHead>
@@ -647,6 +671,9 @@ export default function AdminDashboard() {
                         {visit.commercial ? `${visit.commercial.first_name} ${visit.commercial.last_name}` : 'N/A'}
                       </TableCell>
                       <TableCell>{visit.company?.name || 'N/A'}</TableCell>
+                      <TableCell className="max-w-xs">
+                        {renderNotesCell(visit)}
+                      </TableCell>
                       <TableCell>
                         {visit.sales && visit.sales.length > 0 ? (
                           <div className="space-y-1">
@@ -684,7 +711,7 @@ export default function AdminDashboard() {
                 })}
                 {completedVisits.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground">
+                    <TableCell colSpan={8} className="text-center text-muted-foreground">
                       No hay visitas completadas en los últimos 30 días
                     </TableCell>
                   </TableRow>

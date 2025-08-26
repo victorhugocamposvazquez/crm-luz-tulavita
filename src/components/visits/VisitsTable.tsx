@@ -14,6 +14,7 @@ interface Visit {
   commercial_id?: string;
   created_at?: string;
   approval_status?: string;
+  notes?: string;
   commercial?: {
     first_name: string | null;
     last_name: string | null;
@@ -91,6 +92,35 @@ export default function VisitsTable({
     return name || commercial.email;
   };
 
+  const truncateNotes = (notes: string | undefined, maxLength: number = 50) => {
+    if (!notes) return '-';
+    if (notes.length <= maxLength) return notes;
+    return notes.substring(0, maxLength) + '...';
+  };
+
+  const renderNotesCell = (visit: Visit) => {
+    if (!visit.notes) {
+      return <span className="text-muted-foreground">-</span>;
+    }
+    
+    if (visit.notes.length <= 50) {
+      return <span>{visit.notes}</span>;
+    }
+    
+    return (
+      <span>
+        {visit.notes.substring(0, 50)}
+        <Button
+          variant="link"
+          className="p-0 h-auto text-primary hover:text-primary/80"
+          onClick={() => onViewVisit(visit)}
+        >
+          ...
+        </Button>
+      </span>
+    );
+  };
+
   return (
     <Table>
       <TableHeader>
@@ -105,6 +135,7 @@ export default function VisitsTable({
           <TableHead>Empresa</TableHead>
           <TableHead>Fecha</TableHead>
           <TableHead>Estado</TableHead>
+          <TableHead>Notas</TableHead>
           <TableHead>Ventas</TableHead>
           <TableHead>Comisión</TableHead>
           <TableHead>Acciones</TableHead>
@@ -113,7 +144,7 @@ export default function VisitsTable({
       <TableBody>
         {visits.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={showClientColumns ? 9 : 7} className="text-center py-8 text-muted-foreground">
+            <TableCell colSpan={showClientColumns ? 10 : 8} className="text-center py-8 text-muted-foreground">
               {emptyMessage}
             </TableCell>
           </TableRow>
@@ -155,6 +186,9 @@ export default function VisitsTable({
                     const statusDisplay = getStatusDisplay(visit.status, visit.approval_status);
                     return <Badge className={statusDisplay.color}>{statusDisplay.label}</Badge>;
                   })()}
+                </TableCell>
+                <TableCell className="max-w-xs">
+                  {renderNotesCell(visit)}
                 </TableCell>
                 <TableCell>
                   {totalSales > 0 ? `€${totalSales.toFixed(2)}` : '-'}
