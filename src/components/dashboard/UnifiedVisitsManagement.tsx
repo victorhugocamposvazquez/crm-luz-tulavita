@@ -681,6 +681,16 @@ export default function UnifiedVisitsManagement() {
       });
       return;
     }
+    
+    if (!selectedCompany) {
+      toast({
+        title: "Error",
+        description: "Selecciona una empresa antes de crear el cliente",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setLoading(true);
     try {
       // Include coordinates in client data
@@ -695,12 +705,41 @@ export default function UnifiedVisitsManagement() {
         error
       } = await supabase.from('clients').insert(clientPayload).select().single();
       if (error) throw error;
+      
+      // Automatically create the visit for the new client
+      const visitPayload = {
+        client_id: newClient.id,
+        commercial_id: user!.id,
+        company_id: selectedCompany,
+        notes: 'Visita creada automáticamente al registrar nuevo cliente',
+        status: 'in_progress' as const,
+        latitude: location?.latitude || null,
+        longitude: location?.longitude || null,
+        location_accuracy: location?.accuracy || null,
+        visit_date: new Date().toISOString(),
+        approval_status: 'approved' as const, // Auto-approved for new clients
+        permission: 'approved'
+      };
+      
+      const { data: newVisit, error: visitError } = await supabase
+        .from('visits')
+        .insert(visitPayload as any)
+        .select()
+        .single();
+        
+      if (visitError) {
+        console.error('Visit creation error:', visitError);
+        throw visitError;
+      }
+      
       setExistingClient(newClient);
       setHasApproval(true);
+      setEditingVisitId(newVisit.id); // Set the visit ID for editing
       setCurrentStep('visit-form');
+      
       toast({
-        title: "Cliente creado",
-        description: "Continúa con la información de la visita"
+        title: "Cliente y visita creados",
+        description: "Cliente registrado exitosamente y visita creada automáticamente"
       });
     } catch (error) {
       console.error('Error creating client:', error);
