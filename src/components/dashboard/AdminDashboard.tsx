@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Users, Euro, MapPin, TrendingUp, Eye } from 'lucide-react';
 import { formatCoordinates } from '@/lib/coordinates';
+import { calculateCommission } from '@/lib/commission';
 import { format, subDays, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths, startOfDay, endOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
@@ -212,7 +213,7 @@ export default function AdminDashboard() {
 
         return {
           ...sale,
-          commission_amount: sale.commission_amount || (sale.amount * ((sale.commission_percentage || 5) / 100)),
+          commission_amount: sale.commission_amount || calculateCommission(sale.amount),
           commercial
         };
       }));
@@ -275,7 +276,7 @@ export default function AdminDashboard() {
           commercial,
           sales: visitSales?.map(sale => ({
             ...sale,
-            commission_amount: sale.commission_amount || (sale.amount * ((sale.commission_percentage || 5) / 100))
+            commission_amount: sale.commission_amount || calculateCommission(sale.amount)
           })) || []
         };
       }));
@@ -309,7 +310,7 @@ export default function AdminDashboard() {
         }) || [];
 
         const totalAmount = monthSales.reduce((sum, sale) => sum + sale.amount, 0);
-        const totalCommission = totalAmount * 0.05;
+        const totalCommission = monthSales.reduce((sum, sale) => sum + calculateCommission(sale.amount), 0);
 
         return {
           month: format(month, 'MMM yyyy', { locale: es }),

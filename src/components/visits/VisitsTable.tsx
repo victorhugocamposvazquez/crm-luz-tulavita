@@ -5,6 +5,7 @@ import { Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Link } from 'react-router-dom';
+import { calculateCommission } from '@/lib/commission';
 
 interface Visit {
   id: string;
@@ -163,9 +164,9 @@ export default function VisitsTable({
             // Find sales for this visit and calculate commission properly
             const visitSales = sales.filter(sale => sale.visit_id === visit.id);
             const totalSales = visitSales.reduce((sum, sale) => sum + sale.amount, 0);
-            // Calculate commission using stored amount or calculate from percentage (default 5%)
+            // Calculate commission using stored amount or calculate with new system
             const totalCommission = visitSales.reduce((sum, sale) => {
-              const commission = sale.commission_amount || (sale.amount * ((sale as any).commission_percentage || 5) / 100);
+              const commission = sale.commission_amount || calculateCommission(sale.amount);
               return sum + commission;
             }, 0);
             

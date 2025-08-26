@@ -1,19 +1,20 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { toast } from '@/hooks/use-toast';
-import { format, subDays, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths } from 'date-fns';
+import { Users, Euro, MapPin, TrendingUp, Eye } from 'lucide-react';
+import { format, subDays, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths, startOfDay, endOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Eye, MapPin } from 'lucide-react';
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
+import { calculateCommission } from '@/lib/commission';
 import { formatCoordinates } from '@/lib/coordinates';
+import { toast } from '@/hooks/use-toast';
 
 interface SaleInVisit {
   id: string;
@@ -102,10 +103,10 @@ export default function CommercialStatistics() {
 
       if (salesError) throw salesError;
 
-      // Calculate commission using stored percentage or default to 5%
+      // Calculate commission using new system
       const processedSales = salesData?.map(sale => ({
         ...sale,
-        commission_amount: sale.commission_amount || (sale.amount * ((sale.commission_percentage || 5) / 100))
+        commission_amount: sale.commission_amount || calculateCommission(sale.amount)
       })) || [];
 
       setSales(processedSales);
@@ -148,7 +149,7 @@ export default function CommercialStatistics() {
           ...visit,
           sales: visitSales?.map(sale => ({
             ...sale,
-            commission_amount: sale.commission_amount || (sale.amount * ((sale.commission_percentage || 5) / 100))
+            commission_amount: sale.commission_amount || calculateCommission(sale.amount)
           })) || []
         };
       }));
@@ -178,7 +179,7 @@ export default function CommercialStatistics() {
         }) || [];
 
         const totalAmount = monthSales.reduce((sum, sale) => sum + sale.amount, 0);
-        const totalCommission = totalAmount * 0.05;
+        const totalCommission = monthSales.reduce((sum, sale) => sum + calculateCommission(sale.amount), 0);
 
         return {
           month: format(month, 'MMM yyyy', { locale: es }),

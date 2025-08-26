@@ -20,6 +20,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 import { formatCoordinates } from '@/lib/coordinates';
+import { calculateCommission } from '@/lib/commission';
 
 interface Client {
   id: string;
@@ -371,13 +372,13 @@ export default function VisitSalesManagement() {
 
     const formData = new FormData(e.currentTarget);
     const total = validLines.reduce((sum, line) => sum + (line.quantity * line.unit_price), 0);
-    const commissionAmount = total * 0.05; // 5% fijo
+    const commissionAmount = calculateCommission(total);
 
     const saleData = {
       client_id: formData.get('client_id') as string,
       company_id: formData.get('company_id') as string,
       amount: total,
-      commission_percentage: 5,
+      commission_percentage: commissionAmount > 0 ? (commissionAmount / total) * 100 : 0,
       commission_amount: commissionAmount,
       sale_date: formData.get('sale_date') as string,
       commercial_id: user.id,
@@ -565,8 +566,8 @@ export default function VisitSalesManagement() {
     return saleLines.reduce((sum, line) => sum + (line.quantity * line.unit_price), 0);
   };
 
-  const calculateCommission = () => {
-    return calculateTotal() * 0.05; // Default 5% commission
+  const calculateCommissionAmount = () => {
+    return calculateCommission(calculateTotal());
   };
 
   const openSaleDialog = (sale?: Sale) => {
@@ -944,8 +945,8 @@ export default function VisitSalesManagement() {
                             <span>€{calculateTotal().toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between text-sm text-muted-foreground mt-1">
-                            <span>Comisión (5%):</span>
-                            <span>€{calculateCommission().toFixed(2)}</span>
+                            <span>Comisión:</span>
+                            <span>€{calculateCommissionAmount().toFixed(2)}</span>
                           </div>
                         </div>
                       </div>
@@ -970,7 +971,7 @@ export default function VisitSalesManagement() {
                     <TableHead>Cliente</TableHead>
                     <TableHead>Empresa</TableHead>
                     <TableHead>Importe</TableHead>
-                    <TableHead>Comisión (5%)</TableHead>
+                    <TableHead>Comisión</TableHead>
                     <TableHead>Fecha</TableHead>
                     <TableHead>Líneas</TableHead>
                     <TableHead>Acciones</TableHead>

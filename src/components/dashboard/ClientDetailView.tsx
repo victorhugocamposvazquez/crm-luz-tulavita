@@ -6,16 +6,16 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Separator } from '@/components/ui/separator';
 import { toast } from '@/hooks/use-toast';
-import { ArrowLeft, MapPin, Calendar, DollarSign, TrendingUp, Package, Euro, Building2, Phone, Mail, MapPinIcon, Eye } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, DollarSign, TrendingUp, Building2, Phone, Mail, MapPinIcon, Eye, Euro } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { formatCoordinates } from '@/lib/coordinates';
 import VisitsTable from '@/components/visits/VisitsTable';
 import VisitDetailsDialog from '@/components/visits/VisitDetailsDialog';
+import { calculateCommission } from '@/lib/commission';
 
 interface Client {
   id: string;
@@ -241,15 +241,15 @@ const fetchVisits = async () => {
           .maybeSingle()
       ]);
       
-      // Calculate commission using the stored percentage or default to 5%
-      const commissionPercentage = sale.commission_percentage || 5;
-      const calculatedCommission = sale.amount * (commissionPercentage / 100);
+      // Calculate commission using the new system
+      const commissionPercentage = sale.commission_percentage || 0;
+      const calculatedCommission = sale.commission_amount || calculateCommission(sale.amount);
       
       return { 
         ...sale, 
         sale_lines: lines || [], 
         commercial,
-        commission_amount: sale.commission_amount || calculatedCommission
+        commission_amount: calculatedCommission
       };
     }));
 

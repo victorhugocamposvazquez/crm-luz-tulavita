@@ -10,6 +10,7 @@ import { Search, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import VisitsTable from '@/components/visits/VisitsTable';
 import VisitDetailsDialog from '@/components/visits/VisitDetailsDialog';
+import { calculateCommission } from '@/lib/commission';
 
 interface Visit {
   id: string;
@@ -146,14 +147,14 @@ export default function AdminVisitsView() {
           .select('product_name, quantity, unit_price, paid_cash, is_paid, is_delivered')
           .eq('sale_id', sale.id);
 
-        // Calculate commission using the stored percentage or default to 5%
-        const commissionPercentage = sale.commission_percentage || 5;
-        const calculatedCommission = sale.amount * (commissionPercentage / 100);
+        // Calculate commission using the new system
+        const commissionPercentage = sale.commission_percentage || 0;
+        const calculatedCommission = sale.commission_amount || calculateCommission(sale.amount);
 
         return {
           ...sale,
           sale_lines: linesError ? [] : (linesData || []),
-          commission_amount: sale.commission_amount || calculatedCommission
+          commission_amount: calculatedCommission
         };
       }));
 
