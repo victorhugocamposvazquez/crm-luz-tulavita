@@ -141,19 +141,27 @@ export default function AdminDashboard() {
         monthSales: monthSalesAmount
       });
 
-      // Fetch commercials for filter (only users with 'commercial' role)
-      const { data: commercialsData, error: commercialsError } = await supabase
-        .from('profiles')
-        .select(`
-          id, 
-          first_name, 
-          last_name,
-          user_roles!inner(role)
-        `)
-        .eq('user_roles.role', 'commercial');
+      // Fetch commercials for filter (first get commercial user IDs, then their profiles)
+      const { data: commercialRoles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'commercial');
 
-      if (commercialsError) throw commercialsError;
-      setCommercials(commercialsData || []);
+      if (rolesError) throw rolesError;
+
+      if (commercialRoles && commercialRoles.length > 0) {
+        const commercialIds = commercialRoles.map(role => role.user_id);
+        
+        const { data: commercialsData, error: commercialsError } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name')
+          .in('id', commercialIds);
+
+        if (commercialsError) throw commercialsError;
+        setCommercials(commercialsData || []);
+      } else {
+        setCommercials([]);
+      }
 
       // Build sales query with optional commercial filter  
       let salesQuery = supabase
