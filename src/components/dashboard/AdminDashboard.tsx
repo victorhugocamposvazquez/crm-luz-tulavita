@@ -71,7 +71,8 @@ export default function AdminDashboard() {
     totalClients: 0,
     todaySales: { count: 0, amount: 0 },
     todayVisits: 0,
-    monthSales: 0
+    monthSales: 0,
+    totalSales: 0
   });
   const [sales, setSales] = useState<Sale[]>([]);
   const [visits, setVisits] = useState<Visit[]>([]);
@@ -134,11 +135,22 @@ export default function AdminDashboard() {
 
       const monthSalesAmount = monthSalesData?.reduce((sum, sale) => sum + sale.amount, 0) || 0;
 
+      // Fetch total sales (without filters) for the stats card
+      const { data: totalSalesData, error: totalSalesError } = await supabase
+        .from('sales')
+        .select('amount')
+        .gte('sale_date', thirtyDaysAgo.toISOString());
+
+      if (totalSalesError) throw totalSalesError;
+
+      const totalSalesAmount = totalSalesData?.reduce((sum, sale) => sum + sale.amount, 0) || 0;
+
       setStats({
         totalClients: clientsCount || 0,
         todaySales: { count: todaySalesData?.length || 0, amount: todaySalesAmount },
         todayVisits: todayVisitsCount || 0,
-        monthSales: monthSalesAmount
+        monthSales: monthSalesAmount,
+        totalSales: totalSalesAmount
       });
 
       // Fetch commercials for filter (first get commercial user IDs, then their profiles)
@@ -496,8 +508,8 @@ export default function AdminDashboard() {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(totalSales)}</div>
-              <p className="text-xs text-muted-foreground">{sales.length} ventas totales</p>
+              <div className="text-2xl font-bold">{formatCurrency(stats.totalSales)}</div>
+              <p className="text-xs text-muted-foreground">Últimos 30 días</p>
             </CardContent>
           </Card>
 
