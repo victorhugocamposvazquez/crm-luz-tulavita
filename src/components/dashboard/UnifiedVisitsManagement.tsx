@@ -58,7 +58,11 @@ interface ClientVisit {
 
 type WorkflowStep = 'nif-input' | 'pending-approval' | 'client-form' | 'visit-form';
 
-export default function UnifiedVisitsManagement() {
+interface UnifiedVisitsManagementProps {
+  onSuccess?: () => void;
+}
+
+export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsManagementProps = {}) {
   const {
     user,
     profile,
@@ -732,15 +736,17 @@ export default function UnifiedVisitsManagement() {
         throw visitError;
       }
       
-      setExistingClient(newClient);
-      setHasApproval(true);
-      setEditingVisitId(newVisit.id); // Set the visit ID for editing
-      setCurrentStep('visit-form');
+      console.log('New visit created:', newVisit);
       
       toast({
         title: "Cliente y visita creados",
         description: "Cliente registrado exitosamente y visita creada automáticamente"
       });
+      
+      // Call the onSuccess callback to return to the list
+      if (onSuccess) {
+        onSuccess();
+      }
     } catch (error) {
       console.error('Error creating client:', error);
       toast({
