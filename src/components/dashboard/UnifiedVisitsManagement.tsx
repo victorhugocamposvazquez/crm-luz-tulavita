@@ -1249,9 +1249,9 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
                 required 
                 disabled={isReadOnly}
               >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona una empresa" />
-                </SelectTrigger>
+              <SelectTrigger>
+                <SelectValue placeholder={companies && companies.length > 0 ? "Selecciona una empresa" : "Cargando empresas..."} />
+              </SelectTrigger>
                 <SelectContent>
                   {companies && companies.length > 0 ? (
                     companies.map(company => (
@@ -1259,9 +1259,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
                         {company.name}
                       </SelectItem>
                     ))
-                  ) : (
-                    <SelectItem disabled value="">Cargando empresas...</SelectItem>
-                  )}
+                  ) : null}
                 </SelectContent>
               </Select>
             </div>
