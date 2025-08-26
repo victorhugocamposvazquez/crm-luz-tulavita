@@ -100,23 +100,33 @@ export default function VisitsTable({
 
   const renderNotesCell = (visit: Visit) => {
     if (!visit.notes) {
-      return <span className="text-muted-foreground">-</span>;
+      return (
+        <span 
+          className="text-muted-foreground cursor-pointer hover:text-muted-foreground/80"
+          onClick={() => onViewVisit(visit)}
+        >
+          -
+        </span>
+      );
     }
     
     if (visit.notes.length <= 50) {
-      return <span>{visit.notes}</span>;
+      return (
+        <span 
+          className="cursor-pointer hover:text-foreground/80"
+          onClick={() => onViewVisit(visit)}
+        >
+          {visit.notes}
+        </span>
+      );
     }
     
     return (
-      <span>
-        {visit.notes.substring(0, 50)}
-        <Button
-          variant="link"
-          className="p-0 h-auto text-primary hover:text-primary/80"
-          onClick={() => onViewVisit(visit)}
-        >
-          ...
-        </Button>
+      <span 
+        className="cursor-pointer hover:text-foreground/80"
+        onClick={() => onViewVisit(visit)}
+      >
+        {visit.notes.substring(0, 50)}...
       </span>
     );
   };
