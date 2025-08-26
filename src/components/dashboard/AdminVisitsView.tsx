@@ -15,13 +15,17 @@ import { calculateCommission } from '@/lib/commission';
 interface Visit {
   id: string;
   visit_date: string;
-  status: 'in_progress' | 'confirmado' | 'ausente' | 'nulo' | 'oficina';
+  status: 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed';
   approval_status: 'pending' | 'approved' | 'rejected' | 'waiting_admin';
   notes?: string;
   permission: string;
   commercial_id: string;
   client_id: string;
   company_id?: string;
+  visit_states?: {
+    name: string;
+    description: string;
+  };
   commercial?: {
     first_name: string | null;
     last_name: string | null;
@@ -375,9 +379,9 @@ export default function AdminVisitsView() {
         </CardHeader>
         <CardContent>
           <VisitsTable
-            visits={visits}
+            visits={visits as any}
             sales={sales}
-            onViewVisit={handleViewVisit}
+            onViewVisit={handleViewVisit as any}
             loading={loading}
             showClientColumns={true}
             emptyMessage="No se encontraron visitas con los filtros aplicados"
@@ -387,7 +391,7 @@ export default function AdminVisitsView() {
 
       {/* Visit Detail Dialog - USANDO COMPONENTE COMÚN */}
       <VisitDetailsDialog
-        selectedVisit={selectedVisit}
+        selectedVisit={selectedVisit as any}
         visitSales={visitSales}
         onClose={() => setSelectedVisit(null)}
         showClientInfo={true}

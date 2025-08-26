@@ -10,13 +10,17 @@ import { calculateCommission } from '@/lib/commission';
 interface Visit {
   id: string;
   visit_date: string;
-  status: 'in_progress' | 'confirmado' | 'ausente' | 'nulo' | 'oficina';
+  status: 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed';
   client_id?: string;
   commercial_id?: string;
   created_at?: string;
   approval_status?: string;
   notes?: string;
   permission?: string;
+  visit_states?: {
+    name: string;
+    description: string;
+  };
   commercial?: {
     first_name: string | null;
     last_name: string | null;
@@ -49,18 +53,18 @@ interface VisitsTableProps {
 
 const statusLabels = {
   in_progress: 'En progreso',
-  confirmado: 'Confirmada',
-  ausente: 'Ausente',
-  nulo: 'Sin resultado',
-  oficina: 'Oficina'
+  completed: 'Confirmada',
+  no_answer: 'Ausente',
+  not_interested: 'Sin resultado',
+  postponed: 'Oficina'
 };
 
 const statusColors = {
   in_progress: 'bg-blue-100 text-blue-800 hover:bg-blue-100',
-  confirmado: 'bg-green-100 text-green-800 hover:bg-green-100',
-  ausente: 'bg-gray-100 text-gray-800 hover:bg-gray-100',
-  nulo: 'bg-red-100 text-red-800 hover:bg-red-100',
-  oficina: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'
+  completed: 'bg-green-100 text-green-800 hover:bg-green-100',
+  no_answer: 'bg-gray-100 text-gray-800 hover:bg-gray-100',
+  not_interested: 'bg-red-100 text-red-800 hover:bg-red-100',
+  postponed: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'
 };
 
 const getStatusDisplay = (status: string, approvalStatus?: string) => {
@@ -147,6 +151,7 @@ export default function VisitsTable({
           <TableHead>Empresa</TableHead>
           <TableHead>Fecha</TableHead>
           <TableHead>Estado</TableHead>
+          <TableHead>Resultado de la visita</TableHead>
           <TableHead>Notas</TableHead>
           <TableHead>Ventas</TableHead>
           <TableHead>Comisión</TableHead>
@@ -156,7 +161,7 @@ export default function VisitsTable({
       <TableBody>
         {visits.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={showClientColumns ? 10 : 8} className="text-center py-8 text-muted-foreground">
+            <TableCell colSpan={showClientColumns ? 11 : 9} className="text-center py-8 text-muted-foreground">
               {emptyMessage}
             </TableCell>
           </TableRow>
@@ -198,6 +203,14 @@ export default function VisitsTable({
                     const statusDisplay = getStatusDisplay(visit.status, visit.approval_status);
                     return <Badge className={statusDisplay.color}>{statusDisplay.label}</Badge>;
                   })()}
+                </TableCell>
+                <TableCell>
+                  {visit.visit_states?.name ? 
+                    visit.visit_states.name.charAt(0).toUpperCase() + visit.visit_states.name.slice(1).toLowerCase() 
+                    : visit.status ? 
+                    statusLabels[visit.status as keyof typeof statusLabels]?.charAt(0).toUpperCase() + statusLabels[visit.status as keyof typeof statusLabels]?.slice(1).toLowerCase() 
+                    : '-'
+                  }
                 </TableCell>
                 <TableCell className="max-w-xs">
                   {renderNotesCell(visit)}

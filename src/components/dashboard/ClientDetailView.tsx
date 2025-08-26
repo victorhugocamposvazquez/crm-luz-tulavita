@@ -620,9 +620,9 @@ const fetchVisits = async () => {
           </CardHeader>
           <CardContent>
             <VisitsTable
-              visits={visits}
+              visits={visits as any}
               sales={sales}
-              onViewVisit={handleViewVisit}
+              onViewVisit={handleViewVisit as any}
               loading={loading}
               showClientColumns={false}
               emptyMessage="No hay visitas registradas para este cliente"

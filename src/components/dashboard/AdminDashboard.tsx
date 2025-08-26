@@ -670,6 +670,7 @@ export default function AdminDashboard() {
                   <TableHead>Cliente</TableHead>
                   <TableHead>Comercial</TableHead>
                   <TableHead>Empresa</TableHead>
+                  <TableHead>Resultado de la visita</TableHead>
                   <TableHead>Notas</TableHead>
                   <TableHead>Ventas Generadas</TableHead>
                   <TableHead>Comisión Total</TableHead>
@@ -694,6 +695,12 @@ export default function AdminDashboard() {
                         {visit.commercial ? `${visit.commercial.first_name} ${visit.commercial.last_name}` : 'N/A'}
                       </TableCell>
                       <TableCell>{visit.company?.name || 'N/A'}</TableCell>
+                      <TableCell>
+                        {visit.visit_states?.name ? 
+                          visit.visit_states.name.charAt(0).toUpperCase() + visit.visit_states.name.slice(1).toLowerCase() 
+                          : 'Completada'
+                        }
+                      </TableCell>
                       <TableCell className="max-w-xs">
                         {renderNotesCell(visit)}
                       </TableCell>
@@ -734,7 +741,7 @@ export default function AdminDashboard() {
                 })}
                 {completedVisits.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground">
                       No hay visitas completadas en los últimos 30 días
                     </TableCell>
                   </TableRow>
