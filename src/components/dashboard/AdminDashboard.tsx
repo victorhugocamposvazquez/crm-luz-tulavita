@@ -368,7 +368,7 @@ export default function AdminDashboard() {
   const getStatusBadge = (status: string) => {
     const statusLabels = {
       'in_progress': 'En progreso',
-    'confirmado': 'Confirmada',
+    'completed': 'Confirmada',
     'ausente': 'Ausente', 
     'nulo': 'Sin resultado',
     'oficina': 'Derivado a oficina'
@@ -376,7 +376,7 @@ export default function AdminDashboard() {
 
     const statusColors = {
       'in_progress': 'bg-blue-100 text-blue-800',
-    'confirmado': 'bg-green-100 text-green-800',
+    'completed': 'bg-green-100 text-green-800',
     'ausente': 'bg-gray-100 text-gray-800',
     'nulo': 'bg-red-100 text-red-800',
     'oficina': 'bg-yellow-100 text-yellow-800'
@@ -439,14 +439,14 @@ export default function AdminDashboard() {
   const totalSales = sales.reduce((sum, sale) => sum + sale.amount, 0);
   const totalCommissions = sales.reduce((sum, sale) => sum + sale.commission_amount, 0);
   const approvedVisits = visits.filter(visit => visit.approval_status === 'approved').length;
-  const completedVisits = visits.filter(visit => visit.status === 'confirmado');
+  const completedVisits = visits.filter(visit => visit.status === 'completed');
   const inProgressVisits = visits.filter(visit => visit.status === 'in_progress');
   const rejectedVisits = visits.filter(visit => visit.approval_status === 'rejected');
   
   // Status distribution data for all visit statuses
   const statusLabels = {
     'in_progress': 'En Progreso',
-    'confirmado': 'Confirmada',
+    'completed': 'Confirmada',
     'ausente': 'Ausente',
     'nulo': 'Sin Resultado',
     'oficina': 'Oficina'
@@ -454,7 +454,7 @@ export default function AdminDashboard() {
 
   const statusColors = {
     'in_progress': '#3b82f6',
-    'confirmado': '#22c55e',
+    'completed': '#22c55e',
     'ausente': '#f59e0b',
     'nulo': '#ef4444',
     'oficina': '#8b5cf6'
