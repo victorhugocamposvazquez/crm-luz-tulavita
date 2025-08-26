@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Users, Euro, MapPin, TrendingUp, Eye } from 'lucide-react';
 import { formatCoordinates } from '@/lib/coordinates';
+import { calculateCommission } from '@/lib/commission';
 import { format, subDays, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths, startOfDay, endOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
@@ -71,7 +72,8 @@ export default function AdminDashboard() {
     totalClients: 0,
     todaySales: { count: 0, amount: 0 },
     todayVisits: 0,
-    monthSales: 0
+    monthSales: 0,
+    totalSales: 0
   });
   const [sales, setSales] = useState<Sale[]>([]);
   const [visits, setVisits] = useState<Visit[]>([]);
@@ -134,21 +136,45 @@ export default function AdminDashboard() {
 
       const monthSalesAmount = monthSalesData?.reduce((sum, sale) => sum + sale.amount, 0) || 0;
 
+      // Fetch total sales (without filters) for the stats card
+      const { data: totalSalesData, error: totalSalesError } = await supabase
+        .from('sales')
+        .select('amount')
+        .gte('sale_date', thirtyDaysAgo.toISOString());
+
+      if (totalSalesError) throw totalSalesError;
+
+      const totalSalesAmount = totalSalesData?.reduce((sum, sale) => sum + sale.amount, 0) || 0;
+
       setStats({
         totalClients: clientsCount || 0,
         todaySales: { count: todaySalesData?.length || 0, amount: todaySalesAmount },
         todayVisits: todayVisitsCount || 0,
-        monthSales: monthSalesAmount
+        monthSales: monthSalesAmount,
+        totalSales: totalSalesAmount
       });
 
-      // Fetch commercials for filter
-      const { data: commercialsData, error: commercialsError } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name')
-        .neq('id', user.id); // Exclude admin
+      // Fetch commercials for filter (first get commercial user IDs, then their profiles)
+      const { data: commercialRoles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'commercial');
 
-      if (commercialsError) throw commercialsError;
-      setCommercials(commercialsData || []);
+      if (rolesError) throw rolesError;
+
+      if (commercialRoles && commercialRoles.length > 0) {
+        const commercialIds = commercialRoles.map(role => role.user_id);
+        
+        const { data: commercialsData, error: commercialsError } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name')
+          .in('id', commercialIds);
+
+        if (commercialsError) throw commercialsError;
+        setCommercials(commercialsData || []);
+      } else {
+        setCommercials([]);
+      }
 
       // Build sales query with optional commercial filter  
       let salesQuery = supabase
@@ -187,7 +213,7 @@ export default function AdminDashboard() {
 
         return {
           ...sale,
-          commission_amount: sale.commission_amount || (sale.amount * ((sale.commission_percentage || 5) / 100)),
+          commission_amount: sale.commission_amount || calculateCommission(sale.amount),
           commercial
         };
       }));
@@ -250,7 +276,7 @@ export default function AdminDashboard() {
           commercial,
           sales: visitSales?.map(sale => ({
             ...sale,
-            commission_amount: sale.commission_amount || (sale.amount * ((sale.commission_percentage || 5) / 100))
+            commission_amount: sale.commission_amount || calculateCommission(sale.amount)
           })) || []
         };
       }));
@@ -284,7 +310,7 @@ export default function AdminDashboard() {
         }) || [];
 
         const totalAmount = monthSales.reduce((sum, sale) => sum + sale.amount, 0);
-        const totalCommission = totalAmount * 0.05;
+        const totalCommission = monthSales.reduce((sum, sale) => sum + calculateCommission(sale.amount), 0);
 
         return {
           month: format(month, 'MMM yyyy', { locale: es }),
@@ -342,18 +368,18 @@ export default function AdminDashboard() {
   const getStatusBadge = (status: string) => {
     const statusLabels = {
       'in_progress': 'En progreso',
-      'completed': 'Completada',
-      'no_answer': 'Sin respuesta', 
-      'not_interested': 'No interesado',
-      'postponed': 'Aplazada'
+    'completed': 'Confirmada',
+    'ausente': 'Ausente', 
+    'nulo': 'Sin resultado',
+    'oficina': 'Derivado a oficina'
     };
 
     const statusColors = {
       'in_progress': 'bg-blue-100 text-blue-800',
-      'completed': 'bg-green-100 text-green-800',
-      'no_answer': 'bg-gray-100 text-gray-800',
-      'not_interested': 'bg-red-100 text-red-800',
-      'postponed': 'bg-yellow-100 text-yellow-800'
+    'completed': 'bg-green-100 text-green-800',
+    'ausente': 'bg-gray-100 text-gray-800',
+    'nulo': 'bg-red-100 text-red-800',
+    'oficina': 'bg-yellow-100 text-yellow-800'
     };
 
     const label = statusLabels[status as keyof typeof statusLabels] || status;
@@ -373,6 +399,39 @@ export default function AdminDashboard() {
     return format(new Date(dateString), 'dd/MM/yyyy HH:mm', { locale: es });
   };
 
+  const renderNotesCell = (visit: Visit) => {
+    if (!visit.notes) {
+      return (
+        <span 
+          className="text-muted-foreground cursor-pointer hover:text-muted-foreground/80"
+          onClick={() => handleViewVisit(visit)}
+        >
+          -
+        </span>
+      );
+    }
+    
+    if (visit.notes.length <= 50) {
+      return (
+        <span 
+          className="cursor-pointer hover:text-foreground/80"
+          onClick={() => handleViewVisit(visit)}
+        >
+          {visit.notes}
+        </span>
+      );
+    }
+    
+    return (
+      <span 
+        className="cursor-pointer hover:text-foreground/80"
+        onClick={() => handleViewVisit(visit)}
+      >
+        {visit.notes.substring(0, 50)}...
+      </span>
+    );
+  };
+
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center">Cargando dashboard...</div>;
   }
@@ -387,18 +446,18 @@ export default function AdminDashboard() {
   // Status distribution data for all visit statuses
   const statusLabels = {
     'in_progress': 'En Progreso',
-    'completed': 'Completada',
-    'no_answer': 'Sin Respuesta',
-    'not_interested': 'No Interesado',
-    'postponed': 'Aplazada'
+    'completed': 'Confirmada',
+    'ausente': 'Ausente',
+    'nulo': 'Sin Resultado',
+    'oficina': 'Oficina'
   };
 
   const statusColors = {
     'in_progress': '#3b82f6',
     'completed': '#22c55e',
-    'no_answer': '#f59e0b',
-    'not_interested': '#ef4444',
-    'postponed': '#8b5cf6'
+    'ausente': '#f59e0b',
+    'nulo': '#ef4444',
+    'oficina': '#8b5cf6'
   };
 
   // Create visit distribution by actual status
@@ -450,8 +509,8 @@ export default function AdminDashboard() {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(totalSales)}</div>
-              <p className="text-xs text-muted-foreground">{sales.length} ventas totales</p>
+              <div className="text-2xl font-bold">{formatCurrency(stats.totalSales)}</div>
+              <p className="text-xs text-muted-foreground">Últimos 30 días</p>
             </CardContent>
           </Card>
 
@@ -522,7 +581,7 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{formatCurrency(totalCommissions)}</div>
-              <p className="text-xs text-muted-foreground">5% de las ventas</p>
+              <p className="text-xs text-muted-foreground">Estimación según ventas realizadas</p>
             </CardContent>
           </Card>
 
@@ -611,6 +670,8 @@ export default function AdminDashboard() {
                   <TableHead>Cliente</TableHead>
                   <TableHead>Comercial</TableHead>
                   <TableHead>Empresa</TableHead>
+                  <TableHead>Resultado de la visita</TableHead>
+                  <TableHead>Notas</TableHead>
                   <TableHead>Ventas Generadas</TableHead>
                   <TableHead>Comisión Total</TableHead>
                   <TableHead>Acciones</TableHead>
@@ -634,6 +695,15 @@ export default function AdminDashboard() {
                         {visit.commercial ? `${visit.commercial.first_name} ${visit.commercial.last_name}` : 'N/A'}
                       </TableCell>
                       <TableCell>{visit.company?.name || 'N/A'}</TableCell>
+                      <TableCell>
+                        {visit.visit_states?.name ? 
+                          visit.visit_states.name.charAt(0).toUpperCase() + visit.visit_states.name.slice(1).toLowerCase() 
+                          : 'Completada'
+                        }
+                      </TableCell>
+                      <TableCell className="max-w-xs">
+                        {renderNotesCell(visit)}
+                      </TableCell>
                       <TableCell>
                         {visit.sales && visit.sales.length > 0 ? (
                           <div className="space-y-1">
@@ -671,7 +741,7 @@ export default function AdminDashboard() {
                 })}
                 {completedVisits.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="text-center text-muted-foreground">
                       No hay visitas completadas en los últimos 30 días
                     </TableCell>
                   </TableRow>
@@ -719,7 +789,9 @@ export default function AdminDashboard() {
                   <div>
                     <Label>Resultado de la visita</Label>
                     <div>
-                      <Badge variant="outline">{selectedVisit.visit_states.name}</Badge>
+                      <Badge variant="outline">
+                        {selectedVisit.visit_states.name.charAt(0).toUpperCase() + selectedVisit.visit_states.name.slice(1).toLowerCase()}
+                      </Badge>
                     </div>
                   </div>
                 )}
@@ -778,15 +850,15 @@ export default function AdminDashboard() {
                                     <span>{formatCurrency(line.line_total || (line.quantity * line.unit_price))}</span>
                                   </div>
                                   <div className="flex gap-2 mt-1 text-xs">
-                                    <span className={`px-2 py-1 rounded ${line.paid_cash ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                                      {line.paid_cash ? '✓' : '✗'} Efectivo
-                                    </span>
-                                    <span className={`px-2 py-1 rounded ${line.is_paid ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                                      {line.is_paid ? '✓' : '✗'} Pagado
-                                    </span>
-                                    <span className={`px-2 py-1 rounded ${line.is_delivered ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                                      {line.is_delivered ? '✓' : '✗'} Entregado
-                                    </span>
+                                   <span className={`px-2 py-1 rounded ${line.financiada ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                     {line.financiada ? '✓' : '✗'} Financiada
+                                   </span>
+                                   <span className={`px-2 py-1 rounded ${line.transferencia ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                     {line.transferencia ? '✓' : '✗'} Transferencia
+                                   </span>
+                                   <span className={`px-2 py-1 rounded ${line.nulo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                     {line.nulo ? '✓' : '✗'} Nulo
+                                   </span>
                                   </div>
                                 </div>
                               ))}

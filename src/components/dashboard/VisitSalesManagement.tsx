@@ -20,6 +20,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 import { formatCoordinates } from '@/lib/coordinates';
+import { calculateCommission } from '@/lib/commission';
 
 interface Client {
   id: string;
@@ -38,7 +39,7 @@ interface Visit {
   commercial_id: string;
   company_id: string;
   visit_date: string;
-  status: 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed';
+  status: 'in_progress' | 'confirmado' | 'ausente' | 'nulo' | 'oficina';
   notes?: string;
   latitude?: number;
   longitude?: number;
@@ -52,9 +53,9 @@ interface SaleLine {
   product_name: string;
   quantity: number;
   unit_price: number;
-  paid_cash: boolean;
-  is_paid: boolean;
-  is_delivered: boolean;
+  financiada: boolean;
+  transferencia: boolean;
+  nulo: boolean;
 }
 
 interface Sale {
@@ -78,18 +79,18 @@ interface Sale {
 
 const statusLabels = {
   in_progress: 'En Progreso',
-  completed: 'Completada',
-  no_answer: 'Sin respuesta',
-  not_interested: 'No interesado',
-  postponed: 'Pospuesta'
+  confirmado: 'Confirmada',
+  ausente: 'Ausente',
+  nulo: 'Sin resultado',
+  oficina: 'Oficina'
 };
 
 const statusColors = {
   in_progress: 'bg-blue-100 text-blue-800',
-  completed: 'bg-green-100 text-green-800',
-  no_answer: 'bg-yellow-100 text-yellow-800',
-  not_interested: 'bg-red-100 text-red-800',
-  postponed: 'bg-blue-100 text-blue-800'
+  confirmado: 'bg-green-100 text-green-800',
+  ausente: 'bg-yellow-100 text-yellow-800',
+  nulo: 'bg-red-100 text-red-800',
+  oficina: 'bg-blue-100 text-blue-800'
 };
 
 export default function VisitSalesManagement() {
@@ -107,7 +108,7 @@ export default function VisitSalesManagement() {
   const [editingVisit, setEditingVisit] = useState<Visit | null>(null);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
   const [activeTab, setActiveTab] = useState('visits');
-  const [saleLines, setSaleLines] = useState<SaleLine[]>([{ product_name: '', quantity: 1, unit_price: 0, paid_cash: false, is_paid: false, is_delivered: false }]);
+  const [saleLines, setSaleLines] = useState<SaleLine[]>([{ product_name: '', quantity: 1, unit_price: 0, financiada: false, transferencia: false, nulo: false }]);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
 
   const isAdmin = userRole?.role === 'admin';
@@ -205,7 +206,7 @@ export default function VisitSalesManagement() {
       return;
     }
 
-    setVisits(data || []);
+    setVisits(data as any || []); // Temporary fix for type conflicts
   };
 
   const fetchSales = async () => {
@@ -278,7 +279,7 @@ export default function VisitSalesManagement() {
     const visitData = {
       client_id: clientId,
       visit_date: visitDate,
-      status: status as 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed',
+      status: status as 'in_progress' | 'confirmado' | 'ausente' | 'nulo' | 'oficina',
       notes: notes || null,
       commercial_id: user.id,
       company_id: companyId,
@@ -288,7 +289,7 @@ export default function VisitSalesManagement() {
 
     // Obtener ubicación si el estado es completada
     let locationData = null;
-    if (visitData.status === 'completed') {
+    if (visitData.status === 'confirmado') {
       locationData = await requestLocation();
     }
 
@@ -307,7 +308,7 @@ export default function VisitSalesManagement() {
         
         result = await supabase
           .from('visits')
-          .update(updateData)
+          .update(updateData as any)
           .eq('id', editingVisit.id);
       } else {
         const insertData = { ...visitData };
@@ -321,7 +322,7 @@ export default function VisitSalesManagement() {
         
         result = await supabase
           .from('visits')
-          .insert([insertData]);
+          .insert([insertData as any]);
       }
 
       if (result.error) {
@@ -371,13 +372,13 @@ export default function VisitSalesManagement() {
 
     const formData = new FormData(e.currentTarget);
     const total = validLines.reduce((sum, line) => sum + (line.quantity * line.unit_price), 0);
-    const commissionAmount = total * 0.05; // 5% fijo
+    const commissionAmount = calculateCommission(total);
 
     const saleData = {
       client_id: formData.get('client_id') as string,
       company_id: formData.get('company_id') as string,
       amount: total,
-      commission_percentage: 5,
+      commission_percentage: commissionAmount > 0 ? (commissionAmount / total) * 100 : 0,
       commission_amount: commissionAmount,
       sale_date: formData.get('sale_date') as string,
       commercial_id: user.id,
@@ -464,7 +465,7 @@ export default function VisitSalesManagement() {
 
       setSaleDialogOpen(false);
       setEditingSale(null);
-      setSaleLines([{ product_name: '', quantity: 1, unit_price: 0, paid_cash: false, is_paid: false, is_delivered: false }]);
+      setSaleLines([{ product_name: '', quantity: 1, unit_price: 0, financiada: false, transferencia: false, nulo: false }]);
       await fetchSales();
     } catch (error: any) {
       console.error('Error saving sale:', error);
@@ -546,7 +547,7 @@ export default function VisitSalesManagement() {
   };
 
   const addSaleLine = () => {
-    setSaleLines([...saleLines, { product_name: '', quantity: 1, unit_price: 0, paid_cash: false, is_paid: false, is_delivered: false }]);
+    setSaleLines([...saleLines, { product_name: '', quantity: 1, unit_price: 0, financiada: false, transferencia: false, nulo: false }]);
   };
 
   const removeSaleLine = (index: number) => {
@@ -565,17 +566,17 @@ export default function VisitSalesManagement() {
     return saleLines.reduce((sum, line) => sum + (line.quantity * line.unit_price), 0);
   };
 
-  const calculateCommission = () => {
-    return calculateTotal() * 0.05; // Default 5% commission
+  const calculateCommissionAmount = () => {
+    return calculateCommission(calculateTotal());
   };
 
   const openSaleDialog = (sale?: Sale) => {
     if (sale) {
       setEditingSale(sale);
-      setSaleLines(sale.sale_lines || [{ product_name: '', quantity: 1, unit_price: 0, paid_cash: false, is_paid: false, is_delivered: false }]);
+      setSaleLines(sale.sale_lines || [{ product_name: '', quantity: 1, unit_price: 0, financiada: false, transferencia: false, nulo: false }]);
     } else {
       setEditingSale(null);
-      setSaleLines([{ product_name: '', quantity: 1, unit_price: 0, paid_cash: false, is_paid: false, is_delivered: false }]);
+      setSaleLines([{ product_name: '', quantity: 1, unit_price: 0, financiada: false, transferencia: false, nulo: false }]);
     }
     setSaleDialogOpen(true);
   };
@@ -673,12 +674,12 @@ export default function VisitSalesManagement() {
                         
                          <div className="space-y-2">
                            <Label htmlFor="status">Estado *</Label>
-                           <select name="status" defaultValue={editingVisit?.status || 'postponed'} required className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
-                             <option value="postponed">Pospuesta</option>
-                             <option value="completed">Completada</option>
-                             <option value="no_answer">Sin respuesta</option>
-                             <option value="not_interested">No interesado</option>
-                           </select>
+                            <select name="status" defaultValue={editingVisit?.status || 'oficina'} required className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50">
+                              <option value="oficina">Oficina</option>
+                              <option value="confirmado">Confirmada</option>
+                              <option value="ausente">Ausente</option>
+                              <option value="nulo">Sin resultado</option>
+                            </select>
                          </div>
                       </div>
                       
@@ -896,25 +897,25 @@ export default function VisitSalesManagement() {
                                 />
                               </div>
                               <div className="col-span-1 text-center">
-                                <Label className="text-xs block mb-2">Contado</Label>
-                                <Checkbox
-                                  checked={line.paid_cash}
-                                  onCheckedChange={(checked) => updateSaleLine(index, 'paid_cash', checked)}
-                                />
-                              </div>
-                              <div className="col-span-1 text-center">
-                                <Label className="text-xs block mb-2">Pagado</Label>
-                                <Checkbox
-                                  checked={line.is_paid}
-                                  onCheckedChange={(checked) => updateSaleLine(index, 'is_paid', checked)}
-                                />
-                              </div>
-                              <div className="col-span-1 text-center">
-                                <Label className="text-xs block mb-2">Entregado</Label>
-                                <Checkbox
-                                  checked={line.is_delivered}
-                                  onCheckedChange={(checked) => updateSaleLine(index, 'is_delivered', checked)}
-                                />
+                                 <Label className="text-xs block mb-2">Financiada</Label>
+                                 <Checkbox
+                                   checked={line.financiada}
+                                   onCheckedChange={(checked) => updateSaleLine(index, 'financiada', checked)}
+                                 />
+                               </div>
+                               <div className="col-span-1 text-center">
+                                 <Label className="text-xs block mb-2">Transferencia</Label>
+                                 <Checkbox
+                                   checked={line.transferencia}
+                                   onCheckedChange={(checked) => updateSaleLine(index, 'transferencia', checked)}
+                                 />
+                               </div>
+                               <div className="col-span-1 text-center">
+                                 <Label className="text-xs block mb-2">Nulo</Label>
+                                 <Checkbox
+                                   checked={line.nulo}
+                                   onCheckedChange={(checked) => updateSaleLine(index, 'nulo', checked)}
+                                 />
                               </div>
                               <div className="col-span-1 text-center">
                                 <Label className="text-xs block mb-2">Total</Label>
@@ -944,8 +945,8 @@ export default function VisitSalesManagement() {
                             <span>€{calculateTotal().toFixed(2)}</span>
                           </div>
                           <div className="flex justify-between text-sm text-muted-foreground mt-1">
-                            <span>Comisión (5%):</span>
-                            <span>€{calculateCommission().toFixed(2)}</span>
+                            <span>Comisión:</span>
+                            <span>€{calculateCommissionAmount().toFixed(2)}</span>
                           </div>
                         </div>
                       </div>
@@ -970,7 +971,7 @@ export default function VisitSalesManagement() {
                     <TableHead>Cliente</TableHead>
                     <TableHead>Empresa</TableHead>
                     <TableHead>Importe</TableHead>
-                    <TableHead>Comisión (5%)</TableHead>
+                    <TableHead>Comisión</TableHead>
                     <TableHead>Fecha</TableHead>
                     <TableHead>Líneas</TableHead>
                     <TableHead>Acciones</TableHead>

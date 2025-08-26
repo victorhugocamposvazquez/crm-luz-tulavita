@@ -10,6 +10,7 @@ import { Search, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import VisitsTable from '@/components/visits/VisitsTable';
 import VisitDetailsDialog from '@/components/visits/VisitDetailsDialog';
+import { calculateCommission } from '@/lib/commission';
 
 interface Visit {
   id: string;
@@ -21,6 +22,10 @@ interface Visit {
   commercial_id: string;
   client_id: string;
   company_id?: string;
+  visit_states?: {
+    name: string;
+    description: string;
+  };
   commercial?: {
     first_name: string | null;
     last_name: string | null;
@@ -54,27 +59,27 @@ interface Sale {
     product_name: string;
     quantity: number;
     unit_price: number;
-    paid_cash: boolean;
-    is_paid: boolean;
-    is_delivered: boolean;
+    financiada: boolean;
+    transferencia: boolean;
+    nulo: boolean;
   }[];
 }
 
 // Estados y etiquetas igual que en ClientDetailView
 const statusLabels = {
   in_progress: 'En progreso',
-  completed: 'Completada',
-  no_answer: 'Sin respuesta',
-  not_interested: 'No interesado',
-  postponed: 'Aplazada'
+  confirmado: 'Confirmada',
+  ausente: 'Ausente',
+  nulo: 'Sin resultado',
+  oficina: 'Oficina'
 };
 
 const statusColors = {
   in_progress: 'bg-blue-100 text-blue-800 hover:bg-blue-100',
-  completed: 'bg-green-100 text-green-800 hover:bg-green-100',
-  no_answer: 'bg-gray-100 text-gray-800 hover:bg-gray-100',
-  not_interested: 'bg-red-100 text-red-800 hover:bg-red-100',
-  postponed: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'
+  confirmado: 'bg-green-100 text-green-800 hover:bg-green-100',
+  ausente: 'bg-gray-100 text-gray-800 hover:bg-gray-100',
+  nulo: 'bg-red-100 text-red-800 hover:bg-red-100',
+  oficina: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'
 };
 
 export default function AdminVisitsView() {
@@ -143,17 +148,17 @@ export default function AdminVisitsView() {
       const salesWithLines = await Promise.all((salesData || []).map(async (sale) => {
         const { data: linesData, error: linesError } = await supabase
           .from('sale_lines')
-          .select('product_name, quantity, unit_price, paid_cash, is_paid, is_delivered')
+          .select('product_name, quantity, unit_price, financiada, transferencia, nulo')
           .eq('sale_id', sale.id);
 
-        // Calculate commission using the stored percentage or default to 5%
-        const commissionPercentage = sale.commission_percentage || 5;
-        const calculatedCommission = sale.amount * (commissionPercentage / 100);
+        // Calculate commission using the new system
+        const commissionPercentage = sale.commission_percentage || 0;
+        const calculatedCommission = sale.commission_amount || calculateCommission(sale.amount);
 
         return {
           ...sale,
           sale_lines: linesError ? [] : (linesData || []),
-          commission_amount: sale.commission_amount || calculatedCommission
+          commission_amount: calculatedCommission
         };
       }));
 
@@ -374,9 +379,9 @@ export default function AdminVisitsView() {
         </CardHeader>
         <CardContent>
           <VisitsTable
-            visits={visits}
+            visits={visits as any}
             sales={sales}
-            onViewVisit={handleViewVisit}
+            onViewVisit={handleViewVisit as any}
             loading={loading}
             showClientColumns={true}
             emptyMessage="No se encontraron visitas con los filtros aplicados"
@@ -386,7 +391,7 @@ export default function AdminVisitsView() {
 
       {/* Visit Detail Dialog - USANDO COMPONENTE COMÚN */}
       <VisitDetailsDialog
-        selectedVisit={selectedVisit}
+        selectedVisit={selectedVisit as any}
         visitSales={visitSales}
         onClose={() => setSelectedVisit(null)}
         showClientInfo={true}

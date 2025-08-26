@@ -5,6 +5,7 @@ import { Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Link } from 'react-router-dom';
+import { calculateCommission } from '@/lib/commission';
 
 interface Visit {
   id: string;
@@ -14,6 +15,12 @@ interface Visit {
   commercial_id?: string;
   created_at?: string;
   approval_status?: string;
+  notes?: string;
+  permission?: string;
+  visit_states?: {
+    name: string;
+    description: string;
+  };
   commercial?: {
     first_name: string | null;
     last_name: string | null;
@@ -46,10 +53,10 @@ interface VisitsTableProps {
 
 const statusLabels = {
   in_progress: 'En progreso',
-  completed: 'Completada',
-  no_answer: 'Sin respuesta',
-  not_interested: 'No interesado',
-  postponed: 'Aplazada'
+  completed: 'Confirmada',
+  no_answer: 'Ausente',
+  not_interested: 'Sin resultado',
+  postponed: 'Oficina'
 };
 
 const statusColors = {
@@ -91,6 +98,45 @@ export default function VisitsTable({
     return name || commercial.email;
   };
 
+  const truncateNotes = (notes: string | undefined, maxLength: number = 50) => {
+    if (!notes) return '-';
+    if (notes.length <= maxLength) return notes;
+    return notes.substring(0, maxLength) + '...';
+  };
+
+  const renderNotesCell = (visit: Visit) => {
+    if (!visit.notes) {
+      return (
+        <span 
+          className="text-muted-foreground cursor-pointer hover:text-muted-foreground/80"
+          onClick={() => onViewVisit(visit)}
+        >
+          -
+        </span>
+      );
+    }
+    
+    if (visit.notes.length <= 50) {
+      return (
+        <span 
+          className="cursor-pointer hover:text-foreground/80"
+          onClick={() => onViewVisit(visit)}
+        >
+          {visit.notes}
+        </span>
+      );
+    }
+    
+    return (
+      <span 
+        className="cursor-pointer hover:text-foreground/80"
+        onClick={() => onViewVisit(visit)}
+      >
+        {visit.notes.substring(0, 50)}...
+      </span>
+    );
+  };
+
   return (
     <Table>
       <TableHeader>
@@ -105,6 +151,8 @@ export default function VisitsTable({
           <TableHead>Empresa</TableHead>
           <TableHead>Fecha</TableHead>
           <TableHead>Estado</TableHead>
+          <TableHead>Resultado de la visita</TableHead>
+          <TableHead>Notas</TableHead>
           <TableHead>Ventas</TableHead>
           <TableHead>Comisión</TableHead>
           <TableHead>Acciones</TableHead>
@@ -113,7 +161,7 @@ export default function VisitsTable({
       <TableBody>
         {visits.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={showClientColumns ? 9 : 7} className="text-center py-8 text-muted-foreground">
+            <TableCell colSpan={showClientColumns ? 11 : 9} className="text-center py-8 text-muted-foreground">
               {emptyMessage}
             </TableCell>
           </TableRow>
@@ -122,9 +170,9 @@ export default function VisitsTable({
             // Find sales for this visit and calculate commission properly
             const visitSales = sales.filter(sale => sale.visit_id === visit.id);
             const totalSales = visitSales.reduce((sum, sale) => sum + sale.amount, 0);
-            // Calculate commission using stored amount or calculate from percentage (default 5%)
+            // Calculate commission using stored amount or calculate with new system
             const totalCommission = visitSales.reduce((sum, sale) => {
-              const commission = sale.commission_amount || (sale.amount * ((sale as any).commission_percentage || 5) / 100);
+              const commission = sale.commission_amount || calculateCommission(sale.amount);
               return sum + commission;
             }, 0);
             
@@ -155,6 +203,17 @@ export default function VisitsTable({
                     const statusDisplay = getStatusDisplay(visit.status, visit.approval_status);
                     return <Badge className={statusDisplay.color}>{statusDisplay.label}</Badge>;
                   })()}
+                </TableCell>
+                <TableCell>
+                  {visit.visit_states?.name ? 
+                    visit.visit_states.name.charAt(0).toUpperCase() + visit.visit_states.name.slice(1).toLowerCase() 
+                    : visit.status ? 
+                    statusLabels[visit.status as keyof typeof statusLabels]?.charAt(0).toUpperCase() + statusLabels[visit.status as keyof typeof statusLabels]?.slice(1).toLowerCase() 
+                    : '-'
+                  }
+                </TableCell>
+                <TableCell className="max-w-xs">
+                  {renderNotesCell(visit)}
                 </TableCell>
                 <TableCell>
                   {totalSales > 0 ? `€${totalSales.toFixed(2)}` : '-'}

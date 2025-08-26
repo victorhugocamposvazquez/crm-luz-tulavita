@@ -1,19 +1,20 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/hooks/useAuth';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { toast } from '@/hooks/use-toast';
-import { format, subDays, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths } from 'date-fns';
+import { Users, Euro, MapPin, TrendingUp, Eye } from 'lucide-react';
+import { format, subDays, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths, startOfDay, endOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Eye, MapPin } from 'lucide-react';
+import { useAuth } from "@/hooks/useAuth";
+import { useNavigate } from "react-router-dom";
+import { calculateCommission } from '@/lib/commission';
 import { formatCoordinates } from '@/lib/coordinates';
+import { toast } from '@/hooks/use-toast';
 
 interface SaleInVisit {
   id: string;
@@ -102,10 +103,10 @@ export default function CommercialStatistics() {
 
       if (salesError) throw salesError;
 
-      // Calculate commission using stored percentage or default to 5%
+      // Calculate commission using new system
       const processedSales = salesData?.map(sale => ({
         ...sale,
-        commission_amount: sale.commission_amount || (sale.amount * ((sale.commission_percentage || 5) / 100))
+        commission_amount: sale.commission_amount || calculateCommission(sale.amount)
       })) || [];
 
       setSales(processedSales);
@@ -148,7 +149,7 @@ export default function CommercialStatistics() {
           ...visit,
           sales: visitSales?.map(sale => ({
             ...sale,
-            commission_amount: sale.commission_amount || (sale.amount * ((sale.commission_percentage || 5) / 100))
+            commission_amount: sale.commission_amount || calculateCommission(sale.amount)
           })) || []
         };
       }));
@@ -178,7 +179,7 @@ export default function CommercialStatistics() {
         }) || [];
 
         const totalAmount = monthSales.reduce((sum, sale) => sum + sale.amount, 0);
-        const totalCommission = totalAmount * 0.05;
+        const totalCommission = monthSales.reduce((sum, sale) => sum + calculateCommission(sale.amount), 0);
 
         return {
           month: format(month, 'MMM yyyy', { locale: es }),
@@ -243,18 +244,18 @@ export default function CommercialStatistics() {
   const getStatusBadge = (status: string) => {
     const statusLabels = {
       'in_progress': 'En progreso',
-      'completed': 'Completada',
-      'no_answer': 'Sin respuesta', 
-      'not_interested': 'No interesado',
-      'postponed': 'Aplazada'
+      'confirmado': 'Confirmada',
+      'ausente': 'Ausente', 
+      'nulo': 'Sin resultado',
+      'oficina': 'Oficina'
     };
 
     const statusColors = {
       'in_progress': 'bg-blue-100 text-blue-800',
-      'completed': 'bg-green-100 text-green-800',
-      'no_answer': 'bg-gray-100 text-gray-800',
-      'not_interested': 'bg-red-100 text-red-800',
-      'postponed': 'bg-yellow-100 text-yellow-800'
+      'confirmado': 'bg-green-100 text-green-800',
+      'ausente': 'bg-gray-100 text-gray-800',
+      'nulo': 'bg-red-100 text-red-800',
+      'oficina': 'bg-yellow-100 text-yellow-800'
     };
 
     const label = statusLabels[status as keyof typeof statusLabels] || status;
@@ -286,18 +287,18 @@ export default function CommercialStatistics() {
   // Status distribution data for all visit statuses
   const statusLabels = {
     'in_progress': 'En Progreso',
-    'completed': 'Completada',
-    'no_answer': 'Sin Respuesta',
-    'not_interested': 'No Interesado',
-    'postponed': 'Aplazada'
+    'confirmado': 'Confirmada',
+    'ausente': 'Ausente',
+    'nulo': 'Sin Resultado',
+    'oficina': 'Oficina'
   };
 
   const statusColors = {
     'in_progress': '#3b82f6',
-    'completed': '#22c55e',
-    'no_answer': '#f59e0b',
-    'not_interested': '#ef4444',
-    'postponed': '#8b5cf6'
+    'confirmado': '#22c55e',
+    'ausente': '#f59e0b',
+    'nulo': '#ef4444',
+    'oficina': '#8b5cf6'
   };
 
   // Create visit distribution by actual status
@@ -318,7 +319,7 @@ export default function CommercialStatistics() {
   })).filter(item => item.value > 0);
 
   // Calculate additional statistics
-  const completedVisits = visits.filter(visit => visit.status === 'completed');
+  const completedVisits = visits.filter(visit => visit.status === 'confirmado');
 
   return (
     <div className="space-y-6">
@@ -344,7 +345,7 @@ export default function CommercialStatistics() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(totalCommissions)}</div>
-            <p className="text-xs text-muted-foreground">5% de las ventas</p>
+            <p className="text-xs text-muted-foreground">Estimación según ventas realizadas</p>
           </CardContent>
         </Card>
 
@@ -601,15 +602,15 @@ export default function CommercialStatistics() {
                                     <span>{formatCurrency(line.line_total)}</span>
                                   </div>
                                   <div className="flex gap-2 text-xs">
-                                    <span className={`px-2 py-1 rounded ${line.paid_cash ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                                      {line.paid_cash ? '✓' : '✗'} Efectivo
-                                    </span>
-                                    <span className={`px-2 py-1 rounded ${line.is_paid ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                                      {line.is_paid ? '✓' : '✗'} Pagado
-                                    </span>
-                                    <span className={`px-2 py-1 rounded ${line.is_delivered ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                                      {line.is_delivered ? '✓' : '✗'} Entregado
-                                    </span>
+                                   <span className={`px-2 py-1 rounded ${line.financiada ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                     {line.financiada ? '✓' : '✗'} Financiada
+                                   </span>
+                                   <span className={`px-2 py-1 rounded ${line.transferencia ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                     {line.transferencia ? '✓' : '✗'} Transferencia
+                                   </span>
+                                   <span className={`px-2 py-1 rounded ${line.nulo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                     {line.nulo ? '✓' : '✗'} Nulo
+                                   </span>
                                   </div>
                                 </div>
                               ))}

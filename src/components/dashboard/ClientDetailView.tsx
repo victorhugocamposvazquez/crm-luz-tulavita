@@ -6,16 +6,18 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Separator } from '@/components/ui/separator';
 import { toast } from '@/hooks/use-toast';
-import { ArrowLeft, MapPin, Calendar, DollarSign, TrendingUp, Package, Euro, Building2, Phone, Mail, MapPinIcon, Eye } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, DollarSign, TrendingUp, Building2, Phone, Mail, MapPinIcon, Eye, Euro, Bell } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { formatCoordinates } from '@/lib/coordinates';
 import VisitsTable from '@/components/visits/VisitsTable';
 import VisitDetailsDialog from '@/components/visits/VisitDetailsDialog';
+import { calculateCommission } from '@/lib/commission';
+import RemindersTable from '@/components/reminders/RemindersTable';
+import ReminderDialog from '@/components/reminders/ReminderDialog';
 
 interface Client {
   id: string;
@@ -67,18 +69,18 @@ interface Sale {
     product_name: string;
     quantity: number;
     unit_price: number;
-    paid_cash: boolean;
-    is_paid: boolean;
-    is_delivered: boolean;
+  financiada: boolean;
+  transferencia: boolean;
+  nulo: boolean;
   }>;
 }
 
 const statusLabels = {
   in_progress: 'En Progreso',
-  completed: 'Completada',
-  no_answer: 'Sin respuesta',
-  not_interested: 'No interesado',
-  postponed: 'Pospuesta'
+  completed: 'Confirmada',
+  no_answer: 'Ausente',
+  not_interested: 'Sin resultado',
+  postponed: 'Oficina'
 };
 
 const statusColors = {
@@ -105,6 +107,8 @@ export default function ClientDetailView({ clientId, onBack }: ClientDetailViewP
   const [loading, setLoading] = useState(true);
   const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
   const [visitSales, setVisitSales] = useState<any[]>([]);
+  const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<{ id: string; name: string } | null>(null);
 
   const isAdmin = userRole?.role === 'admin';
 
@@ -241,15 +245,15 @@ const fetchVisits = async () => {
           .maybeSingle()
       ]);
       
-      // Calculate commission using the stored percentage or default to 5%
-      const commissionPercentage = sale.commission_percentage || 5;
-      const calculatedCommission = sale.amount * (commissionPercentage / 100);
+      // Calculate commission using the new system
+      const commissionPercentage = sale.commission_percentage || 0;
+      const calculatedCommission = sale.commission_amount || calculateCommission(sale.amount);
       
       return { 
         ...sale, 
         sale_lines: lines || [], 
         commercial,
-        commission_amount: sale.commission_amount || calculatedCommission
+        commission_amount: calculatedCommission
       };
     }));
 
@@ -447,6 +451,34 @@ const fetchVisits = async () => {
         </CardContent>
       </Card>
 
+      {/* Recordatorios de renovación (solo admin) */}
+      {isAdmin && (
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between text-xl">
+              <div className="flex items-center gap-3">
+                <Bell className="h-6 w-6" />
+                Recordatorios de renovación
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSelectedClient({ id: clientId, name: client.nombre_apellidos });
+                  setReminderDialogOpen(true);
+                }}
+              >
+                <Bell className="h-4 w-4 mr-2" />
+                Nuevo recordatorio
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <RemindersTable clientId={clientId} onReminderUpdate={fetchClientData} />
+          </CardContent>
+        </Card>
+      )}
+
       {/* Métricas resumidas */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <Card className="border-l-4 border-l-green-500">
@@ -620,9 +652,9 @@ const fetchVisits = async () => {
           </CardHeader>
           <CardContent>
             <VisitsTable
-              visits={visits}
+              visits={visits as any}
               sales={sales}
-              onViewVisit={handleViewVisit}
+              onViewVisit={handleViewVisit as any}
               loading={loading}
               showClientColumns={false}
               emptyMessage="No hay visitas registradas para este cliente"
@@ -637,6 +669,15 @@ const fetchVisits = async () => {
         visitSales={visitSales}
         onClose={() => setSelectedVisit(null)}
         showClientInfo={false}
+      />
+
+      {/* Reminder Dialog */}
+      <ReminderDialog
+        open={reminderDialogOpen}
+        onOpenChange={setReminderDialogOpen}
+        clientId={clientId}
+        clientName={client?.nombre_apellidos || ''}
+        onReminderCreated={fetchClientData}
       />
     </div>
   );

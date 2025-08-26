@@ -254,7 +254,7 @@ export default function CommercialVisitsManager() {
           last_name: ''
         } : undefined
       })) || [];
-      setVisits(formattedVisits);
+      setVisits(formattedVisits as any); // Temporary fix for type conflicts
 
       // Calculate stats
       const totalVisits = formattedVisits.length;
@@ -339,7 +339,7 @@ export default function CommercialVisitsManager() {
         const {
           data: linesData,
           error: linesError
-        } = await supabase.from('sale_lines').select('id, product_name, quantity, unit_price, line_total, paid_cash, is_paid, is_delivered').eq('sale_id', sale.id);
+        } = await supabase.from('sale_lines').select('id, product_name, quantity, unit_price, line_total, financiada, transferencia, nulo').eq('sale_id', sale.id);
         if (linesError) {
           console.error('Error fetching sale lines:', linesError);
           return {
@@ -643,15 +643,15 @@ export default function CommercialVisitsManager() {
                                     <span>€{line.line_total}</span>
                                   </div>
                                   <div className="flex gap-2 text-xs">
-                                    <span className={`px-2 py-1 rounded ${line.paid_cash ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                                      {line.paid_cash ? '✓' : '✗'} Efectivo
-                                    </span>
-                                    <span className={`px-2 py-1 rounded ${line.is_paid ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                                      {line.is_paid ? '✓' : '✗'} Pagado
-                                    </span>
-                                    <span className={`px-2 py-1 rounded ${line.is_delivered ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                                      {line.is_delivered ? '✓' : '✗'} Entregado
-                                    </span>
+                                   <span className={`px-2 py-1 rounded ${line.financiada ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                     {line.financiada ? '✓' : '✗'} Financiada
+                                   </span>
+                                   <span className={`px-2 py-1 rounded ${line.transferencia ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                     {line.transferencia ? '✓' : '✗'} Transferencia
+                                   </span>
+                                   <span className={`px-2 py-1 rounded ${line.nulo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                     {line.nulo ? '✓' : '✗'} Nulo
+                                   </span>
                                   </div>
                                 </div>
                               ))}

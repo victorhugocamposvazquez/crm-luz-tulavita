@@ -16,6 +16,7 @@ interface Visit {
   latitude?: number;
   longitude?: number;
   location_accuracy?: number;
+  permission?: string;
   commercial?: {
     first_name: string | null;
     last_name: string | null;
@@ -42,9 +43,9 @@ interface Sale {
     product_name: string;
     quantity: number;
     unit_price: number;
-    paid_cash: boolean;
-    is_paid: boolean;
-    is_delivered: boolean;
+    financiada: boolean;
+    transferencia: boolean;
+    nulo: boolean;
   }[];
 }
 
@@ -57,10 +58,10 @@ interface VisitDetailsDialogProps {
 
 const statusLabels = {
   in_progress: 'En progreso',
-  completed: 'Completada',
-  no_answer: 'Sin respuesta',
-  not_interested: 'No interesado',
-  postponed: 'Aplazada'
+  completed: 'Confirmada',
+  no_answer: 'Ausente',
+  not_interested: 'Sin resultado',
+  postponed: 'Oficina'
 };
 
 const statusColors = {
@@ -142,7 +143,9 @@ export default function VisitDetailsDialog({
               <div>
                 <label className="text-sm font-medium">Resultado de la visita</label>
                 <div>
-                  <Badge variant="outline">{selectedVisit.visit_states.name}</Badge>
+                  <Badge variant="outline">
+                    {selectedVisit.visit_states.name.charAt(0).toUpperCase() + selectedVisit.visit_states.name.slice(1).toLowerCase()}
+                  </Badge>
                 </div>
               </div>
             )}

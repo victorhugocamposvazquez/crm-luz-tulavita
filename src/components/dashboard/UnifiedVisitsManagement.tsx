@@ -31,9 +31,9 @@ interface SaleLine {
   product_name: string;
   quantity: number;
   unit_price: number;
-  paid_cash: boolean;
-  is_paid: boolean;
-  is_delivered: boolean;
+  financiada: boolean;
+  transferencia: boolean;
+  nulo: boolean;
 }
 
 interface ClientPurchase {
@@ -58,7 +58,11 @@ interface ClientVisit {
 
 type WorkflowStep = 'nif-input' | 'pending-approval' | 'client-form' | 'visit-form';
 
-export default function UnifiedVisitsManagement() {
+interface UnifiedVisitsManagementProps {
+  onSuccess?: () => void;
+}
+
+export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsManagementProps = {}) {
   const {
     user,
     profile,
@@ -163,7 +167,7 @@ export default function UnifiedVisitsManagement() {
           if (error) throw error;
           setVisitData({
             notes: visitData.notes || '',
-            status: visitData.status,
+            status: visitData.status as any,
             company_id: visitData.company_id || '',
             permission: visitData.permission || 'pending',
             visitStateCode: visitData.visit_state_code || ''
@@ -314,7 +318,7 @@ export default function UnifiedVisitsManagement() {
       } = await supabase.from('sales').select(`
           id, amount, sale_date, product_description,
           visits!inner(status)
-        `).eq('client_id', clientId).eq('visits.status', 'completed').order('sale_date', {
+        `).eq('client_id', clientId).eq('visits.status', 'completed' as any).order('sale_date', {
         ascending: false
       }).limit(5);
       if (salesError) {
@@ -408,7 +412,7 @@ export default function UnifiedVisitsManagement() {
         const {
           data: saleLinesData,
           error: saleLinesError
-        } = await supabase.from('sale_lines').select('product_name, quantity, unit_price, paid_cash, is_paid, is_delivered').eq('sale_id', saleId);
+        } = await supabase.from('sale_lines').select('product_name, quantity, unit_price, financiada, transferencia, nulo').eq('sale_id', saleId);
         
         if (saleLinesError) {
           console.error('Error fetching sale lines:', saleLinesError);
@@ -633,7 +637,7 @@ export default function UnifiedVisitsManagement() {
       const {
         data: visit,
         error: visitError
-      } = await supabase.from('visits').insert(visitPayload).select().single();
+      } = await supabase.from('visits').insert(visitPayload as any).select().single();
       if (visitError) {
         console.error('Error creating visit:', visitError);
         throw visitError;
@@ -681,6 +685,16 @@ export default function UnifiedVisitsManagement() {
       });
       return;
     }
+    
+    if (!selectedCompany) {
+      toast({
+        title: "Error",
+        description: "Selecciona una empresa antes de crear el cliente",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setLoading(true);
     try {
       // Include coordinates in client data
@@ -695,13 +709,44 @@ export default function UnifiedVisitsManagement() {
         error
       } = await supabase.from('clients').insert(clientPayload).select().single();
       if (error) throw error;
-      setExistingClient(newClient);
-      setHasApproval(true);
-      setCurrentStep('visit-form');
+      
+      // Automatically create the visit for the new client
+      const visitPayload = {
+        client_id: newClient.id,
+        commercial_id: user!.id,
+        company_id: selectedCompany,
+        notes: '',
+        status: 'in_progress' as const,
+        latitude: location?.latitude || null,
+        longitude: location?.longitude || null,
+        location_accuracy: location?.accuracy || null,
+        visit_date: new Date().toISOString(),
+        approval_status: 'approved' as const, // Auto-approved for new clients
+        permission: 'approved'
+      };
+      
+      const { data: newVisit, error: visitError } = await supabase
+        .from('visits')
+        .insert(visitPayload as any)
+        .select()
+        .single();
+        
+      if (visitError) {
+        console.error('Visit creation error:', visitError);
+        throw visitError;
+      }
+      
+      console.log('New visit created:', newVisit);
+      
       toast({
-        title: "Cliente creado",
-        description: "Continúa con la información de la visita"
+        title: "Cliente y visita creados",
+        description: "Cliente registrado exitosamente y visita creada automáticamente"
       });
+      
+      // Dispatch events to navigate back to visits list (same pattern as when completing a visit)
+      window.dispatchEvent(new CustomEvent('visitCreated', { detail: newVisit }));
+      window.dispatchEvent(new CustomEvent('navigateToVisitsList'));
+      
     } catch (error) {
       console.error('Error creating client:', error);
       toast({
@@ -719,9 +764,9 @@ export default function UnifiedVisitsManagement() {
       product_name: '',
       quantity: 1,
       unit_price: 0,
-      paid_cash: false,
-      is_paid: false,
-      is_delivered: false
+      financiada: false,
+      transferencia: false,
+      nulo: false
     }]);
   };
 
@@ -784,7 +829,7 @@ export default function UnifiedVisitsManagement() {
         
         const { error: visitError } = await supabase
           .from('visits')
-          .update(updatePayload)
+          .update(updatePayload as any)
           .eq('id', editingVisitId);
           
         if (visitError) {
@@ -828,7 +873,7 @@ export default function UnifiedVisitsManagement() {
         
         const { data: newVisit, error: visitError } = await supabase
           .from('visits')
-          .insert(visitPayload)
+          .insert(visitPayload as any)
           .select()
           .single();
           
@@ -896,9 +941,9 @@ export default function UnifiedVisitsManagement() {
           product_name: line.product_name,
           quantity: line.quantity,
           unit_price: line.unit_price,
-          paid_cash: line.paid_cash,
-          is_paid: line.is_paid,
-          is_delivered: line.is_delivered,
+          financiada: line.financiada,
+          transferencia: line.transferencia,
+          nulo: line.nulo,
           sale_id: saleId
         }));
         const {
@@ -1295,16 +1340,16 @@ export default function UnifiedVisitsManagement() {
 
                     <div className="flex gap-4 text-sm">
                       <label className="flex items-center gap-2">
-                        <input type="checkbox" checked={line.paid_cash} onChange={e => updateSaleLine(index, 'paid_cash', e.target.checked)} disabled={isReadOnly} />
-                        Pagado en efectivo
+                        <input type="checkbox" checked={line.financiada} onChange={e => updateSaleLine(index, 'financiada', e.target.checked)} disabled={isReadOnly} />
+                        <span>Financiada</span>
                       </label>
                       <label className="flex items-center gap-2">
-                        <input type="checkbox" checked={line.is_paid} onChange={e => updateSaleLine(index, 'is_paid', e.target.checked)} disabled={isReadOnly} />
-                        Pagado
+                        <input type="checkbox" checked={line.transferencia} onChange={e => updateSaleLine(index, 'transferencia', e.target.checked)} disabled={isReadOnly} />
+                        <span>Transferencia</span>
                       </label>
                       <label className="flex items-center gap-2">
-                        <input type="checkbox" checked={line.is_delivered} onChange={e => updateSaleLine(index, 'is_delivered', e.target.checked)} disabled={isReadOnly} />
-                        Entregado
+                        <input type="checkbox" checked={line.nulo} onChange={e => updateSaleLine(index, 'nulo', e.target.checked)} disabled={isReadOnly} />
+                        <span>Nulo</span>
                       </label>
                     </div>
 

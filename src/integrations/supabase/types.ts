@@ -208,43 +208,84 @@ export type Database = {
           },
         ]
       }
+      renewal_reminders: {
+        Row: {
+          client_id: string
+          created_at: string
+          created_by: string
+          id: string
+          notes: string | null
+          reminder_date: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          notes?: string | null
+          reminder_date: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          notes?: string | null
+          reminder_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "renewal_reminders_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sale_lines: {
         Row: {
           created_at: string
+          financiada: boolean
           id: string
-          is_delivered: boolean
-          is_paid: boolean
           line_total: number | null
-          paid_cash: boolean
+          nulo: boolean
           product_name: string
           quantity: number
           sale_id: string
+          transferencia: boolean
           unit_price: number
           updated_at: string
         }
         Insert: {
           created_at?: string
+          financiada?: boolean
           id?: string
-          is_delivered?: boolean
-          is_paid?: boolean
           line_total?: number | null
-          paid_cash?: boolean
+          nulo?: boolean
           product_name: string
           quantity?: number
           sale_id: string
+          transferencia?: boolean
           unit_price?: number
           updated_at?: string
         }
         Update: {
           created_at?: string
+          financiada?: boolean
           id?: string
-          is_delivered?: boolean
-          is_paid?: boolean
           line_total?: number | null
-          paid_cash?: boolean
+          nulo?: boolean
           product_name?: string
           quantity?: number
           sale_id?: string
+          transferencia?: boolean
           unit_price?: number
           updated_at?: string
         }
