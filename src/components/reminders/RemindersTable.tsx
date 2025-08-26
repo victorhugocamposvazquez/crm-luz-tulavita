@@ -35,7 +35,9 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
   const [loading, setLoading] = useState(true);
   const [visitCreationDialog, setVisitCreationDialog] = useState<{ open: boolean; reminder: Reminder | null }>({ open: false, reminder: null });
   const [selectedCommercial, setSelectedCommercial] = useState<string>('');
+  const [selectedCompany, setSelectedCompany] = useState<string>('');
   const [commercials, setCommercials] = useState<Array<{ id: string; name: string; email: string }>>([]);
+  const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([]);
 
   const isAdmin = userRole?.role === 'admin';
 
@@ -43,6 +45,7 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
     fetchReminders();
     if (isAdmin) {
       fetchCommercials();
+      fetchCompanies();
     }
   }, [clientId, isAdmin]);
 
@@ -95,28 +98,65 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
 
   const fetchCommercials = async () => {
     try {
-      const { data, error } = await supabase
+      console.log('Fetching commercials...');
+      // First get user_roles with role 'commercial'
+      const { data: userRoles, error: roleError } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'commercial');
+
+      if (roleError) {
+        console.error('Error fetching user roles:', roleError);
+        throw roleError;
+      }
+
+      console.log('User roles data:', userRoles);
+
+      if (!userRoles || userRoles.length === 0) {
+        console.log('No commercials found');
+        setCommercials([]);
+        return;
+      }
+
+      // Then get profiles for those users
+      const userIds = userRoles.map(role => role.user_id);
+      const { data: profiles, error: profileError } = await supabase
         .from('profiles')
-        .select(`
-          id,
-          first_name,
-          last_name,
-          email,
-          user_roles!inner(role)
-        `)
-        .eq('user_roles.role', 'commercial');
+        .select('id, first_name, last_name, email')
+        .in('id', userIds);
 
-      if (error) throw error;
+      if (profileError) {
+        console.error('Error fetching profiles:', profileError);
+        throw profileError;
+      }
 
-      const commercialsList = (data || []).map(commercial => ({
-        id: commercial.id,
-        name: `${commercial.first_name || ''} ${commercial.last_name || ''}`.trim() || commercial.email,
-        email: commercial.email
+      console.log('Profiles data:', profiles);
+
+      const commercialsList = (profiles || []).map(profile => ({
+        id: profile.id,
+        name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.email,
+        email: profile.email
       }));
 
+      console.log('Transformed commercials:', commercialsList);
       setCommercials(commercialsList);
     } catch (error) {
       console.error('Error fetching commercials:', error);
+    }
+  };
+
+  const fetchCompanies = async () => {
+    try {
+      const { data: companiesData, error } = await supabase
+        .from('companies')
+        .select('id, name')
+        .order('name');
+
+      if (error) throw error;
+
+      setCompanies(companiesData || []);
+    } catch (error) {
+      console.error('Error fetching companies:', error);
     }
   };
 
@@ -146,8 +186,8 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
     }
   };
 
-  const handleDelete = async (reminderId: string) => {
-    if (!confirm('¿Estás seguro de que quieres eliminar este recordatorio?')) return;
+  const handleDelete = async (reminderId: string, showConfirm: boolean = true) => {
+    if (showConfirm && !confirm('¿Estás seguro de que quieres eliminar este recordatorio?')) return;
 
     try {
       const { error } = await supabase
@@ -157,25 +197,29 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
 
       if (error) throw error;
 
-      toast({
-        title: "Recordatorio eliminado",
-        description: "El recordatorio ha sido eliminado correctamente",
-      });
-
-      fetchReminders();
-      onReminderUpdate();
+      if (showConfirm) {
+        toast({
+          title: "Recordatorio eliminado",
+          description: "El recordatorio ha sido eliminado correctamente",
+        });
+        fetchReminders();
+        onReminderUpdate();
+      }
     } catch (error: any) {
       console.error('Error deleting reminder:', error);
-      toast({
-        title: "Error",
-        description: "No se pudo eliminar el recordatorio",
-        variant: "destructive",
-      });
+      if (showConfirm) {
+        toast({
+          title: "Error",
+          description: "No se pudo eliminar el recordatorio",
+          variant: "destructive",
+        });
+      }
+      throw error;
     }
   };
 
   const handleCreateVisit = async () => {
-    if (!visitCreationDialog.reminder || !selectedCommercial) return;
+    if (!visitCreationDialog.reminder || !selectedCommercial || !selectedCompany) return;
 
     try {
       // Create approved and in_progress visit
@@ -184,6 +228,7 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
         .insert({
           client_id: clientId,
           commercial_id: selectedCommercial,
+          company_id: selectedCompany,
           status: 'in_progress',
           approval_status: 'approved',
           notes: `Visita creada desde recordatorio de renovación: ${visitCreationDialog.reminder.notes || 'Sin notas'}`,
@@ -194,8 +239,8 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
 
       if (visitError) throw visitError;
 
-      // Delete reminder after creating visit
-      await handleDelete(visitCreationDialog.reminder.id);
+      // Delete reminder after creating visit (without confirmation)
+      await handleDelete(visitCreationDialog.reminder.id, false);
 
       toast({
         title: "Visita creada",
@@ -204,6 +249,9 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
 
       setVisitCreationDialog({ open: false, reminder: null });
       setSelectedCommercial('');
+      setSelectedCompany('');
+      fetchReminders();
+      onReminderUpdate();
     } catch (error: any) {
       console.error('Error creating visit:', error);
       toast({
@@ -355,13 +403,29 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
                 </SelectContent>
               </Select>
             </div>
+            
+            <div>
+              <label className="text-sm font-medium">Empresa</label>
+              <Select value={selectedCompany} onValueChange={setSelectedCompany}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar empresa..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setVisitCreationDialog({ open: false, reminder: null })}>
               Cancelar
             </Button>
-            <Button onClick={handleCreateVisit} disabled={!selectedCommercial}>
+            <Button onClick={handleCreateVisit} disabled={!selectedCommercial || !selectedCompany}>
               Crear visita
             </Button>
           </DialogFooter>
