@@ -206,7 +206,7 @@ export default function VisitSalesManagement() {
       return;
     }
 
-    setVisits(data || []);
+    setVisits(data as any || []); // Temporary fix for type conflicts
   };
 
   const fetchSales = async () => {
@@ -308,7 +308,7 @@ export default function VisitSalesManagement() {
         
         result = await supabase
           .from('visits')
-          .update(updateData)
+          .update(updateData as any)
           .eq('id', editingVisit.id);
       } else {
         const insertData = { ...visitData };
@@ -322,7 +322,7 @@ export default function VisitSalesManagement() {
         
         result = await supabase
           .from('visits')
-          .insert([insertData]);
+          .insert([insertData as any]);
       }
 
       if (result.error) {

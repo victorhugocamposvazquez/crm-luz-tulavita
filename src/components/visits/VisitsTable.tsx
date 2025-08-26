@@ -10,12 +10,13 @@ import { calculateCommission } from '@/lib/commission';
 interface Visit {
   id: string;
   visit_date: string;
-  status: 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed';
+  status: 'in_progress' | 'confirmado' | 'ausente' | 'nulo' | 'oficina';
   client_id?: string;
   commercial_id?: string;
   created_at?: string;
   approval_status?: string;
   notes?: string;
+  permission?: string;
   commercial?: {
     first_name: string | null;
     last_name: string | null;
@@ -48,18 +49,18 @@ interface VisitsTableProps {
 
 const statusLabels = {
   in_progress: 'En progreso',
-  completed: 'Completada',
-  no_answer: 'Sin respuesta',
-  not_interested: 'No interesado',
-  postponed: 'Aplazada'
+  confirmado: 'Confirmada',
+  ausente: 'Ausente',
+  nulo: 'Sin resultado',
+  oficina: 'Oficina'
 };
 
 const statusColors = {
   in_progress: 'bg-blue-100 text-blue-800 hover:bg-blue-100',
-  completed: 'bg-green-100 text-green-800 hover:bg-green-100',
-  no_answer: 'bg-gray-100 text-gray-800 hover:bg-gray-100',
-  not_interested: 'bg-red-100 text-red-800 hover:bg-red-100',
-  postponed: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'
+  confirmado: 'bg-green-100 text-green-800 hover:bg-green-100',
+  ausente: 'bg-gray-100 text-gray-800 hover:bg-gray-100',
+  nulo: 'bg-red-100 text-red-800 hover:bg-red-100',
+  oficina: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'
 };
 
 const getStatusDisplay = (status: string, approvalStatus?: string) => {

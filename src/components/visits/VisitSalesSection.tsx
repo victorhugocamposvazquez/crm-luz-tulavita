@@ -9,9 +9,9 @@ interface Sale {
     product_name: string;
     quantity: number;
     unit_price: number;
-    paid_cash: boolean;
-    is_paid: boolean;
-    is_delivered: boolean;
+    financiada: boolean;
+    transferencia: boolean;
+    nulo: boolean;
   }[];
 }
 
@@ -47,14 +47,14 @@ export default function VisitSalesSection({ visitSales }: VisitSalesSectionProps
                       </span>
                     </div>
                     <div className="flex gap-3 text-xs">
-                      <span className={`px-2 py-1 rounded ${line.paid_cash ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                        {line.paid_cash ? '✓' : '✗'} Efectivo
+                      <span className={`px-2 py-1 rounded ${line.financiada ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                        {line.financiada ? '✓' : '✗'} Financiada
                       </span>
-                      <span className={`px-2 py-1 rounded ${line.is_paid ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                        {line.is_paid ? '✓' : '✗'} Pagado
+                      <span className={`px-2 py-1 rounded ${line.transferencia ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                        {line.transferencia ? '✓' : '✗'} Transferencia
                       </span>
-                      <span className={`px-2 py-1 rounded ${line.is_delivered ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                        {line.is_delivered ? '✓' : '✗'} Entregado
+                      <span className={`px-2 py-1 rounded ${line.nulo ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600'}`}>
+                        {line.nulo ? '✓' : '✗'} Nulo
                       </span>
                     </div>
                   </div>

@@ -163,7 +163,7 @@ export default function UnifiedVisitsManagement() {
           if (error) throw error;
           setVisitData({
             notes: visitData.notes || '',
-            status: visitData.status,
+            status: visitData.status as any,
             company_id: visitData.company_id || '',
             permission: visitData.permission || 'pending',
             visitStateCode: visitData.visit_state_code || ''
@@ -314,7 +314,7 @@ export default function UnifiedVisitsManagement() {
       } = await supabase.from('sales').select(`
           id, amount, sale_date, product_description,
           visits!inner(status)
-        `).eq('client_id', clientId).eq('visits.status', 'confirmado').order('sale_date', {
+        `).eq('client_id', clientId).eq('visits.status', 'confirmado' as any).order('sale_date', {
         ascending: false
       }).limit(5);
       if (salesError) {
@@ -633,7 +633,7 @@ export default function UnifiedVisitsManagement() {
       const {
         data: visit,
         error: visitError
-      } = await supabase.from('visits').insert(visitPayload).select().single();
+      } = await supabase.from('visits').insert(visitPayload as any).select().single();
       if (visitError) {
         console.error('Error creating visit:', visitError);
         throw visitError;
@@ -784,7 +784,7 @@ export default function UnifiedVisitsManagement() {
         
         const { error: visitError } = await supabase
           .from('visits')
-          .update(updatePayload)
+          .update(updatePayload as any)
           .eq('id', editingVisitId);
           
         if (visitError) {
@@ -828,7 +828,7 @@ export default function UnifiedVisitsManagement() {
         
         const { data: newVisit, error: visitError } = await supabase
           .from('visits')
-          .insert(visitPayload)
+          .insert(visitPayload as any)
           .select()
           .single();
           

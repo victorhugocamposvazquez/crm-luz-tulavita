@@ -231,7 +231,7 @@ export default function CommercialVisitsManager() {
           client:clients(nombre_apellidos, dni),
           company:companies(name)
         `).eq('commercial_id', user?.id)
-        .neq('status', 'confirmado')  // Exclude completed visits (shown in stats)
+        .neq('status', 'confirmado' as any)  // Exclude completed visits (shown in stats)
         .order('visit_date', {
         ascending: false
       });
@@ -254,7 +254,7 @@ export default function CommercialVisitsManager() {
           last_name: ''
         } : undefined
       })) || [];
-      setVisits(formattedVisits);
+      setVisits(formattedVisits as any); // Temporary fix for type conflicts
 
       // Calculate stats
       const totalVisits = formattedVisits.length;
