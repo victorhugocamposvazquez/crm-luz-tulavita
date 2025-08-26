@@ -17,7 +17,7 @@ import UnifiedVisitsManagement from './UnifiedVisitsManagement';
 interface Visit {
   id: string;
   visit_date: string;
-  status: 'in_progress' | 'confirmado' | 'ausente' | 'nulo' | 'oficina';
+  status: 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed';
   approval_status: 'pending' | 'approved' | 'rejected' | 'waiting_admin';
   notes: string;
   client_id: string;
@@ -231,7 +231,7 @@ export default function CommercialVisitsManager() {
           client:clients(nombre_apellidos, dni),
           company:companies(name)
         `).eq('commercial_id', user?.id)
-        .neq('status', 'confirmado' as any)  // Exclude completed visits (shown in stats)
+        .neq('status', 'completed')  // Exclude completed visits (shown in stats)
         .order('visit_date', {
         ascending: false
       });
@@ -286,7 +286,7 @@ export default function CommercialVisitsManager() {
       variant = 'destructive';
     } else {
       // Solo mostramos el estado real de la visita (en curso o completada)
-      if (visit.status === 'confirmado') {
+      if (visit.status === 'completed') {
         finalStatus = 'Completada';
         variant = 'default';
       } else {
