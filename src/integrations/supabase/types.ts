@@ -211,40 +211,40 @@ export type Database = {
       sale_lines: {
         Row: {
           created_at: string
+          financiada: boolean
           id: string
-          is_delivered: boolean
-          is_paid: boolean
           line_total: number | null
-          paid_cash: boolean
+          nulo: boolean
           product_name: string
           quantity: number
           sale_id: string
+          transferencia: boolean
           unit_price: number
           updated_at: string
         }
         Insert: {
           created_at?: string
+          financiada?: boolean
           id?: string
-          is_delivered?: boolean
-          is_paid?: boolean
           line_total?: number | null
-          paid_cash?: boolean
+          nulo?: boolean
           product_name: string
           quantity?: number
           sale_id: string
+          transferencia?: boolean
           unit_price?: number
           updated_at?: string
         }
         Update: {
           created_at?: string
+          financiada?: boolean
           id?: string
-          is_delivered?: boolean
-          is_paid?: boolean
           line_total?: number | null
-          paid_cash?: boolean
+          nulo?: boolean
           product_name?: string
           quantity?: number
           sale_id?: string
+          transferencia?: boolean
           unit_price?: number
           updated_at?: string
         }

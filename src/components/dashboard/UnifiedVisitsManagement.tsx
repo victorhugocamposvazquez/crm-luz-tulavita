@@ -31,9 +31,9 @@ interface SaleLine {
   product_name: string;
   quantity: number;
   unit_price: number;
-  paid_cash: boolean;
-  is_paid: boolean;
-  is_delivered: boolean;
+  financiada: boolean;
+  transferencia: boolean;
+  nulo: boolean;
 }
 
 interface ClientPurchase {
@@ -89,7 +89,7 @@ export default function UnifiedVisitsManagement() {
   });
   const [visitData, setVisitData] = useState({
     notes: '',
-    status: 'in_progress' as 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed',
+    status: 'in_progress' as 'in_progress' | 'confirmado' | 'ausente' | 'nulo' | 'oficina',
     company_id: '',
     permission: 'pending',
     visitStateCode: ''
@@ -314,7 +314,7 @@ export default function UnifiedVisitsManagement() {
       } = await supabase.from('sales').select(`
           id, amount, sale_date, product_description,
           visits!inner(status)
-        `).eq('client_id', clientId).eq('visits.status', 'completed').order('sale_date', {
+        `).eq('client_id', clientId).eq('visits.status', 'confirmado').order('sale_date', {
         ascending: false
       }).limit(5);
       if (salesError) {
@@ -408,7 +408,7 @@ export default function UnifiedVisitsManagement() {
         const {
           data: saleLinesData,
           error: saleLinesError
-        } = await supabase.from('sale_lines').select('product_name, quantity, unit_price, paid_cash, is_paid, is_delivered').eq('sale_id', saleId);
+        } = await supabase.from('sale_lines').select('product_name, quantity, unit_price, financiada, transferencia, nulo').eq('sale_id', saleId);
         
         if (saleLinesError) {
           console.error('Error fetching sale lines:', saleLinesError);
@@ -621,7 +621,7 @@ export default function UnifiedVisitsManagement() {
         company_id: companies[0]?.id || null,
         // Use first available company or null
         notes: '',
-        status: 'in_progress' as 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed',
+        status: 'in_progress' as 'in_progress' | 'confirmado' | 'ausente' | 'nulo' | 'oficina',
         latitude: location?.latitude || null,
         longitude: location?.longitude || null,
         location_accuracy: location?.accuracy || null,
@@ -719,9 +719,9 @@ export default function UnifiedVisitsManagement() {
       product_name: '',
       quantity: 1,
       unit_price: 0,
-      paid_cash: false,
-      is_paid: false,
-      is_delivered: false
+      financiada: false,
+      transferencia: false,
+      nulo: false
     }]);
   };
 
@@ -770,10 +770,10 @@ export default function UnifiedVisitsManagement() {
         const updatePayload = {
           company_id: visitData.company_id,
           notes: visitData.notes || null,
-          status: isComplete ? 'completed' as const : 'in_progress' as const,
+          status: isComplete ? 'confirmado' as const : 'in_progress' as const,
           visit_state_code: visitData.visitStateCode || null,
           // Solo actualizar coordenadas si la visita no está completada o si se está completando ahora
-          ...(currentVisitStatus !== 'completed' && location ? {
+          ...(currentVisitStatus !== 'confirmado' && location ? {
             latitude: location.latitude,
             longitude: location.longitude, 
             location_accuracy: location.accuracy
@@ -816,7 +816,7 @@ export default function UnifiedVisitsManagement() {
           commercial_id: user!.id,
           company_id: visitData.company_id,
           notes: visitData.notes || null,
-          status: isComplete ? 'completed' as const : 'in_progress' as const,
+          status: isComplete ? 'confirmado' as const : 'in_progress' as const,
           latitude: location?.latitude || null,
           longitude: location?.longitude || null,
           location_accuracy: location?.accuracy || null,
@@ -896,9 +896,9 @@ export default function UnifiedVisitsManagement() {
           product_name: line.product_name,
           quantity: line.quantity,
           unit_price: line.unit_price,
-          paid_cash: line.paid_cash,
-          is_paid: line.is_paid,
-          is_delivered: line.is_delivered,
+          financiada: line.financiada,
+          transferencia: line.transferencia,
+          nulo: line.nulo,
           sale_id: saleId
         }));
         const {
@@ -1106,7 +1106,7 @@ export default function UnifiedVisitsManagement() {
 
   const renderVisitForm = () => {
     // Check if visit is completed or rejected (read-only)
-    const isReadOnly = currentVisitStatus === 'completed' || currentVisitStatus === 'no_answer' || currentVisitStatus === 'not_interested' || currentVisitStatus === 'postponed';
+    const isReadOnly = currentVisitStatus === 'confirmado' || currentVisitStatus === 'ausente' || currentVisitStatus === 'nulo' || currentVisitStatus === 'oficina';
     
     return (
       <div className="space-y-6">
@@ -1167,7 +1167,7 @@ export default function UnifiedVisitsManagement() {
                           <p className="text-sm font-medium">
                             {new Date(visit.visit_date).toLocaleDateString()}
                           </p>
-                          <span className={`px-2 py-1 rounded text-xs ${visit.status === 'completed' ? 'bg-green-100 text-green-800' : visit.status === 'scheduled' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>
+                          <span className={`px-2 py-1 rounded text-xs ${visit.status === 'confirmado' ? 'bg-green-100 text-green-800' : visit.status === 'scheduled' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>
                             {visit.status}
                           </span>
                         </div>
@@ -1295,16 +1295,16 @@ export default function UnifiedVisitsManagement() {
 
                     <div className="flex gap-4 text-sm">
                       <label className="flex items-center gap-2">
-                        <input type="checkbox" checked={line.paid_cash} onChange={e => updateSaleLine(index, 'paid_cash', e.target.checked)} disabled={isReadOnly} />
-                        Pagado en efectivo
+                        <input type="checkbox" checked={line.financiada} onChange={e => updateSaleLine(index, 'financiada', e.target.checked)} disabled={isReadOnly} />
+                        <span>Financiada</span>
                       </label>
                       <label className="flex items-center gap-2">
-                        <input type="checkbox" checked={line.is_paid} onChange={e => updateSaleLine(index, 'is_paid', e.target.checked)} disabled={isReadOnly} />
-                        Pagado
+                        <input type="checkbox" checked={line.transferencia} onChange={e => updateSaleLine(index, 'transferencia', e.target.checked)} disabled={isReadOnly} />
+                        <span>Transferencia</span>
                       </label>
                       <label className="flex items-center gap-2">
-                        <input type="checkbox" checked={line.is_delivered} onChange={e => updateSaleLine(index, 'is_delivered', e.target.checked)} disabled={isReadOnly} />
-                        Entregado
+                        <input type="checkbox" checked={line.nulo} onChange={e => updateSaleLine(index, 'nulo', e.target.checked)} disabled={isReadOnly} />
+                        <span>Nulo</span>
                       </label>
                     </div>
 

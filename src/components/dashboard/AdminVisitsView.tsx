@@ -15,7 +15,7 @@ import { calculateCommission } from '@/lib/commission';
 interface Visit {
   id: string;
   visit_date: string;
-  status: 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed';
+  status: 'in_progress' | 'confirmado' | 'ausente' | 'nulo' | 'oficina';
   approval_status: 'pending' | 'approved' | 'rejected' | 'waiting_admin';
   notes?: string;
   permission: string;
@@ -55,27 +55,27 @@ interface Sale {
     product_name: string;
     quantity: number;
     unit_price: number;
-    paid_cash: boolean;
-    is_paid: boolean;
-    is_delivered: boolean;
+    financiada: boolean;
+    transferencia: boolean;
+    nulo: boolean;
   }[];
 }
 
 // Estados y etiquetas igual que en ClientDetailView
 const statusLabels = {
   in_progress: 'En progreso',
-  completed: 'Completada',
-  no_answer: 'Sin respuesta',
-  not_interested: 'No interesado',
-  postponed: 'Aplazada'
+  confirmado: 'Confirmada',
+  ausente: 'Ausente',
+  nulo: 'Sin resultado',
+  oficina: 'Oficina'
 };
 
 const statusColors = {
   in_progress: 'bg-blue-100 text-blue-800 hover:bg-blue-100',
-  completed: 'bg-green-100 text-green-800 hover:bg-green-100',
-  no_answer: 'bg-gray-100 text-gray-800 hover:bg-gray-100',
-  not_interested: 'bg-red-100 text-red-800 hover:bg-red-100',
-  postponed: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'
+  confirmado: 'bg-green-100 text-green-800 hover:bg-green-100',
+  ausente: 'bg-gray-100 text-gray-800 hover:bg-gray-100',
+  nulo: 'bg-red-100 text-red-800 hover:bg-red-100',
+  oficina: 'bg-yellow-100 text-yellow-800 hover:bg-yellow-100'
 };
 
 export default function AdminVisitsView() {
@@ -144,7 +144,7 @@ export default function AdminVisitsView() {
       const salesWithLines = await Promise.all((salesData || []).map(async (sale) => {
         const { data: linesData, error: linesError } = await supabase
           .from('sale_lines')
-          .select('product_name, quantity, unit_price, paid_cash, is_paid, is_delivered')
+          .select('product_name, quantity, unit_price, financiada, transferencia, nulo')
           .eq('sale_id', sale.id);
 
         // Calculate commission using the new system

@@ -244,18 +244,18 @@ export default function CommercialStatistics() {
   const getStatusBadge = (status: string) => {
     const statusLabels = {
       'in_progress': 'En progreso',
-      'completed': 'Completada',
-      'no_answer': 'Sin respuesta', 
-      'not_interested': 'No interesado',
-      'postponed': 'Aplazada'
+      'confirmado': 'Confirmada',
+      'ausente': 'Ausente', 
+      'nulo': 'Sin resultado',
+      'oficina': 'Oficina'
     };
 
     const statusColors = {
       'in_progress': 'bg-blue-100 text-blue-800',
-      'completed': 'bg-green-100 text-green-800',
-      'no_answer': 'bg-gray-100 text-gray-800',
-      'not_interested': 'bg-red-100 text-red-800',
-      'postponed': 'bg-yellow-100 text-yellow-800'
+      'confirmado': 'bg-green-100 text-green-800',
+      'ausente': 'bg-gray-100 text-gray-800',
+      'nulo': 'bg-red-100 text-red-800',
+      'oficina': 'bg-yellow-100 text-yellow-800'
     };
 
     const label = statusLabels[status as keyof typeof statusLabels] || status;
@@ -287,18 +287,18 @@ export default function CommercialStatistics() {
   // Status distribution data for all visit statuses
   const statusLabels = {
     'in_progress': 'En Progreso',
-    'completed': 'Completada',
-    'no_answer': 'Sin Respuesta',
-    'not_interested': 'No Interesado',
-    'postponed': 'Aplazada'
+    'confirmado': 'Confirmada',
+    'ausente': 'Ausente',
+    'nulo': 'Sin Resultado',
+    'oficina': 'Oficina'
   };
 
   const statusColors = {
     'in_progress': '#3b82f6',
-    'completed': '#22c55e',
-    'no_answer': '#f59e0b',
-    'not_interested': '#ef4444',
-    'postponed': '#8b5cf6'
+    'confirmado': '#22c55e',
+    'ausente': '#f59e0b',
+    'nulo': '#ef4444',
+    'oficina': '#8b5cf6'
   };
 
   // Create visit distribution by actual status
@@ -319,7 +319,7 @@ export default function CommercialStatistics() {
   })).filter(item => item.value > 0);
 
   // Calculate additional statistics
-  const completedVisits = visits.filter(visit => visit.status === 'completed');
+  const completedVisits = visits.filter(visit => visit.status === 'confirmado');
 
   return (
     <div className="space-y-6">
@@ -602,15 +602,15 @@ export default function CommercialStatistics() {
                                     <span>{formatCurrency(line.line_total)}</span>
                                   </div>
                                   <div className="flex gap-2 text-xs">
-                                    <span className={`px-2 py-1 rounded ${line.paid_cash ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                                      {line.paid_cash ? '✓' : '✗'} Efectivo
-                                    </span>
-                                    <span className={`px-2 py-1 rounded ${line.is_paid ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                                      {line.is_paid ? '✓' : '✗'} Pagado
-                                    </span>
-                                    <span className={`px-2 py-1 rounded ${line.is_delivered ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                                      {line.is_delivered ? '✓' : '✗'} Entregado
-                                    </span>
+                                   <span className={`px-2 py-1 rounded ${line.financiada ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                     {line.financiada ? '✓' : '✗'} Financiada
+                                   </span>
+                                   <span className={`px-2 py-1 rounded ${line.transferencia ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                     {line.transferencia ? '✓' : '✗'} Transferencia
+                                   </span>
+                                   <span className={`px-2 py-1 rounded ${line.nulo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                     {line.nulo ? '✓' : '✗'} Nulo
+                                   </span>
                                   </div>
                                 </div>
                               ))}
