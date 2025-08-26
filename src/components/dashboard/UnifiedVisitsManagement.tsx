@@ -93,7 +93,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
   });
   const [visitData, setVisitData] = useState({
     notes: '',
-    status: 'in_progress' as 'in_progress' | 'confirmado' | 'ausente' | 'nulo' | 'oficina',
+    status: 'in_progress' as 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed',
     company_id: '',
     permission: 'pending',
     visitStateCode: ''
@@ -318,7 +318,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       } = await supabase.from('sales').select(`
           id, amount, sale_date, product_description,
           visits!inner(status)
-        `).eq('client_id', clientId).eq('visits.status', 'confirmado' as any).order('sale_date', {
+        `).eq('client_id', clientId).eq('visits.status', 'completed' as any).order('sale_date', {
         ascending: false
       }).limit(5);
       if (salesError) {
@@ -625,7 +625,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
         company_id: companies[0]?.id || null,
         // Use first available company or null
         notes: '',
-        status: 'in_progress' as 'in_progress' | 'confirmado' | 'ausente' | 'nulo' | 'oficina',
+        status: 'in_progress' as 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed',
         latitude: location?.latitude || null,
         longitude: location?.longitude || null,
         location_accuracy: location?.accuracy || null,
@@ -715,7 +715,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
         client_id: newClient.id,
         commercial_id: user!.id,
         company_id: selectedCompany,
-        notes: 'Visita creada automáticamente al registrar nuevo cliente',
+        notes: '',
         status: 'in_progress' as const,
         latitude: location?.latitude || null,
         longitude: location?.longitude || null,
@@ -737,6 +737,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       }
       
       console.log('New visit created:', newVisit);
+      console.log('Calling onSuccess callback...');
       
       toast({
         title: "Cliente y visita creados",
@@ -744,9 +745,14 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       });
       
       // Call the onSuccess callback to return to the list
-      if (onSuccess) {
-        onSuccess();
-      }
+      setTimeout(() => {
+        if (onSuccess) {
+          console.log('Executing onSuccess callback');
+          onSuccess();
+        } else {
+          console.log('No onSuccess callback provided');
+        }
+      }, 1000); // Small delay to ensure toast is shown
     } catch (error) {
       console.error('Error creating client:', error);
       toast({
@@ -815,10 +821,10 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
         const updatePayload = {
           company_id: visitData.company_id,
           notes: visitData.notes || null,
-          status: isComplete ? 'confirmado' as const : 'in_progress' as const,
+          status: isComplete ? 'completed' as const : 'in_progress' as const,
           visit_state_code: visitData.visitStateCode || null,
           // Solo actualizar coordenadas si la visita no está completada o si se está completando ahora
-          ...(currentVisitStatus !== 'confirmado' && location ? {
+          ...(currentVisitStatus !== 'completed' && location ? {
             latitude: location.latitude,
             longitude: location.longitude, 
             location_accuracy: location.accuracy
@@ -861,7 +867,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
           commercial_id: user!.id,
           company_id: visitData.company_id,
           notes: visitData.notes || null,
-          status: isComplete ? 'confirmado' as const : 'in_progress' as const,
+          status: isComplete ? 'completed' as const : 'in_progress' as const,
           latitude: location?.latitude || null,
           longitude: location?.longitude || null,
           location_accuracy: location?.accuracy || null,
@@ -1151,7 +1157,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
 
   const renderVisitForm = () => {
     // Check if visit is completed or rejected (read-only)
-    const isReadOnly = currentVisitStatus === 'confirmado' || currentVisitStatus === 'ausente' || currentVisitStatus === 'nulo' || currentVisitStatus === 'oficina';
+    const isReadOnly = currentVisitStatus === 'completed' || currentVisitStatus === 'no_answer' || currentVisitStatus === 'not_interested' || currentVisitStatus === 'postponed';
     
     return (
       <div className="space-y-6">
@@ -1212,7 +1218,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
                           <p className="text-sm font-medium">
                             {new Date(visit.visit_date).toLocaleDateString()}
                           </p>
-                          <span className={`px-2 py-1 rounded text-xs ${visit.status === 'confirmado' ? 'bg-green-100 text-green-800' : visit.status === 'scheduled' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>
+                          <span className={`px-2 py-1 rounded text-xs ${visit.status === 'completed' ? 'bg-green-100 text-green-800' : visit.status === 'scheduled' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>
                             {visit.status}
                           </span>
                         </div>
