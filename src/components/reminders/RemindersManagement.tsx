@@ -8,8 +8,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
-import { Bell, BellOff, Trash2, UserPlus, Calendar, Search, Filter } from 'lucide-react';
+import { Bell, BellOff, Trash2, UserPlus, Calendar, Search, Filter, X, CheckSquare } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import ReminderDialog from './ReminderDialog';
@@ -46,6 +47,7 @@ export default function RemindersManagement() {
   });
   const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<{ id: string; name: string } | null>(null);
+  const [selectedReminders, setSelectedReminders] = useState<string[]>([]);
   const [visitCreationDialog, setVisitCreationDialog] = useState<{ open: boolean; reminder: Reminder | null }>({ open: false, reminder: null });
   const [selectedCommercial, setSelectedCommercial] = useState<string>('');
   const [commercials, setCommercials] = useState<Array<{ id: string; name: string; email: string }>>([]);
@@ -128,28 +130,102 @@ export default function RemindersManagement() {
 
   const fetchCommercials = async () => {
     try {
-      const { data, error } = await supabase
+      console.log('Fetching commercials...');
+      // First get user_roles with role 'commercial'
+      const { data: userRoles, error: roleError } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'commercial');
+
+      if (roleError) {
+        console.error('Error fetching user roles:', roleError);
+        throw roleError;
+      }
+
+      console.log('User roles data:', userRoles);
+
+      if (!userRoles || userRoles.length === 0) {
+        console.log('No commercials found');
+        setCommercials([]);
+        return;
+      }
+
+      // Then get profiles for those users
+      const userIds = userRoles.map(role => role.user_id);
+      const { data: profiles, error: profileError } = await supabase
         .from('profiles')
-        .select(`
-          id,
-          first_name,
-          last_name,
-          email,
-          user_roles!inner(role)
-        `)
-        .eq('user_roles.role', 'commercial');
+        .select('id, first_name, last_name, email')
+        .in('id', userIds);
 
-      if (error) throw error;
+      if (profileError) {
+        console.error('Error fetching profiles:', profileError);
+        throw profileError;
+      }
 
-      const commercialsList = (data || []).map(commercial => ({
-        id: commercial.id,
-        name: `${commercial.first_name || ''} ${commercial.last_name || ''}`.trim() || commercial.email,
-        email: commercial.email
+      console.log('Profiles data:', profiles);
+
+      const commercialsList = (profiles || []).map(profile => ({
+        id: profile.id,
+        name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.email,
+        email: profile.email
       }));
 
+      console.log('Transformed commercials:', commercialsList);
       setCommercials(commercialsList);
     } catch (error) {
       console.error('Error fetching commercials:', error);
+    }
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      client_name: '',
+      dni: '',
+      status: 'all',
+      start_date: '',
+      end_date: ''
+    });
+  };
+
+  const handleReminderSelection = (reminderId: string, checked: boolean) => {
+    setSelectedReminders(prev => 
+      checked 
+        ? [...prev, reminderId]
+        : prev.filter(id => id !== reminderId)
+    );
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    setSelectedReminders(checked ? reminders.map(r => r.id) : []);
+  };
+
+  const handleDeleteMultiple = async () => {
+    if (selectedReminders.length === 0) return;
+    
+    if (!confirm(`¿Estás seguro de que quieres eliminar ${selectedReminders.length} recordatorio(s)?`)) return;
+
+    try {
+      const { error } = await supabase
+        .from('renewal_reminders')
+        .delete()
+        .in('id', selectedReminders);
+
+      if (error) throw error;
+
+      toast({
+        title: "Recordatorios eliminados",
+        description: `Se han eliminado ${selectedReminders.length} recordatorio(s) correctamente`,
+      });
+
+      setSelectedReminders([]);
+      fetchReminders();
+    } catch (error: any) {
+      console.error('Error deleting reminders:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron eliminar los recordatorios",
+        variant: "destructive",
+      });
     }
   };
 
@@ -343,13 +419,32 @@ export default function RemindersManagement() {
               />
             </div>
           </div>
+          <div className="flex justify-end mt-4">
+            <Button variant="outline" onClick={clearFilters} className="flex items-center gap-2">
+              <X className="h-4 w-4" />
+              Limpiar filtros
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
       {/* Reminders Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Recordatorios ({reminders.length})</CardTitle>
+          <CardTitle className="flex items-center justify-between">
+            <span>Recordatorios ({reminders.length})</span>
+            {selectedReminders.length > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleDeleteMultiple}
+                className="flex items-center gap-2"
+              >
+                <Trash2 className="h-4 w-4" />
+                Eliminar seleccionados ({selectedReminders.length})
+              </Button>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -362,6 +457,12 @@ export default function RemindersManagement() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={selectedReminders.length === reminders.length && reminders.length > 0}
+                        onCheckedChange={handleSelectAll}
+                      />
+                    </TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>DNI</TableHead>
                     <TableHead>Fecha recordatorio</TableHead>
@@ -374,6 +475,12 @@ export default function RemindersManagement() {
                 <TableBody>
                   {reminders.map((reminder) => (
                     <TableRow key={reminder.id} className={isPastDue(reminder.reminder_date, reminder.status) ? 'bg-red-50' : ''}>
+                      <TableCell>
+                        <Checkbox
+                          checked={selectedReminders.includes(reminder.id)}
+                          onCheckedChange={(checked) => handleReminderSelection(reminder.id, checked as boolean)}
+                        />
+                      </TableCell>
                       <TableCell className="font-medium">
                         {reminder.client?.nombre_apellidos || 'Cliente eliminado'}
                       </TableCell>
@@ -431,7 +538,7 @@ export default function RemindersManagement() {
                   ))}
                   {reminders.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                         No hay recordatorios que coincidan con los filtros
                       </TableCell>
                     </TableRow>
