@@ -670,6 +670,15 @@ const fetchVisits = async () => {
         onClose={() => setSelectedVisit(null)}
         showClientInfo={false}
       />
+
+      {/* Reminder Dialog */}
+      <ReminderDialog
+        open={reminderDialogOpen}
+        onOpenChange={setReminderDialogOpen}
+        clientId={clientId}
+        clientName={client?.nombre_apellidos || ''}
+        onReminderCreated={fetchClientData}
+      />
     </div>
   );
 }

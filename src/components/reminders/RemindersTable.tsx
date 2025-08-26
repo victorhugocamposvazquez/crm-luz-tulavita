@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
-import { Bell, Trash2, UserPlus, CheckCircle, XCircle } from 'lucide-react';
+import { Bell, Trash2, UserPlus } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -194,8 +194,8 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
 
       if (visitError) throw visitError;
 
-      // Mark reminder as completed
-      await handleStatusUpdate(visitCreationDialog.reminder.id, 'completed');
+      // Delete reminder after creating visit
+      await handleDelete(visitCreationDialog.reminder.id);
 
       toast({
         title: "Visita creada",
@@ -291,38 +291,18 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
                   {isAdmin && (
                     <div className="flex items-center gap-2">
                       {reminder.status === 'pending' && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleStatusUpdate(reminder.id, 'completed')}
-                            className="text-green-600 border-green-600 hover:bg-green-50"
-                            title="Marcar como completado"
-                          >
-                            <CheckCircle className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setVisitCreationDialog({ open: true, reminder });
-                              setSelectedCommercial('');
-                            }}
-                            className="text-blue-600 border-blue-600 hover:bg-blue-50"
-                            title="Crear visita"
-                          >
-                            <UserPlus className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleStatusUpdate(reminder.id, 'cancelled')}
-                            className="text-red-600 border-red-600 hover:bg-red-50"
-                            title="Cancelar recordatorio"
-                          >
-                            <XCircle className="h-4 w-4" />
-                          </Button>
-                        </>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setVisitCreationDialog({ open: true, reminder });
+                            setSelectedCommercial('');
+                          }}
+                          className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                          title="Crear visita"
+                        >
+                          <UserPlus className="h-4 w-4" />
+                        </Button>
                       )}
                       <Button
                         size="sm"

@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
-import { Bell, BellOff, Trash2, UserPlus, Calendar, CheckCircle, XCircle, Search, Filter } from 'lucide-react';
+import { Bell, BellOff, Trash2, UserPlus, Calendar, Search, Filter } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import ReminderDialog from './ReminderDialog';
@@ -40,7 +40,9 @@ export default function RemindersManagement() {
   const [filters, setFilters] = useState({
     client_name: '',
     dni: '',
-    status: 'all'
+    status: 'all',
+    start_date: '',
+    end_date: ''
   });
   const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<{ id: string; name: string } | null>(null);
@@ -76,6 +78,12 @@ export default function RemindersManagement() {
       }
       if (filters.status !== 'all') {
         query = query.eq('status', filters.status);
+      }
+      if (filters.start_date) {
+        query = query.gte('reminder_date', filters.start_date);
+      }
+      if (filters.end_date) {
+        query = query.lte('reminder_date', filters.end_date);
       }
 
       const { data, error } = await query;
@@ -217,8 +225,8 @@ export default function RemindersManagement() {
 
       if (visitError) throw visitError;
 
-      // Mark reminder as completed
-      await handleStatusUpdate(visitCreationDialog.reminder.id, 'completed');
+      // Delete reminder after creating visit
+      await handleDelete(visitCreationDialog.reminder.id);
 
       toast({
         title: "Visita creada",
@@ -289,7 +297,7 @@ export default function RemindersManagement() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div>
               <label className="text-sm font-medium">Nombre del cliente</label>
               <Input
@@ -315,10 +323,24 @@ export default function RemindersManagement() {
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="pending">Pendientes</SelectItem>
-                  <SelectItem value="completed">Completados</SelectItem>
-                  <SelectItem value="cancelled">Cancelados</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Fecha inicio</label>
+              <Input
+                type="date"
+                value={filters.start_date}
+                onChange={(e) => setFilters(prev => ({ ...prev, start_date: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Fecha fin</label>
+              <Input
+                type="date"
+                value={filters.end_date}
+                onChange={(e) => setFilters(prev => ({ ...prev, end_date: e.target.value }))}
+              />
             </div>
           </div>
         </CardContent>
@@ -381,41 +403,25 @@ export default function RemindersManagement() {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           {reminder.status === 'pending' && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleStatusUpdate(reminder.id, 'completed')}
-                                className="text-green-600 border-green-600 hover:bg-green-50"
-                              >
-                                <CheckCircle className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => {
-                                  setVisitCreationDialog({ open: true, reminder });
-                                  setSelectedCommercial('');
-                                }}
-                                className="text-blue-600 border-blue-600 hover:bg-blue-50"
-                              >
-                                <UserPlus className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleStatusUpdate(reminder.id, 'cancelled')}
-                                className="text-red-600 border-red-600 hover:bg-red-50"
-                              >
-                                <XCircle className="h-4 w-4" />
-                              </Button>
-                            </>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setVisitCreationDialog({ open: true, reminder });
+                                setSelectedCommercial('');
+                              }}
+                              className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                              title="Crear visita"
+                            >
+                              <UserPlus className="h-4 w-4" />
+                            </Button>
                           )}
                           <Button
                             size="sm"
                             variant="outline"
                             onClick={() => handleDelete(reminder.id)}
                             className="text-red-600 border-red-600 hover:bg-red-50"
+                            title="Eliminar recordatorio"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
