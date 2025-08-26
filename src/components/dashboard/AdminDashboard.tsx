@@ -141,11 +141,16 @@ export default function AdminDashboard() {
         monthSales: monthSalesAmount
       });
 
-      // Fetch commercials for filter
+      // Fetch commercials for filter (only users with 'commercial' role)
       const { data: commercialsData, error: commercialsError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name')
-        .neq('id', user.id); // Exclude admin
+        .select(`
+          id, 
+          first_name, 
+          last_name,
+          user_roles!inner(role)
+        `)
+        .eq('user_roles.role', 'commercial');
 
       if (commercialsError) throw commercialsError;
       setCommercials(commercialsData || []);
