@@ -82,7 +82,8 @@ export default function CommercialVisitsManager() {
     total: 0,
     pending: 0,
     approved: 0,
-    rejected: 0
+    rejected: 0,
+    completed: 0
   });
   useEffect(() => {
     fetchVisits();
@@ -256,16 +257,36 @@ export default function CommercialVisitsManager() {
       })) || [];
       setVisits(formattedVisits as any); // Temporary fix for type conflicts
 
-      // Calculate stats
+      // Calculate stats for non-completed visits
       const totalVisits = formattedVisits.length;
       const pendingVisits = formattedVisits.filter(v => v.approval_status === 'pending').length;
       const approvedVisits = formattedVisits.filter(v => v.approval_status === 'approved').length;
       const rejectedVisits = formattedVisits.filter(v => v.approval_status === 'rejected').length;
+
+      // Fetch completed visits for last 30 days separately
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      
+      const { data: completedVisitsData, error: completedError } = await supabase
+        .from('visits')
+        .select('id')
+        .eq('commercial_id', user?.id)
+        .eq('status', 'completed')
+        .gte('visit_date', thirtyDaysAgo.toISOString())
+        .order('visit_date', { ascending: false });
+
+      if (completedError) {
+        console.error('Error fetching completed visits:', completedError);
+      }
+
+      const completedVisitsCount = completedVisitsData?.length || 0;
+
       setStats({
         total: totalVisits,
         pending: pendingVisits,
         approved: approvedVisits,
-        rejected: rejectedVisits
+        rejected: rejectedVisits,
+        completed: completedVisitsCount
       });
     } catch (error) {
       console.error('Error fetching visits:', error);
@@ -427,6 +448,19 @@ export default function CommercialVisitsManager() {
             </Card>
           </div>
 
+          {/* Completed Visits Card */}
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Visitas completadas - últimos 30 días</CardTitle>
+                <CheckCircle className="h-4 w-4 text-blue-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-500">{stats.completed}</div>
+              </CardContent>
+            </Card>
+          </div>
+
           {/* Visits Table */}
           <Card>
             <CardHeader>
@@ -517,7 +551,7 @@ export default function CommercialVisitsManager() {
                   <div>
                     <Label>Resultado de la visita</Label>
                     <div>
-                      <Badge variant="outline">{selectedVisit.visit_states.name}</Badge>
+                      <Badge variant="outline">{selectedVisit.visit_states.name.charAt(0).toUpperCase() + selectedVisit.visit_states.name.slice(1).toLowerCase()}</Badge>
                     </div>
                   </div>
                 )}

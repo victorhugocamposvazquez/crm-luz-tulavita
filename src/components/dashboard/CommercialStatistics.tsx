@@ -244,18 +244,18 @@ export default function CommercialStatistics() {
   const getStatusBadge = (status: string) => {
     const statusLabels = {
       'in_progress': 'En progreso',
-      'confirmado': 'Confirmada',
-      'ausente': 'Ausente', 
-      'nulo': 'Sin resultado',
-      'oficina': 'Oficina'
+      'completed': 'Completada',
+      'no_answer': 'Sin respuesta', 
+      'not_interested': 'No interesado',
+      'postponed': 'Pospuesto'
     };
 
     const statusColors = {
       'in_progress': 'bg-blue-100 text-blue-800',
-      'confirmado': 'bg-green-100 text-green-800',
-      'ausente': 'bg-gray-100 text-gray-800',
-      'nulo': 'bg-red-100 text-red-800',
-      'oficina': 'bg-yellow-100 text-yellow-800'
+      'completed': 'bg-green-100 text-green-800',
+      'no_answer': 'bg-gray-100 text-gray-800',
+      'not_interested': 'bg-red-100 text-red-800',
+      'postponed': 'bg-yellow-100 text-yellow-800'
     };
 
     const label = statusLabels[status as keyof typeof statusLabels] || status;
@@ -284,21 +284,20 @@ export default function CommercialStatistics() {
   const approvedVisits = visits.filter(visit => visit.approval_status === 'approved').length;
   const pendingVisits = visits.filter(visit => visit.approval_status === 'pending').length;
 
-  // Status distribution data for all visit statuses
   const statusLabels = {
     'in_progress': 'En Progreso',
-    'confirmado': 'Confirmada',
-    'ausente': 'Ausente',
-    'nulo': 'Sin Resultado',
-    'oficina': 'Oficina'
+    'completed': 'Completada',
+    'no_answer': 'Sin Respuesta',
+    'not_interested': 'No Interesado',
+    'postponed': 'Pospuesto'
   };
 
   const statusColors = {
     'in_progress': '#3b82f6',
-    'confirmado': '#22c55e',
-    'ausente': '#f59e0b',
-    'nulo': '#ef4444',
-    'oficina': '#8b5cf6'
+    'completed': '#22c55e',
+    'no_answer': '#f59e0b',
+    'not_interested': '#ef4444',
+    'postponed': '#8b5cf6'
   };
 
   // Create visit distribution by actual status
@@ -319,7 +318,7 @@ export default function CommercialStatistics() {
   })).filter(item => item.value > 0);
 
   // Calculate additional statistics
-  const completedVisits = visits.filter(visit => visit.status === 'confirmado');
+  const completedVisits = visits.filter(visit => visit.status === 'completed');
 
   return (
     <div className="space-y-6">

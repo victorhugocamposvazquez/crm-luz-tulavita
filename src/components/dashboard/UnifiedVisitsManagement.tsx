@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Loader2, MapPin, Plus, Minus } from 'lucide-react';
 import { formatCoordinates } from '@/lib/coordinates';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Client {
   id: string;
@@ -1016,20 +1017,22 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="company">Empresa *</Label>
-          <select 
-            id="company" 
+          <Select 
             value={selectedCompany} 
-            onChange={(e) => setSelectedCompany(e.target.value)}
-            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" 
+            onValueChange={setSelectedCompany}
             required
           >
-            <option value="">Selecciona una empresa</option>
-            {companies.map(company => (
-              <option key={company.id} value={company.id}>
-                {company.name}
-              </option>
-            ))}
-          </select>
+            <SelectTrigger>
+              <SelectValue placeholder="Selecciona una empresa" />
+            </SelectTrigger>
+            <SelectContent>
+              {companies.map(company => (
+                <SelectItem key={company.id} value={company.id}>
+                  {company.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
         
         <div className="space-y-2">
@@ -1240,25 +1243,25 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="company">Empresa *</Label>
-              <select 
-                id="company" 
+              <Select 
                 value={visitData.company_id || selectedCompany || ''} 
-                onChange={(e) => setVisitData(prev => ({ ...prev, company_id: e.target.value }))} 
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" 
+                onValueChange={(value) => setVisitData(prev => ({ ...prev, company_id: value }))}
                 required 
                 disabled={isReadOnly}
               >
-                <option value="">Selecciona una empresa</option>
-                {companies && companies.length > 0 ? (
-                  companies.map(company => (
-                    <option key={company.id} value={company.id}>
-                      {company.name}
-                    </option>
-                  ))
-                ) : (
-                  <option disabled>Cargando empresas...</option>
-                )}
-              </select>
+              <SelectTrigger>
+                <SelectValue placeholder={companies && companies.length > 0 ? "Selecciona una empresa" : "Cargando empresas..."} />
+              </SelectTrigger>
+                <SelectContent>
+                  {companies && companies.length > 0 ? (
+                    companies.map(company => (
+                      <SelectItem key={company.id} value={company.id}>
+                        {company.name}
+                      </SelectItem>
+                    ))
+                  ) : null}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
@@ -1275,21 +1278,23 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
 
             <div className="space-y-2">
               <Label htmlFor="visitStateCode">Estado de la Visita *</Label>
-              <select 
-                id="visitStateCode" 
+              <Select 
                 value={visitData.visitStateCode} 
-                onChange={(e) => setVisitData(prev => ({ ...prev, visitStateCode: e.target.value }))} 
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" 
+                onValueChange={(value) => setVisitData(prev => ({ ...prev, visitStateCode: value }))}
                 disabled={isReadOnly}
                 required
               >
-                <option value="">Selecciona un estado</option>
-                {visitStates.map(state => (
-                  <option key={state.code} value={state.code}>
-                    {state.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona un estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  {visitStates.map(state => (
+                    <SelectItem key={state.code} value={state.code}>
+                      {state.name.charAt(0).toUpperCase() + state.name.slice(1).toLowerCase()}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {location && (
