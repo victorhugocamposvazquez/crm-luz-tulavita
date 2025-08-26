@@ -208,6 +208,47 @@ export type Database = {
           },
         ]
       }
+      renewal_reminders: {
+        Row: {
+          client_id: string
+          created_at: string
+          created_by: string
+          id: string
+          notes: string | null
+          reminder_date: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          created_by: string
+          id?: string
+          notes?: string | null
+          reminder_date: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          created_by?: string
+          id?: string
+          notes?: string | null
+          reminder_date?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "renewal_reminders_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sale_lines: {
         Row: {
           created_at: string

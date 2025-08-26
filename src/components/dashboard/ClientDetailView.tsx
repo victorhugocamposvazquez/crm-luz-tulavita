@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { toast } from '@/hooks/use-toast';
-import { ArrowLeft, MapPin, Calendar, DollarSign, TrendingUp, Building2, Phone, Mail, MapPinIcon, Eye, Euro } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, DollarSign, TrendingUp, Building2, Phone, Mail, MapPinIcon, Eye, Euro, Bell } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
@@ -16,6 +16,8 @@ import { formatCoordinates } from '@/lib/coordinates';
 import VisitsTable from '@/components/visits/VisitsTable';
 import VisitDetailsDialog from '@/components/visits/VisitDetailsDialog';
 import { calculateCommission } from '@/lib/commission';
+import RemindersTable from '@/components/reminders/RemindersTable';
+import ReminderDialog from '@/components/reminders/ReminderDialog';
 
 interface Client {
   id: string;
@@ -105,6 +107,8 @@ export default function ClientDetailView({ clientId, onBack }: ClientDetailViewP
   const [loading, setLoading] = useState(true);
   const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
   const [visitSales, setVisitSales] = useState<any[]>([]);
+  const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<{ id: string; name: string } | null>(null);
 
   const isAdmin = userRole?.role === 'admin';
 
@@ -446,6 +450,34 @@ const fetchVisits = async () => {
           </div>
         </CardContent>
       </Card>
+
+      {/* Recordatorios de renovación (solo admin) */}
+      {isAdmin && (
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between text-xl">
+              <div className="flex items-center gap-3">
+                <Bell className="h-6 w-6" />
+                Recordatorios de renovación
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setSelectedClient({ id: clientId, name: client.nombre_apellidos });
+                  setReminderDialogOpen(true);
+                }}
+              >
+                <Bell className="h-4 w-4 mr-2" />
+                Nuevo recordatorio
+              </Button>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <RemindersTable clientId={clientId} onReminderUpdate={fetchClientData} />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Métricas resumidas */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">

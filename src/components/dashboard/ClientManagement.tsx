@@ -10,12 +10,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { UserPlus, Edit, Trash2, Upload, Loader2, Eye } from 'lucide-react';
+import { UserPlus, Edit, Trash2, Upload, Loader2, Eye, Bell } from 'lucide-react';
 import { formatCoordinates, parseCoordinates } from '@/lib/coordinates';
 import ClientDetailView from './ClientDetailView';
 import ClientFilters from './ClientFilters';
 import ClientPagination from './ClientPagination';
 import { MapSelector } from '@/components/ui/map-selector';
+import ReminderDialog from '@/components/reminders/ReminderDialog';
 
 interface Client {
   id: string;
@@ -40,6 +41,8 @@ export default function ClientManagement() {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<{ id: string; name: string } | null>(null);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -649,39 +652,50 @@ export default function ClientManagement() {
                      </TableCell>
                      <TableCell>{client.telefono1 || '-'}</TableCell>
                      <TableCell>{client.email || '-'}</TableCell>
-                     <TableCell>
-                       <div className="flex space-x-2">
-                         <Button 
-                           variant="outline" 
-                           size="sm"
-                           onClick={() => setSelectedClientId(client.id)}
-                         >
-                           <Eye className="h-4 w-4" />
-                         </Button>
-                         {/* Only show edit/delete for admins */}
-                         {isAdmin && (
-                           <>
-                             <Button
-                               variant="outline"
-                               size="sm"
-                               onClick={() => {
-                                 setEditingClient(client);
-                                 setDialogOpen(true);
-                               }}
-                             >
-                               <Edit className="h-4 w-4" />
-                             </Button>
-                             <Button
-                               variant="outline"
-                               size="sm"
-                               onClick={() => handleDelete(client.id)}
-                             >
-                               <Trash2 className="h-4 w-4" />
-                             </Button>
-                           </>
-                         )}
-                       </div>
-                     </TableCell>
+                      <TableCell>
+                        <div className="flex space-x-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => setSelectedClientId(client.id)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          {/* Only show edit/delete for admins */}
+                          {isAdmin && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setEditingClient(client);
+                                  setDialogOpen(true);
+                                }}
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setSelectedClient({ id: client.id, name: client.nombre_apellidos });
+                                  setReminderDialogOpen(true);
+                                }}
+                                title="Crear recordatorio de renovación"
+                              >
+                                <Bell className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleDelete(client.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
                   </TableRow>
                 ))
               )}
@@ -701,6 +715,17 @@ export default function ClientManagement() {
           )}
         </CardContent>
       </Card>
+
+      {/* Reminder Dialog */}
+      {selectedClient && (
+        <ReminderDialog
+          open={reminderDialogOpen}
+          onOpenChange={setReminderDialogOpen}
+          clientId={selectedClient.id}
+          clientName={selectedClient.name}
+          onReminderCreated={fetchClients}
+        />
+      )}
     </div>
   );
 }
