@@ -480,10 +480,7 @@ export default function CommercialVisitsManager() {
           </Card>
         </>}
 
-      {currentView === 'create-single' && <UnifiedVisitsManagement onSuccess={() => {
-        setCurrentView('list');
-        fetchVisits(); // Refresh the visits list
-      }} />}
+      {currentView === 'create-single' && <UnifiedVisitsManagement />}
 
 
       {/* Visit Detail Dialog */}

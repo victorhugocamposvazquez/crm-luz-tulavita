@@ -737,22 +737,16 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       }
       
       console.log('New visit created:', newVisit);
-      console.log('Calling onSuccess callback...');
       
       toast({
         title: "Cliente y visita creados",
         description: "Cliente registrado exitosamente y visita creada automáticamente"
       });
       
-      // Call the onSuccess callback to return to the list
-      setTimeout(() => {
-        if (onSuccess) {
-          console.log('Executing onSuccess callback');
-          onSuccess();
-        } else {
-          console.log('No onSuccess callback provided');
-        }
-      }, 1000); // Small delay to ensure toast is shown
+      // Dispatch events to navigate back to visits list (same pattern as when completing a visit)
+      window.dispatchEvent(new CustomEvent('visitCreated', { detail: newVisit }));
+      window.dispatchEvent(new CustomEvent('navigateToVisitsList'));
+      
     } catch (error) {
       console.error('Error creating client:', error);
       toast({
