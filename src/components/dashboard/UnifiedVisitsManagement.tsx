@@ -1286,7 +1286,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
                 <option value="">Selecciona un estado</option>
                 {visitStates.map(state => (
                   <option key={state.code} value={state.code}>
-                    {state.name}
+                    {state.name.charAt(0).toUpperCase() + state.name.slice(1).toLowerCase()}
                   </option>
                 ))}
               </select>
