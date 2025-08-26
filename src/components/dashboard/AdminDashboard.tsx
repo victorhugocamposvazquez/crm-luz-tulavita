@@ -581,7 +581,7 @@ export default function AdminDashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{formatCurrency(totalCommissions)}</div>
-              <p className="text-xs text-muted-foreground">5% de las ventas</p>
+              <p className="text-xs text-muted-foreground">Estimación según ventas realizadas</p>
             </CardContent>
           </Card>
 
