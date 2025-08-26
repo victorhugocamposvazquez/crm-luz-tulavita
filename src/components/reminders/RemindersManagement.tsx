@@ -316,7 +316,7 @@ export default function RemindersManagement() {
           company_id: selectedCompany,
           status: 'in_progress',
           approval_status: 'approved',
-          notes: `Visita creada desde recordatorio de renovación: ${visitCreationDialog.reminder.notes || 'Sin notas'}`,
+          notes: '',
           visit_date: new Date().toISOString()
         })
         .select()
