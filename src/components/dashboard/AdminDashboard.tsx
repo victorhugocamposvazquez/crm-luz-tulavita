@@ -10,12 +10,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Users, Euro, MapPin, TrendingUp, Eye } from 'lucide-react';
+import { Users, Euro, MapPin, TrendingUp, Eye, Check, ChevronsUpDown } from 'lucide-react';
 import { formatCoordinates } from '@/lib/coordinates';
 import { calculateCommission } from '@/lib/commission';
 import { format, subDays, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths, startOfDay, endOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
+import { cn } from '@/lib/utils';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface Sale {
   id: string;
@@ -83,6 +86,7 @@ export default function AdminDashboard() {
   const [visitSales, setVisitSales] = useState<any[]>([]);
   const [selectedCommercial, setSelectedCommercial] = useState<string>('all');
   const [commercials, setCommercials] = useState<any[]>([]);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -547,19 +551,71 @@ export default function AdminDashboard() {
           <CardContent>
             <div className="flex items-center space-x-4">
               <Label htmlFor="commercial-filter">Comercial:</Label>
-              <Select value={selectedCommercial} onValueChange={setSelectedCommercial}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Seleccionar comercial" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los comerciales</SelectItem>
-                  {commercials.map((commercial) => (
-                    <SelectItem key={commercial.id} value={commercial.id}>
-                      {commercial.first_name} {commercial.last_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Popover open={open} onOpenChange={setOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={open}
+                    className="w-[200px] justify-between"
+                  >
+                    {selectedCommercial === 'all'
+                      ? 'Todos los comerciales'
+                      : commercials.find(
+                          (commercial) => commercial.id === selectedCommercial
+                        )
+                      ? `${commercials.find(
+                          (commercial) => commercial.id === selectedCommercial
+                        )?.first_name} ${commercials.find(
+                          (commercial) => commercial.id === selectedCommercial
+                        )?.last_name}`
+                      : "Seleccionar comercial..."
+                    }
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[200px] p-0">
+                  <Command>
+                    <CommandInput placeholder="Buscar comercial..." />
+                    <CommandEmpty>No se encontró comercial.</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        value="all"
+                        onSelect={() => {
+                          setSelectedCommercial('all');
+                          setOpen(false);
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            selectedCommercial === 'all' ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        Todos los comerciales
+                      </CommandItem>
+                      {commercials.map((commercial) => (
+                        <CommandItem
+                          key={commercial.id}
+                          value={`${commercial.first_name} ${commercial.last_name}`}
+                          onSelect={() => {
+                            setSelectedCommercial(commercial.id);
+                            setOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              selectedCommercial === commercial.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {commercial.first_name} {commercial.last_name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </Command>
+                </PopoverContent>
+              </Popover>
             </div>
           </CardContent>
         </Card>
