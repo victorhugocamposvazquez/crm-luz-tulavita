@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon } from 'lucide-react';
+import { CalendarIcon, X } from 'lucide-react';
 import { format, addWeeks, addMonths, addYears, startOfDay, setHours } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from '@/hooks/use-toast';
@@ -223,28 +223,45 @@ export default function ReminderDialog({
             <div className="space-y-2">
               <Label>Cliente</Label>
               <div className="space-y-2">
-                <Input
-                  placeholder="Buscar cliente..."
-                  value={clientSearch}
-                  onChange={(e) => setClientSearch(e.target.value)}
-                />
-                {filteredClients.length > 0 && (
-                  <div className="border rounded-md max-h-40 overflow-y-auto">
-                    {filteredClients.slice(0, 10).map((client) => (
-                      <div
-                        key={client.id}
-                        className={cn(
-                          "p-2 cursor-pointer hover:bg-muted",
-                          selectedClient?.id === client.id && "bg-primary text-primary-foreground"
-                        )}
-                        onClick={() => {
-                          setSelectedClient({ id: client.id, name: client.nombre_apellidos });
-                          setClientSearch(client.nombre_apellidos);
-                        }}
-                      >
-                        {client.nombre_apellidos}
+                {!selectedClient ? (
+                  <>
+                    <Input
+                      placeholder="Buscar cliente..."
+                      value={clientSearch}
+                      onChange={(e) => setClientSearch(e.target.value)}
+                    />
+                    {clientSearch.length > 0 && filteredClients.length > 0 && (
+                      <div className="border rounded-md max-h-40 overflow-y-auto">
+                        {filteredClients.slice(0, 10).map((client) => (
+                          <div
+                            key={client.id}
+                            className="p-2 cursor-pointer hover:bg-muted"
+                            onClick={() => {
+                              setSelectedClient({ id: client.id, name: client.nombre_apellidos });
+                              setClientSearch('');
+                            }}
+                          >
+                            {client.nombre_apellidos}
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
+                  </>
+                ) : (
+                  <div className="flex items-center justify-between p-2 border rounded-md bg-muted">
+                    <span>{selectedClient.name}</span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedClient(null);
+                        setClientSearch('');
+                      }}
+                      className="h-6 w-6 p-0"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
                   </div>
                 )}
               </div>
