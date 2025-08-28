@@ -42,6 +42,7 @@ interface Visit {
   status: string;
   approval_status: string;
   client_id: string;
+  visit_state_code?: string;
   latitude?: number;
   longitude?: number;
   location_accuracy?: number;
@@ -606,6 +607,85 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
+        {/* Visit States Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          {(() => {
+            const visitStatesCounts = {
+              nulo: visits.filter(v => v.visit_state_code === 'nulo').length,
+              ausente: visits.filter(v => v.visit_state_code === 'ausente').length,
+              oficina: visits.filter(v => v.visit_state_code === 'oficina').length,
+              confirmado: visits.filter(v => v.visit_state_code === 'confirmado').length
+            };
+            
+            const visitsWithSales = visits.filter(v => v.sales && v.sales.length > 0).length;
+            const salesConversionRate = visits.length > 0 ? ((visitsWithSales / visits.length) * 100).toFixed(1) : '0';
+
+            return (
+              <>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Visitas nulas</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{visitStatesCounts.nulo}</div>
+                    <p className="text-xs text-muted-foreground">
+                      {visits.length > 0 ? ((visitStatesCounts.nulo / visits.length) * 100).toFixed(1) : '0'}% del total
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Visitas ausentes</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{visitStatesCounts.ausente}</div>
+                    <p className="text-xs text-muted-foreground">
+                      {visits.length > 0 ? ((visitStatesCounts.ausente / visits.length) * 100).toFixed(1) : '0'}% del total
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Visitas oficina</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{visitStatesCounts.oficina}</div>
+                    <p className="text-xs text-muted-foreground">
+                      {visits.length > 0 ? ((visitStatesCounts.oficina / visits.length) * 100).toFixed(1) : '0'}% del total
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Visitas confirmadas</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{visitStatesCounts.confirmado}</div>
+                    <p className="text-xs text-muted-foreground">
+                      {visits.length > 0 ? ((visitStatesCounts.confirmado / visits.length) * 100).toFixed(1) : '0'}% del total
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Visitas con ventas</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{visitsWithSales}</div>
+                    <p className="text-xs text-muted-foreground">
+                      {salesConversionRate}% conversión
+                    </p>
+                  </CardContent>
+                </Card>
+              </>
+            );
+          })()}
+        </div>
+
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <Card>
@@ -648,6 +728,138 @@ export default function AdminDashboard() {
                     {visitDistributionData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Additional Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Distribución por estado de visita</CardTitle>
+              <CardDescription>Resultados específicos de las visitas</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={(() => {
+                      const visitStatesCounts = {
+                        nulo: visits.filter(v => v.visit_state_code === 'nulo').length,
+                        ausente: visits.filter(v => v.visit_state_code === 'ausente').length,
+                        oficina: visits.filter(v => v.visit_state_code === 'oficina').length,
+                        confirmado: visits.filter(v => v.visit_state_code === 'confirmado').length
+                      };
+
+                      const stateColors = {
+                        nulo: '#ef4444',
+                        ausente: '#f59e0b', 
+                        oficina: '#8b5cf6',
+                        confirmado: '#22c55e'
+                      };
+
+                      return Object.entries(visitStatesCounts)
+                        .filter(([_, count]) => count > 0)
+                        .map(([state, count]) => ({
+                          name: state.charAt(0).toUpperCase() + state.slice(1),
+                          value: count,
+                          color: stateColors[state as keyof typeof stateColors]
+                        }));
+                    })()}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, value }) => `${name}: ${value}`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {(() => {
+                      const visitStatesCounts = {
+                        nulo: visits.filter(v => v.visit_state_code === 'nulo').length,
+                        ausente: visits.filter(v => v.visit_state_code === 'ausente').length,
+                        oficina: visits.filter(v => v.visit_state_code === 'oficina').length,
+                        confirmado: visits.filter(v => v.visit_state_code === 'confirmado').length
+                      };
+
+                      const stateColors = {
+                        nulo: '#ef4444',
+                        ausente: '#f59e0b', 
+                        oficina: '#8b5cf6',
+                        confirmado: '#22c55e'
+                      };
+
+                      return Object.entries(visitStatesCounts)
+                        .filter(([_, count]) => count > 0)
+                        .map(([state, count], index) => (
+                          <Cell key={`cell-${index}`} fill={stateColors[state as keyof typeof stateColors]} />
+                        ));
+                    })()}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Conversión de ventas</CardTitle>
+              <CardDescription>Visitas con y sin ventas generadas</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={(() => {
+                      const visitsWithSales = visits.filter(v => v.sales && v.sales.length > 0).length;
+                      const visitsWithoutSales = visits.length - visitsWithSales;
+
+                      return [
+                        {
+                          name: 'Con ventas',
+                          value: visitsWithSales,
+                          color: '#22c55e'
+                        },
+                        {
+                          name: 'Sin ventas', 
+                          value: visitsWithoutSales,
+                          color: '#6b7280'
+                        }
+                      ].filter(item => item.value > 0);
+                    })()}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(1)}%)`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {(() => {
+                      const visitsWithSales = visits.filter(v => v.sales && v.sales.length > 0).length;
+                      const visitsWithoutSales = visits.length - visitsWithSales;
+
+                      return [
+                        {
+                          name: 'Con ventas',
+                          value: visitsWithSales,
+                          color: '#22c55e'
+                        },
+                        {
+                          name: 'Sin ventas', 
+                          value: visitsWithoutSales,
+                          color: '#6b7280'
+                        }
+                      ].filter(item => item.value > 0)
+                      .map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ));
+                    })()}
                   </Pie>
                   <Tooltip />
                 </PieChart>
