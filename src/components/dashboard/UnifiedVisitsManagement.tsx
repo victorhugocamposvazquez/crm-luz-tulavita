@@ -91,7 +91,8 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
     direccion: '',
     telefono1: '',
     telefono2: '',
-    email: ''
+    email: '',
+    note: ''
   });
   const [visitData, setVisitData] = useState({
     notes: '',
@@ -1144,6 +1145,19 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
           ...prev,
           email: e.target.value
         }))} />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="note">Nota</Label>
+          <Textarea 
+            id="note" 
+            value={clientData.note} 
+            onChange={e => setClientData(prev => ({
+              ...prev,
+              note: e.target.value
+            }))}
+            placeholder="Añade una nota sobre este cliente..."
+          />
         </div>
 
         {location && (
