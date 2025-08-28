@@ -10,7 +10,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { UserPlus, Edit, Trash2, Upload, Loader2, Eye, Bell } from 'lucide-react';
+import { UserPlus, Edit, Trash2, Upload, Loader2, Eye, Bell, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Textarea } from '@/components/ui/textarea';
 import { formatCoordinates, parseCoordinates } from '@/lib/coordinates';
 import ClientDetailView from './ClientDetailView';
 import ClientFilters from './ClientFilters';
@@ -29,6 +31,8 @@ interface Client {
   latitude?: number;
   longitude?: number;
   created_at: string;
+  status: 'active' | 'inactive';
+  note?: string;
 }
 
 export default function ClientManagement() {
@@ -124,7 +128,7 @@ export default function ClientManagement() {
 
       if (error) throw error;
       
-      setClients(data || []);
+      setClients((data || []) as Client[]);
       setTotalItems(count || 0);
     } catch (error) {
       console.error('Error fetching clients:', error);
@@ -167,6 +171,7 @@ export default function ClientManagement() {
       email: formData.get('email') as string || null,
       latitude,
       longitude,
+      note: formData.get('note') as string || null,
     };
 
     try {
@@ -408,6 +413,33 @@ export default function ClientManagement() {
     }
   };
 
+  const handleStatusToggle = async (clientId: string, status: 'active' | 'inactive') => {
+    if (!isAdmin) return;
+
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .update({ status })
+        .eq('id', clientId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Status actualizado",
+        description: `El cliente ha sido marcado como ${status === 'active' ? 'activo' : 'inactivo'}`,
+      });
+
+      fetchClients();
+    } catch (error: any) {
+      console.error('Error updating client status:', error);
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo actualizar el status del cliente",
+        variant: "destructive",
+      });
+    }
+  };
+
   // Remove the loading wrapper that hides everything
 
   if (selectedClientId) {
@@ -504,6 +536,15 @@ export default function ClientManagement() {
                       />
                     </div>
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="note">Note</Label>
+                    <Textarea 
+                      id="note" 
+                      name="note" 
+                      placeholder="Add a note about this client..."
+                      defaultValue={editingClient?.note || ''}
+                    />
+                  </div>
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -577,6 +618,7 @@ export default function ClientManagement() {
               <TableRow>
                       <TableHead>Nombre</TableHead>
                       <TableHead>DNI</TableHead>
+                      <TableHead>Status</TableHead>
                       <TableHead>Dirección</TableHead>
                       <TableHead>Coordenadas</TableHead>
                       <TableHead>Teléfono</TableHead>
@@ -586,29 +628,41 @@ export default function ClientManagement() {
             </TableHeader>
             <TableBody>
               {loading ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8">
-                    <div className="flex items-center justify-center">
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                      <span className="text-muted-foreground">Cargando clientes...</span>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ) : clients.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                    {Object.values(filters).some(f => f.trim()) ? 
-                      "No se encontraron clientes con los filtros aplicados" : 
-                      "No hay clientes registrados"
-                    }
-                  </TableCell>
-                </TableRow>
+                 <TableRow>
+                   <TableCell colSpan={8} className="text-center py-8">
+                     <div className="flex items-center justify-center">
+                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                       <span className="text-muted-foreground">Cargando clientes...</span>
+                     </div>
+                   </TableCell>
+                 </TableRow>
+               ) : clients.length === 0 ? (
+                 <TableRow>
+                   <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                     {Object.values(filters).some(f => f.trim()) ? 
+                       "No se encontraron clientes con los filtros aplicados" : 
+                       "No hay clientes registrados"
+                     }
+                   </TableCell>
+                 </TableRow>
               ) : (
-                clients.map((client) => (
-                  <TableRow key={client.id}>
-                     <TableCell className="font-medium">{client.nombre_apellidos}</TableCell>
-                     <TableCell>{client.dni || '-'}</TableCell>
-                     <TableCell>{client.direccion}</TableCell>
+                 clients.map((client) => (
+                   <TableRow key={client.id} className={client.status === 'inactive' ? 'opacity-60' : ''}>
+                      <TableCell className="font-medium">{client.nombre_apellidos}</TableCell>
+                      <TableCell>{client.dni || '-'}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            checked={client.status === 'active'}
+                            onCheckedChange={(checked) => handleStatusToggle(client.id, checked ? 'active' : 'inactive')}
+                            disabled={!isAdmin}
+                          />
+                          <span className={`text-sm ${client.status === 'active' ? 'text-green-600' : 'text-red-600'}`}>
+                            {client.status === 'active' ? 'Active' : 'Inactive'}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell>{client.direccion}</TableCell>
                      <TableCell className="max-w-[150px]">
                        {client.latitude && client.longitude ? (
                          editingCoordinates?.id === client.id ? (
