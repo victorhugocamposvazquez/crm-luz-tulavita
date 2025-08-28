@@ -594,10 +594,10 @@ export default function AdminDashboard() {
                         />
                         Todos los comerciales
                       </CommandItem>
-                      {commercials.map((commercial) => (
+                      {Array.isArray(commercials) && commercials.map((commercial) => (
                         <CommandItem
                           key={commercial.id}
-                          value={`${commercial.first_name} ${commercial.last_name}`}
+                          value={`${commercial.first_name || ''} ${commercial.last_name || ''}`}
                           onSelect={() => {
                             setSelectedCommercial(commercial.id);
                             setOpen(false);
