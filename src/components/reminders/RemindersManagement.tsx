@@ -387,6 +387,13 @@ export default function RemindersManagement() {
           <h2 className="text-2xl font-bold">Gestión de recordatorios</h2>
           <p className="text-muted-foreground">Administra los recordatorios de renovación de clientes</p>
         </div>
+        <Button 
+          onClick={() => setReminderDialogOpen(true)} 
+          className="flex items-center gap-2"
+        >
+          <Bell className="h-4 w-4" />
+          Nuevo recordatorio
+        </Button>
       </div>
 
       {/* Filters */}
@@ -632,15 +639,16 @@ export default function RemindersManagement() {
       </Dialog>
 
       {/* Reminder Dialog */}
-      {selectedClient && (
-        <ReminderDialog
-          open={reminderDialogOpen}
-          onOpenChange={setReminderDialogOpen}
-          clientId={selectedClient.id}
-          clientName={selectedClient.name}
-          onReminderCreated={fetchReminders}
-        />
-      )}
+      <ReminderDialog
+        open={reminderDialogOpen}
+        onOpenChange={setReminderDialogOpen}
+        clientId={selectedClient?.id}
+        clientName={selectedClient?.name}
+        onReminderCreated={() => {
+          fetchReminders();
+          setSelectedClient(null);
+        }}
+      />
     </div>
   );
 }
