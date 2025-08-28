@@ -542,7 +542,7 @@ export default function ClientManagement() {
                     </div>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="note">Note</Label>
+                    <Label htmlFor="note">Nota</Label>
                     <Textarea 
                       id="note" 
                       name="note" 
