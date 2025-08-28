@@ -611,10 +611,10 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           {(() => {
             const visitStatesCounts = {
-              nulo: visits.filter(v => v.visit_state_code === 'nulo').length,
-              ausente: visits.filter(v => v.visit_state_code === 'ausente').length,
-              oficina: visits.filter(v => v.visit_state_code === 'oficina').length,
-              confirmado: visits.filter(v => v.visit_state_code === 'confirmado').length
+              nulo: visits.filter(v => v.visit_state_code === 'not_interested').length,
+              ausente: visits.filter(v => v.visit_state_code === 'no_answer').length,
+              oficina: visits.filter(v => v.visit_state_code === 'postponed').length,
+              confirmado: visits.filter(v => v.visit_state_code === 'completed').length
             };
             
             const visitsWithSales = visits.filter(v => v.sales && v.sales.length > 0).length;
@@ -747,13 +747,13 @@ export default function AdminDashboard() {
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie
-                    data={(() => {
-                      const visitStatesCounts = {
-                        nulo: visits.filter(v => v.visit_state_code === 'nulo').length,
-                        ausente: visits.filter(v => v.visit_state_code === 'ausente').length,
-                        oficina: visits.filter(v => v.visit_state_code === 'oficina').length,
-                        confirmado: visits.filter(v => v.visit_state_code === 'confirmado').length
-                      };
+                     data={(() => {
+                       const visitStatesCounts = {
+                         nulo: visits.filter(v => v.visit_state_code === 'not_interested').length,
+                         ausente: visits.filter(v => v.visit_state_code === 'no_answer').length,
+                         oficina: visits.filter(v => v.visit_state_code === 'postponed').length,
+                         confirmado: visits.filter(v => v.visit_state_code === 'completed').length
+                       };
 
                       const stateColors = {
                         nulo: '#ef4444',
@@ -778,13 +778,13 @@ export default function AdminDashboard() {
                     fill="#8884d8"
                     dataKey="value"
                   >
-                    {(() => {
-                      const visitStatesCounts = {
-                        nulo: visits.filter(v => v.visit_state_code === 'nulo').length,
-                        ausente: visits.filter(v => v.visit_state_code === 'ausente').length,
-                        oficina: visits.filter(v => v.visit_state_code === 'oficina').length,
-                        confirmado: visits.filter(v => v.visit_state_code === 'confirmado').length
-                      };
+                     {(() => {
+                       const visitStatesCounts = {
+                         nulo: visits.filter(v => v.visit_state_code === 'not_interested').length,
+                         ausente: visits.filter(v => v.visit_state_code === 'no_answer').length,
+                         oficina: visits.filter(v => v.visit_state_code === 'postponed').length,
+                         confirmado: visits.filter(v => v.visit_state_code === 'completed').length
+                       };
 
                       const stateColors = {
                         nulo: '#ef4444',
