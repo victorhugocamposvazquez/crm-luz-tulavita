@@ -610,18 +610,18 @@ export default function AdminDashboard() {
         </div>
 
         {/* Visit States Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {(() => {
             const completedVisitsOnly = visits.filter(visit => visit.status === 'completed');
             const visitStatesCounts = {
               nulo: completedVisitsOnly.filter(v => v.visit_state_code === 'not_interested').length,
               ausente: completedVisitsOnly.filter(v => v.visit_state_code === 'no_answer').length,
               oficina: completedVisitsOnly.filter(v => v.visit_state_code === 'postponed').length,
-              confirmado: completedVisitsOnly.filter(v => v.visit_state_code === 'completed').length
+              confirmado: completedVisitsOnly.filter(v => v.visit_state_code === 'completed').length,
+              sinEstado: completedVisitsOnly.filter(v => !v.visit_state_code).length
             };
-            
-            const visitsWithSales = visits.filter(v => v.sales && v.sales.length > 0).length;
-            const salesConversionRate = visits.length > 0 ? ((visitsWithSales / visits.length) * 100).toFixed(1) : '0';
+
+            const totalWithStates = visitStatesCounts.nulo + visitStatesCounts.ausente + visitStatesCounts.oficina + visitStatesCounts.confirmado;
 
             return (
               <>
@@ -669,18 +669,7 @@ export default function AdminDashboard() {
                     <div className="text-2xl font-bold">{visitStatesCounts.confirmado}</div>
                     <p className="text-xs text-muted-foreground">
                       {completedVisitsOnly.length > 0 ? ((visitStatesCounts.confirmado / completedVisitsOnly.length) * 100).toFixed(1) : '0'}% de completadas
-                    </p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Visitas con ventas</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{visitsWithSales}</div>
-                    <p className="text-xs text-muted-foreground">
-                      {salesConversionRate}% conversión
+                      {visitStatesCounts.sinEstado > 0 && ` | ${visitStatesCounts.sinEstado} sin estado`}
                     </p>
                   </CardContent>
                 </Card>
