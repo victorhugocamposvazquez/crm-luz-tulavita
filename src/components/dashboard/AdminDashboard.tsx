@@ -10,7 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Users, Euro, MapPin, TrendingUp, Eye, Bell } from 'lucide-react';
+import { Users, Euro, MapPin, TrendingUp, Eye, Bell, X } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { formatCoordinates } from '@/lib/coordinates';
 import { calculateCommission } from '@/lib/commission';
 import { format, subDays, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths, startOfDay, endOfDay } from 'date-fns';
@@ -86,12 +87,15 @@ export default function AdminDashboard() {
   const [commercials, setCommercials] = useState<any[]>([]);
   const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
   const [selectedClientForReminder, setSelectedClientForReminder] = useState<{id: string, name: string} | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [dateFromFilter, setDateFromFilter] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [dateToFilter, setDateToFilter] = useState<string>('');
 
   useEffect(() => {
     if (user) {
       fetchDashboardData();
     }
-  }, [user, selectedCommercial]);
+  }, [user, selectedCommercial, statusFilter, dateFromFilter, dateToFilter]);
 
   const fetchDashboardData = async () => {
     try {
@@ -224,7 +228,7 @@ export default function AdminDashboard() {
 
       setSales(salesWithCommercials);
 
-      // Build visits query with optional commercial filter
+      // Build visits query with filters
       let visitsQuery = supabase
         .from('visits')
         .select(`
@@ -246,11 +250,31 @@ export default function AdminDashboard() {
           client:clients(nombre_apellidos, dni),
           company:companies(name)
         `)
-        .gte('visit_date', thirtyDaysAgo.toISOString())
         .order('visit_date', { ascending: false });
 
+      // Apply date filters
+      if (dateFromFilter) {
+        visitsQuery = visitsQuery.gte('visit_date', new Date(dateFromFilter).toISOString());
+      } else {
+        visitsQuery = visitsQuery.gte('visit_date', thirtyDaysAgo.toISOString());
+      }
+      
+      if (dateToFilter) {
+        visitsQuery = visitsQuery.lte('visit_date', new Date(dateToFilter + 'T23:59:59').toISOString());
+      }
+
+      // Apply commercial filter
       if (selectedCommercial !== 'all') {
         visitsQuery = visitsQuery.eq('commercial_id', selectedCommercial);
+      }
+
+      // Apply status filter
+      if (statusFilter !== 'all') {
+        if (statusFilter === 'in_progress') {
+          visitsQuery = visitsQuery.eq('status', 'in_progress');
+        } else if (statusFilter === 'completed') {
+          visitsQuery = visitsQuery.eq('status', 'completed');
+        }
       }
 
       const { data: visitsData, error: visitsError } = await visitsQuery;
@@ -350,6 +374,13 @@ export default function AdminDashboard() {
     // Could refetch data here if needed
     setSelectedClientForReminder(null);
     setReminderDialogOpen(false);
+  };
+
+  const clearFilters = () => {
+    setSelectedCommercial('all');
+    setStatusFilter('all');
+    setDateFromFilter(format(new Date(), 'yyyy-MM-dd'));
+    setDateToFilter('');
   };
 
   const fetchVisitSales = async (visitId: string) => {
@@ -558,25 +589,72 @@ export default function AdminDashboard() {
         {/* Filter Section */}
         <Card>
           <CardHeader>
-            <CardTitle>Filtros de estadísticas</CardTitle>
-            <CardDescription>Filtra los datos por comercial para análisis específicos</CardDescription>
+            <CardTitle className="flex items-center justify-between">
+              <span>Filtros de estadísticas</span>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={clearFilters} 
+                className="h-8 w-8 p-0"
+                title="Limpiar filtros"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </CardTitle>
+            <CardDescription>Filtra los datos por comercial, estado y fechas para análisis específicos</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex items-center space-x-4">
-              <Label htmlFor="commercial-filter">Comercial:</Label>
-              <Select value={selectedCommercial} onValueChange={setSelectedCommercial}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Seleccionar comercial" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los comerciales</SelectItem>
-                  {commercials.map((commercial) => (
-                    <SelectItem key={commercial.id} value={commercial.id}>
-                      {commercial.first_name} {commercial.last_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div>
+                <Label htmlFor="commercial-filter">Comercial:</Label>
+                <Select value={selectedCommercial} onValueChange={setSelectedCommercial}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar comercial" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los comerciales</SelectItem>
+                    {commercials.map((commercial) => (
+                      <SelectItem key={commercial.id} value={commercial.id}>
+                        {commercial.first_name} {commercial.last_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="status-filter">Estado:</Label>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar estado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todos los estados</SelectItem>
+                    <SelectItem value="in_progress">En progreso</SelectItem>
+                    <SelectItem value="completed">Confirmadas</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="date-from-filter">Fecha desde:</Label>
+                <Input
+                  id="date-from-filter"
+                  type="date"
+                  value={dateFromFilter}
+                  onChange={(e) => setDateFromFilter(e.target.value)}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="date-to-filter">Fecha hasta:</Label>
+                <Input
+                  id="date-to-filter"
+                  type="date"
+                  value={dateToFilter}
+                  onChange={(e) => setDateToFilter(e.target.value)}
+                />
+              </div>
             </div>
           </CardContent>
         </Card>
