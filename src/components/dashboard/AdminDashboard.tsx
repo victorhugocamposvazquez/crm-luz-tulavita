@@ -10,12 +10,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Users, Euro, MapPin, TrendingUp, Eye } from 'lucide-react';
+import { Users, Euro, MapPin, TrendingUp, Eye, Bell } from 'lucide-react';
 import { formatCoordinates } from '@/lib/coordinates';
 import { calculateCommission } from '@/lib/commission';
 import { format, subDays, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths, startOfDay, endOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
+import ReminderDialog from '@/components/reminders/ReminderDialog';
 
 interface Sale {
   id: string;
@@ -83,6 +84,8 @@ export default function AdminDashboard() {
   const [visitSales, setVisitSales] = useState<any[]>([]);
   const [selectedCommercial, setSelectedCommercial] = useState<string>('all');
   const [commercials, setCommercials] = useState<any[]>([]);
+  const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
+  const [selectedClientForReminder, setSelectedClientForReminder] = useState<{id: string, name: string} | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -333,6 +336,20 @@ export default function AdminDashboard() {
   const handleViewVisit = async (visit: Visit) => {
     setSelectedVisit(visit);
     await fetchVisitSales(visit.id);
+  };
+
+  const handleCreateReminder = (visit: Visit) => {
+    setSelectedClientForReminder({
+      id: visit.client_id,
+      name: visit.client.nombre_apellidos
+    });
+    setReminderDialogOpen(true);
+  };
+
+  const handleReminderCreated = () => {
+    // Could refetch data here if needed
+    setSelectedClientForReminder(null);
+    setReminderDialogOpen(false);
   };
 
   const fetchVisitSales = async (visitId: string) => {
@@ -934,13 +951,23 @@ export default function AdminDashboard() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewVisit(visit)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewVisit(visit)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCreateReminder(visit)}
+                            title="Crear recordatorio"
+                          >
+                            <Bell className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -1079,6 +1106,17 @@ export default function AdminDashboard() {
             </div>
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* Reminder Dialog */}
+      {selectedClientForReminder && (
+        <ReminderDialog
+          open={reminderDialogOpen}
+          onOpenChange={setReminderDialogOpen}
+          clientId={selectedClientForReminder.id}
+          clientName={selectedClientForReminder.name}
+          onReminderCreated={handleReminderCreated}
+        />
       )}
     </div>
   );
