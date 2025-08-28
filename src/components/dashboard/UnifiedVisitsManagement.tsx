@@ -1151,12 +1151,13 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
           <Label htmlFor="note">Nota</Label>
           <Textarea 
             id="note" 
-            value={clientData.note} 
+            value={clientData.note || ''} 
             onChange={e => setClientData(prev => ({
               ...prev,
               note: e.target.value
             }))}
             placeholder="Añade una nota sobre este cliente..."
+            className="min-h-[60px]"
           />
         </div>
 
