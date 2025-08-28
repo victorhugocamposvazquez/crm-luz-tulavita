@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import AdminNotifications from '@/components/dashboard/AdminNotifications';
@@ -8,17 +8,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Users, Euro, MapPin, TrendingUp, Eye, Check, ChevronsUpDown, ChevronDown } from 'lucide-react';
+import { Users, Euro, MapPin, TrendingUp, Eye } from 'lucide-react';
 import { formatCoordinates } from '@/lib/coordinates';
 import { calculateCommission } from '@/lib/commission';
 import { format, subDays, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths, startOfDay, endOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
-import { cn } from '@/lib/utils';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 interface Sale {
   id: string;
@@ -86,12 +83,9 @@ export default function AdminDashboard() {
   const [visitSales, setVisitSales] = useState<any[]>([]);
   const [selectedCommercial, setSelectedCommercial] = useState<string>('all');
   const [commercials, setCommercials] = useState<any[]>([]);
-  const [commercialSearch, setCommercialSearch] = useState<string>('');
-  const [showCommercialsDropdown, setShowCommercialsDropdown] = useState<boolean>(false);
 
   useEffect(() => {
     if (user) {
-      console.log('AdminDashboard: Fetching dashboard data', { selectedCommercial, commercialsLength: commercials.length });
       fetchDashboardData();
     }
   }, [user, selectedCommercial]);
@@ -553,101 +547,19 @@ export default function AdminDashboard() {
           <CardContent>
             <div className="flex items-center space-x-4">
               <Label htmlFor="commercial-filter">Comercial:</Label>
-              <div className="relative">
-                <Popover open={showCommercialsDropdown} onOpenChange={setShowCommercialsDropdown}>
-                  <PopoverTrigger asChild>
-                    <div className="relative">
-                      <Input
-                        value={commercialSearch}
-                        onChange={(e) => setCommercialSearch(e.target.value)}
-                        placeholder={
-                          selectedCommercial === 'all' 
-                            ? 'Todos los comerciales' 
-                            : commercials.find(c => c.id === selectedCommercial) 
-                              ? `${commercials.find(c => c.id === selectedCommercial)?.first_name} ${commercials.find(c => c.id === selectedCommercial)?.last_name}`
-                              : 'Buscar comercial...'
-                        }
-                        className="w-[200px] pr-8 cursor-pointer"
-                        onClick={() => setShowCommercialsDropdown(true)}
-                        onFocus={() => {
-                          setShowCommercialsDropdown(true);
-                          if (selectedCommercial !== 'all') {
-                            setCommercialSearch('');
-                          }
-                        }}
-                      />
-                      <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                    </div>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[200px] p-0" align="start">
-                    <div className="max-h-60 overflow-auto">
-                      {/* Show "All commercials" option */}
-                      <div
-                        className={cn(
-                          "px-3 py-2 text-sm cursor-pointer hover:bg-muted flex items-center",
-                          selectedCommercial === 'all' && "bg-muted"
-                        )}
-                        onClick={() => {
-                          setSelectedCommercial('all');
-                          setCommercialSearch('');
-                          setShowCommercialsDropdown(false);
-                        }}
-                      >
-                        <Check
-                          className={cn(
-                            "mr-2 h-4 w-4",
-                            selectedCommercial === 'all' ? "opacity-100" : "opacity-0"
-                          )}
-                        />
-                        Todos los comerciales
-                      </div>
-                      
-                      {/* Filter and show commercials */}
-                      {commercials
-                        .filter(commercial => {
-                          const searchTerm = commercialSearch.toLowerCase();
-                          const fullName = `${commercial.first_name} ${commercial.last_name}`.toLowerCase();
-                          return fullName.includes(searchTerm);
-                        })
-                        .map((commercial) => (
-                          <div
-                            key={commercial.id}
-                            className={cn(
-                              "px-3 py-2 text-sm cursor-pointer hover:bg-muted flex items-center",
-                              selectedCommercial === commercial.id && "bg-muted"
-                            )}
-                            onClick={() => {
-                              setSelectedCommercial(commercial.id);
-                              setCommercialSearch('');
-                              setShowCommercialsDropdown(false);
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                selectedCommercial === commercial.id ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                            {commercial.first_name} {commercial.last_name}
-                          </div>
-                        ))
-                      }
-                      
-                      {/* Show "No results" if no matches */}
-                      {commercialSearch && 
-                       commercials.filter(commercial => {
-                         const searchTerm = commercialSearch.toLowerCase();
-                         const fullName = `${commercial.first_name} ${commercial.last_name}`.toLowerCase();
-                         return fullName.includes(searchTerm);
-                       }).length === 0 && (
-                        <div className="px-3 py-2 text-sm text-muted-foreground">
-                          No se encontraron comerciales
-                        </div>
-                      )}
-                    </div>
-                  </PopoverContent>
-                </Popover>
-              </div>
+              <Select value={selectedCommercial} onValueChange={setSelectedCommercial}>
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Seleccionar comercial" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los comerciales</SelectItem>
+                  {commercials.map((commercial) => (
+                    <SelectItem key={commercial.id} value={commercial.id}>
+                      {commercial.first_name} {commercial.last_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
         </Card>
