@@ -21,6 +21,7 @@ interface Client {
   telefono1?: string;
   telefono2?: string;
   email?: string;
+  note?: string;
 }
 
 interface Company {
@@ -1199,6 +1200,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
                   {existingClient.dni && <p className="text-green-600">DNI: {existingClient.dni}</p>}
                   {existingClient.telefono1 && <p className="text-green-600">Tel: {existingClient.telefono1}</p>}
                   {existingClient.telefono2 && <p className="text-green-600">Tel 2: {existingClient.telefono2}</p>}
+                  {existingClient.note && <p className="text-green-600">Nota: {existingClient.note}</p>}
                   {existingClient.email && <p className="text-green-600">Email: {existingClient.email}</p>}
                 </div>
               </div>
