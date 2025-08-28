@@ -28,6 +28,7 @@ interface ApprovalRequest {
   commercial_id: string;
   status: 'pending' | 'approved' | 'rejected';
   created_at: string;
+  hasDuplicateToday?: boolean; // New field to track duplicate requests
   client?: {
     nombre_apellidos: string;
   };
@@ -82,7 +83,38 @@ export function useRealtimeNotifications() {
       .order('created_at', { ascending: false });
 
     if (approvals) {
-      setPendingApprovals(approvals as ApprovalRequest[]);
+      // Get today's date range
+      const today = new Date();
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+      
+      // Get all visits for today
+      const { data: todaysVisits } = await supabase
+        .from('visits')
+        .select('client_id')
+        .gte('visit_date', startOfDay.toISOString())
+        .lt('visit_date', endOfDay.toISOString());
+      
+      // Count visits per client today
+      const clientVisitCounts = new Map<string, number>();
+      if (todaysVisits) {
+        todaysVisits.forEach(visit => {
+          const currentCount = clientVisitCounts.get(visit.client_id) || 0;
+          clientVisitCounts.set(visit.client_id, currentCount + 1);
+        });
+      }
+      
+      // Mark requests as having duplicates if there are multiple visits for the same client today
+      const processedApprovals = approvals.map(approval => {
+        const hasDuplicateToday = (clientVisitCounts.get(approval.client_id) || 0) > 1;
+        
+        return {
+          ...approval,
+          hasDuplicateToday
+        } as ApprovalRequest;
+      });
+      
+      setPendingApprovals(processedApprovals);
     }
   };
 

@@ -10,12 +10,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Users, Euro, MapPin, TrendingUp, Eye } from 'lucide-react';
+import { Users, Euro, MapPin, TrendingUp, Eye, Bell } from 'lucide-react';
 import { formatCoordinates } from '@/lib/coordinates';
 import { calculateCommission } from '@/lib/commission';
 import { format, subDays, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths, startOfDay, endOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
+import ReminderDialog from '@/components/reminders/ReminderDialog';
 
 interface Sale {
   id: string;
@@ -42,6 +43,7 @@ interface Visit {
   status: string;
   approval_status: string;
   client_id: string;
+  visit_state_code?: string;
   latitude?: number;
   longitude?: number;
   location_accuracy?: number;
@@ -82,6 +84,8 @@ export default function AdminDashboard() {
   const [visitSales, setVisitSales] = useState<any[]>([]);
   const [selectedCommercial, setSelectedCommercial] = useState<string>('all');
   const [commercials, setCommercials] = useState<any[]>([]);
+  const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
+  const [selectedClientForReminder, setSelectedClientForReminder] = useState<{id: string, name: string} | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -332,6 +336,20 @@ export default function AdminDashboard() {
   const handleViewVisit = async (visit: Visit) => {
     setSelectedVisit(visit);
     await fetchVisitSales(visit.id);
+  };
+
+  const handleCreateReminder = (visit: Visit) => {
+    setSelectedClientForReminder({
+      id: visit.client_id,
+      name: visit.client.nombre_apellidos
+    });
+    setReminderDialogOpen(true);
+  };
+
+  const handleReminderCreated = () => {
+    // Could refetch data here if needed
+    setSelectedClientForReminder(null);
+    setReminderDialogOpen(false);
   };
 
   const fetchVisitSales = async (visitId: string) => {
@@ -587,11 +605,13 @@ export default function AdminDashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Visitas (30 días)</CardTitle>
+              <CardTitle className="text-sm font-medium">Visitas con ventas</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{visits.length}</div>
-              <p className="text-xs text-muted-foreground">{approvedVisits} aprobadas</p>
+              <div className="text-2xl font-bold">{visits.filter(v => v.sales && v.sales.length > 0).length}</div>
+              <p className="text-xs text-muted-foreground">
+                {visits.length > 0 ? (((visits.filter(v => v.sales && v.sales.length > 0).length / visits.length) * 100).toFixed(1)) : '0'}% del total
+              </p>
             </CardContent>
           </Card>
 
@@ -604,6 +624,75 @@ export default function AdminDashboard() {
               <p className="text-xs text-muted-foreground">De {visits.length} totales</p>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Visit States Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {(() => {
+            const completedVisitsOnly = visits.filter(visit => visit.status === 'completed');
+            const visitStatesCounts = {
+              nulo: completedVisitsOnly.filter(v => v.visit_state_code === 'not_interested').length,
+              ausente: completedVisitsOnly.filter(v => v.visit_state_code === 'no_answer').length,
+              oficina: completedVisitsOnly.filter(v => v.visit_state_code === 'postponed').length,
+              confirmado: completedVisitsOnly.filter(v => v.visit_state_code === 'completed').length,
+              sinEstado: completedVisitsOnly.filter(v => !v.visit_state_code).length
+            };
+
+            const totalWithStates = visitStatesCounts.nulo + visitStatesCounts.ausente + visitStatesCounts.oficina + visitStatesCounts.confirmado;
+
+            return (
+              <>
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Visitas nulas</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{visitStatesCounts.nulo}</div>
+                    <p className="text-xs text-muted-foreground">
+                      {completedVisitsOnly.length > 0 ? ((visitStatesCounts.nulo / completedVisitsOnly.length) * 100).toFixed(1) : '0'}% de completadas
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Visitas ausentes</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{visitStatesCounts.ausente}</div>
+                    <p className="text-xs text-muted-foreground">
+                      {completedVisitsOnly.length > 0 ? ((visitStatesCounts.ausente / completedVisitsOnly.length) * 100).toFixed(1) : '0'}% de completadas
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Visitas oficina</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{visitStatesCounts.oficina}</div>
+                    <p className="text-xs text-muted-foreground">
+                      {completedVisitsOnly.length > 0 ? ((visitStatesCounts.oficina / completedVisitsOnly.length) * 100).toFixed(1) : '0'}% de completadas
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-sm font-medium">Visitas confirmadas</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl font-bold">{visitStatesCounts.confirmado}</div>
+                    <p className="text-xs text-muted-foreground">
+                      {completedVisitsOnly.length > 0 ? ((visitStatesCounts.confirmado / completedVisitsOnly.length) * 100).toFixed(1) : '0'}% de completadas
+                      {visitStatesCounts.sinEstado > 0 && ` | ${visitStatesCounts.sinEstado} sin estado`}
+                    </p>
+                  </CardContent>
+                </Card>
+              </>
+            );
+          })()}
         </div>
 
         {/* Charts */}
@@ -635,19 +724,153 @@ export default function AdminDashboard() {
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
+                   <Pie
+                     data={visitDistributionData}
+                     cx="50%"
+                     cy="50%"
+                     labelLine={false}
+                     label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(1)}%)`}
+                     outerRadius={80}
+                     fill="#8884d8"
+                     dataKey="value"
+                   >
+                    {visitDistributionData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Additional Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Distribución por estado de visita</CardTitle>
+              <CardDescription>Resultados específicos de las visitas</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
                   <Pie
-                    data={visitDistributionData}
+                      data={(() => {
+                        const completedVisitsOnly = visits.filter(visit => visit.status === 'completed');
+                        const visitStatesCounts = {
+                          nulo: completedVisitsOnly.filter(v => v.visit_state_code === 'not_interested').length,
+                          ausente: completedVisitsOnly.filter(v => v.visit_state_code === 'no_answer').length,
+                          oficina: completedVisitsOnly.filter(v => v.visit_state_code === 'postponed').length,
+                          confirmado: completedVisitsOnly.filter(v => v.visit_state_code === 'completed').length
+                        };
+
+                      const stateColors = {
+                        nulo: '#ef4444',
+                        ausente: '#f59e0b', 
+                        oficina: '#8b5cf6',
+                        confirmado: '#22c55e'
+                      };
+
+                      return Object.entries(visitStatesCounts)
+                        .filter(([_, count]) => count > 0)
+                        .map(([state, count]) => ({
+                          name: state.charAt(0).toUpperCase() + state.slice(1),
+                          value: count,
+                          color: stateColors[state as keyof typeof stateColors]
+                        }));
+                    })()}
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ name, value }) => `${name}: ${value}`}
+                    label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(1)}%)`}
                     outerRadius={80}
                     fill="#8884d8"
                     dataKey="value"
                   >
-                    {visitDistributionData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
+                     {(() => {
+                       const completedVisitsOnly = visits.filter(visit => visit.status === 'completed');
+                       const visitStatesCounts = {
+                         nulo: completedVisitsOnly.filter(v => v.visit_state_code === 'not_interested').length,
+                         ausente: completedVisitsOnly.filter(v => v.visit_state_code === 'no_answer').length,
+                         oficina: completedVisitsOnly.filter(v => v.visit_state_code === 'postponed').length,
+                         confirmado: completedVisitsOnly.filter(v => v.visit_state_code === 'completed').length
+                       };
+
+                      const stateColors = {
+                        nulo: '#ef4444',
+                        ausente: '#f59e0b', 
+                        oficina: '#8b5cf6',
+                        confirmado: '#22c55e'
+                      };
+
+                      return Object.entries(visitStatesCounts)
+                        .filter(([_, count]) => count > 0)
+                        .map(([state, count], index) => (
+                          <Cell key={`cell-${index}`} fill={stateColors[state as keyof typeof stateColors]} />
+                        ));
+                    })()}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Conversión de ventas</CardTitle>
+              <CardDescription>Visitas con y sin ventas generadas</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={(() => {
+                      const visitsWithSales = visits.filter(v => v.sales && v.sales.length > 0).length;
+                      const visitsWithoutSales = visits.length - visitsWithSales;
+
+                      return [
+                        {
+                          name: 'Con ventas',
+                          value: visitsWithSales,
+                          color: '#22c55e'
+                        },
+                        {
+                          name: 'Sin ventas', 
+                          value: visitsWithoutSales,
+                          color: '#6b7280'
+                        }
+                      ].filter(item => item.value > 0);
+                    })()}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(1)}%)`}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {(() => {
+                      const visitsWithSales = visits.filter(v => v.sales && v.sales.length > 0).length;
+                      const visitsWithoutSales = visits.length - visitsWithSales;
+
+                      return [
+                        {
+                          name: 'Con ventas',
+                          value: visitsWithSales,
+                          color: '#22c55e'
+                        },
+                        {
+                          name: 'Sin ventas', 
+                          value: visitsWithoutSales,
+                          color: '#6b7280'
+                        }
+                      ].filter(item => item.value > 0)
+                      .map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ));
+                    })()}
                   </Pie>
                   <Tooltip />
                 </PieChart>
@@ -728,13 +951,23 @@ export default function AdminDashboard() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewVisit(visit)}
-                        >
-                          <Eye className="h-4 w-4" />
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewVisit(visit)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCreateReminder(visit)}
+                            title="Crear recordatorio"
+                          >
+                            <Bell className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
@@ -873,6 +1106,17 @@ export default function AdminDashboard() {
             </div>
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* Reminder Dialog */}
+      {selectedClientForReminder && (
+        <ReminderDialog
+          open={reminderDialogOpen}
+          onOpenChange={setReminderDialogOpen}
+          clientId={selectedClientForReminder.id}
+          clientName={selectedClientForReminder.name}
+          onReminderCreated={handleReminderCreated}
+        />
       )}
     </div>
   );

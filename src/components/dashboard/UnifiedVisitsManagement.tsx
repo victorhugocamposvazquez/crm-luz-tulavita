@@ -21,6 +21,7 @@ interface Client {
   telefono1?: string;
   telefono2?: string;
   email?: string;
+  note?: string;
 }
 
 interface Company {
@@ -90,7 +91,8 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
     direccion: '',
     telefono1: '',
     telefono2: '',
-    email: ''
+    email: '',
+    note: ''
   });
   const [visitData, setVisitData] = useState({
     notes: '',
@@ -471,6 +473,17 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
         if (error) throw error;
 
         if (clientData) {
+          // Check if client is active
+          if (clientData.status === 'inactive') {
+            toast({
+              title: "Cliente inactivo", 
+              description: "No se puede crear una visita para un cliente inactivo. Contacta con el administrador.",
+              variant: "destructive"
+            });
+            setLoading(false);
+            return;
+          }
+          
           // Check if user is admin
           if (userRole?.role === 'admin') {
             // Admin doesn't need approval, go directly to visit form
@@ -506,19 +519,31 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
 
         const { data: existingClients, error: clientError } = await supabase
           .from('clients')
-          .select('id, dni, nombre_apellidos')
+          .select('id, dni, nombre_apellidos, status')
           .in('dni', nifs);
 
         if (clientError) throw clientError;
 
-        const existingNIFs = existingClients?.map(c => c.dni) || [];
+        // Filter out inactive clients
+        const activeClients = existingClients?.filter(c => c.status !== 'inactive') || [];
+        const inactiveClients = existingClients?.filter(c => c.status === 'inactive') || [];
+        
+        if (inactiveClients.length > 0) {
+          toast({
+            title: "Clientes inactivos detectados",
+            description: `Los siguientes clientes están inactivos y no se crearán visitas: ${inactiveClients.map(c => c.dni).join(', ')}`,
+            variant: "destructive"
+          });
+        }
+
+        const existingNIFs = activeClients?.map(c => c.dni) || [];
         const missingNIFs = nifs.filter(nif => !existingNIFs.includes(nif));
 
-        // Create visits for existing clients
-        if (existingClients && existingClients.length > 0) {
+        // Create visits for existing active clients
+        if (activeClients && activeClients.length > 0) {
           const batchId = crypto.randomUUID();
           
-          for (const client of existingClients) {
+          for (const client of activeClients) {
             // Create approval request for each client (only for commercials)
             if (userRole?.role !== 'admin') {
               const { data: approvalData, error: approvalError } = await supabase
@@ -1122,6 +1147,20 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
         }))} />
         </div>
 
+        <div className="space-y-2">
+          <Label htmlFor="note">Nota</Label>
+          <Textarea 
+            id="note" 
+            value={clientData.note || ''} 
+            onChange={e => setClientData(prev => ({
+              ...prev,
+              note: e.target.value
+            }))}
+            placeholder="Añade una nota sobre este cliente..."
+            className="min-h-[60px]"
+          />
+        </div>
+
         {location && (
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -1176,6 +1215,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
                   {existingClient.dni && <p className="text-green-600">DNI: {existingClient.dni}</p>}
                   {existingClient.telefono1 && <p className="text-green-600">Tel: {existingClient.telefono1}</p>}
                   {existingClient.telefono2 && <p className="text-green-600">Tel 2: {existingClient.telefono2}</p>}
+                  {existingClient.note && <p className="text-green-600">Nota: {existingClient.note}</p>}
                   {existingClient.email && <p className="text-green-600">Email: {existingClient.email}</p>}
                 </div>
               </div>

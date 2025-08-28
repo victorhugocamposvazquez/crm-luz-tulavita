@@ -29,6 +29,8 @@ interface Client {
   dni?: string;
   latitude?: number;
   longitude?: number;
+  status?: 'active' | 'inactive';
+  note?: string;
 }
 
 interface Visit {
@@ -155,7 +157,7 @@ export default function ClientDetailView({ clientId, onBack }: ClientDetailViewP
       return;
     }
 
-    setClient(data);
+    setClient(data as Client);
   };
 
 const fetchVisits = async () => {
@@ -445,6 +447,11 @@ const fetchVisits = async () => {
               <div className="flex items-center gap-3 p-4 bg-muted/30 rounded-lg border">
                 <span className="text-sm font-medium flex-shrink-0">DNI:</span>
                 <span className="text-sm">{client.dni}</span>
+              </div>
+            )}
+            {client.note && (
+              <div className="flex items-start gap-3 p-4 bg-muted/30 rounded-lg border col-span-full">
+                <span className="text-sm">{client.note}</span>
               </div>
             )}
           </div>

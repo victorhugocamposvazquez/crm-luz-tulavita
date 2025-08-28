@@ -387,14 +387,32 @@ export default function RemindersManagement() {
           <h2 className="text-2xl font-bold">Gestión de recordatorios</h2>
           <p className="text-muted-foreground">Administra los recordatorios de renovación de clientes</p>
         </div>
+        <Button 
+          onClick={() => setReminderDialogOpen(true)} 
+          className="flex items-center gap-2"
+        >
+          <Bell className="h-4 w-4" />
+          Nuevo recordatorio
+        </Button>
       </div>
 
       {/* Filters */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Filtros
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Filter className="h-5 w-5" />
+              Filtros
+            </div>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={clearFilters} 
+              className="h-8 w-8 p-0"
+              title="Limpiar filtros"
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -443,12 +461,6 @@ export default function RemindersManagement() {
                 onChange={(e) => setFilters(prev => ({ ...prev, end_date: e.target.value }))}
               />
             </div>
-          </div>
-          <div className="flex justify-end mt-4">
-            <Button variant="outline" onClick={clearFilters} className="flex items-center gap-2">
-              <X className="h-4 w-4" />
-              Limpiar filtros
-            </Button>
           </div>
         </CardContent>
       </Card>
@@ -632,15 +644,16 @@ export default function RemindersManagement() {
       </Dialog>
 
       {/* Reminder Dialog */}
-      {selectedClient && (
-        <ReminderDialog
-          open={reminderDialogOpen}
-          onOpenChange={setReminderDialogOpen}
-          clientId={selectedClient.id}
-          clientName={selectedClient.name}
-          onReminderCreated={fetchReminders}
-        />
-      )}
+      <ReminderDialog
+        open={reminderDialogOpen}
+        onOpenChange={setReminderDialogOpen}
+        clientId={selectedClient?.id}
+        clientName={selectedClient?.name}
+        onReminderCreated={() => {
+          fetchReminders();
+          setSelectedClient(null);
+        }}
+      />
     </div>
   );
 }
