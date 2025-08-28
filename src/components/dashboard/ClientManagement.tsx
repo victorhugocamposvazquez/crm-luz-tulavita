@@ -59,7 +59,8 @@ export default function ClientManagement() {
     dni: '',
     direccion: '',
     telefono: '',
-    email: ''
+    email: '',
+    status: ''
   });
 
   const isAdmin = userRole?.role === 'admin';
@@ -114,6 +115,9 @@ export default function ClientManagement() {
       }
       if (filters.email.trim()) {
         query = query.ilike('email', `%${filters.email.trim()}%`);
+      }
+      if (filters.status.trim()) {
+        query = query.eq('status', filters.status.trim());
       }
 
       // Apply pagination
@@ -360,7 +364,8 @@ export default function ClientManagement() {
       dni: '',
       direccion: '',
       telefono: '',
-      email: ''
+      email: '',
+      status: ''
     });
     setCurrentPage(1);
   };
@@ -618,7 +623,7 @@ export default function ClientManagement() {
               <TableRow>
                       <TableHead>Nombre</TableHead>
                       <TableHead>DNI</TableHead>
-                      <TableHead>Status</TableHead>
+                      <TableHead>Activo</TableHead>
                       <TableHead>Dirección</TableHead>
                       <TableHead>Coordenadas</TableHead>
                       <TableHead>Teléfono</TableHead>
@@ -650,18 +655,13 @@ export default function ClientManagement() {
                    <TableRow key={client.id} className={client.status === 'inactive' ? 'opacity-60' : ''}>
                       <TableCell className="font-medium">{client.nombre_apellidos}</TableCell>
                       <TableCell>{client.dni || '-'}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center space-x-2">
-                          <Switch
-                            checked={client.status === 'active'}
-                            onCheckedChange={(checked) => handleStatusToggle(client.id, checked ? 'active' : 'inactive')}
-                            disabled={!isAdmin}
-                          />
-                          <span className={`text-sm ${client.status === 'active' ? 'text-green-600' : 'text-red-600'}`}>
-                            {client.status === 'active' ? 'Active' : 'Inactive'}
-                          </span>
-                        </div>
-                      </TableCell>
+                       <TableCell>
+                         <Switch
+                           checked={client.status === 'active'}
+                           onCheckedChange={(checked) => handleStatusToggle(client.id, checked ? 'active' : 'inactive')}
+                           disabled={!isAdmin}
+                         />
+                       </TableCell>
                       <TableCell>{client.direccion}</TableCell>
                      <TableCell className="max-w-[150px]">
                        {client.latitude && client.longitude ? (

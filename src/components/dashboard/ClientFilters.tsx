@@ -1,6 +1,7 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Search, X } from 'lucide-react';
 
 interface ClientFiltersProps {
@@ -10,6 +11,7 @@ interface ClientFiltersProps {
     direccion: string;
     telefono: string;
     email: string;
+    status: string;
   };
   onFilterChange: (key: string, value: string) => void;
   onClearFilters: () => void;
@@ -37,7 +39,7 @@ export default function ClientFilters({ filters, onFilterChange, onClearFilters 
         )}
       </div>
       
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <Input
           placeholder="Nombre..."
           value={filters.nombre}
@@ -72,6 +74,17 @@ export default function ClientFilters({ filters, onFilterChange, onClearFilters 
           onChange={(e) => onFilterChange('email', e.target.value)}
           className="h-8 text-sm"
         />
+
+        <Select value={filters.status} onValueChange={(value) => onFilterChange('status', value)}>
+          <SelectTrigger className="h-8 text-sm">
+            <SelectValue placeholder="Estado..." />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">Todos</SelectItem>
+            <SelectItem value="active">Activo</SelectItem>
+            <SelectItem value="inactive">Inactivo</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
     </div>
   );
