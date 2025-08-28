@@ -93,8 +93,9 @@ export default function AdminVisitsView() {
   const [filters, setFilters] = useState({
     commercial: '',
     dni: '',
-    startDate: '',
-    endDate: ''
+    startDate: new Date().toISOString().split('T')[0], // Fecha de hoy por defecto
+    endDate: '',
+    status: '' // Nuevo filtro de estado
   });
 
   // Redirect if not admin
@@ -197,6 +198,13 @@ export default function AdminVisitsView() {
         query = query.lte('visit_date', filters.endDate + 'T23:59:59.999Z');
       }
 
+      // Aplicar filtro de estado
+      if (filters.status === 'in_progress') {
+        query = query.eq('status', 'in_progress');
+      } else if (filters.status === 'approved') {
+        query = query.eq('approval_status', 'approved');
+      }
+
       const { data: visitsData, error } = await query;
 
       if (error) throw error;
@@ -267,8 +275,9 @@ export default function AdminVisitsView() {
     setFilters({
       commercial: '',
       dni: '',
-      startDate: '',
-      endDate: ''
+      startDate: new Date().toISOString().split('T')[0], // Mantener fecha de hoy por defecto
+      endDate: '',
+      status: ''
     });
   };
 
@@ -306,19 +315,20 @@ export default function AdminVisitsView() {
       {/* Filters */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Search className="h-5 w-5" />
-            <span>Filtros</span>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Search className="h-5 w-5" />
+              <span>Filtros</span>
+            </div>
             {hasActiveFilters && (
-              <Button variant="outline" size="sm" onClick={clearFilters}>
-                <X className="h-4 w-4 mr-1" />
-                Limpiar
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="h-6 w-6 p-0">
+                <X className="h-4 w-4" />
               </Button>
             )}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div>
               <Label htmlFor="commercial">Comercial</Label>
               <Select
@@ -347,6 +357,23 @@ export default function AdminVisitsView() {
                 value={filters.dni}
                 onChange={(e) => handleFilterChange('dni', e.target.value)}
               />
+            </div>
+
+            <div>
+              <Label htmlFor="status">Estado</Label>
+              <Select
+                value={filters.status || undefined}
+                onValueChange={(value) => handleFilterChange('status', value === 'all' ? '' : value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos los estados" />
+                </SelectTrigger>
+                <SelectContent className="z-50 bg-background">
+                  <SelectItem value="all">Todos los estados</SelectItem>
+                  <SelectItem value="in_progress">En progreso</SelectItem>
+                  <SelectItem value="approved">Confirmadas</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
