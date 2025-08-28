@@ -93,7 +93,7 @@ export default function AdminNotifications() {
             }`}>
               {request.hasDuplicateToday && (
                 <span className="mr-2 text-red-600 font-bold text-xs bg-red-200 px-2 py-1 rounded-full animate-bounce">
-                  ⚠️ MÚLTIPLES PETICIONES HOY
+                  🚨 YA HAY VISITAS HOY PARA ESTE CLIENTE
                 </span>
               )}
               Solicitud de acceso

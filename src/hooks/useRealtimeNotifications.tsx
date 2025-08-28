@@ -83,24 +83,30 @@ export function useRealtimeNotifications() {
       .order('created_at', { ascending: false });
 
     if (approvals) {
-      // Check for duplicate requests for the same client on the same day
-      const today = new Date().toDateString();
-      const clientRequestCounts = new Map<string, number>();
+      // Get today's date range
+      const today = new Date();
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
       
-      // Count requests per client today
-      approvals.forEach(approval => {
-        const requestDate = new Date(approval.created_at).toDateString();
-        if (requestDate === today) {
-          const currentCount = clientRequestCounts.get(approval.client_id) || 0;
-          clientRequestCounts.set(approval.client_id, currentCount + 1);
-        }
-      });
+      // Get all visits for today
+      const { data: todaysVisits } = await supabase
+        .from('visits')
+        .select('client_id')
+        .gte('visit_date', startOfDay.toISOString())
+        .lt('visit_date', endOfDay.toISOString());
       
-      // Mark requests as duplicated if there are multiple for the same client today
+      // Count visits per client today
+      const clientVisitCounts = new Map<string, number>();
+      if (todaysVisits) {
+        todaysVisits.forEach(visit => {
+          const currentCount = clientVisitCounts.get(visit.client_id) || 0;
+          clientVisitCounts.set(visit.client_id, currentCount + 1);
+        });
+      }
+      
+      // Mark requests as having duplicates if there are multiple visits for the same client today
       const processedApprovals = approvals.map(approval => {
-        const requestDate = new Date(approval.created_at).toDateString();
-        const hasDuplicateToday = requestDate === today && 
-          (clientRequestCounts.get(approval.client_id) || 0) > 1;
+        const hasDuplicateToday = (clientVisitCounts.get(approval.client_id) || 0) >= 1;
         
         return {
           ...approval,
