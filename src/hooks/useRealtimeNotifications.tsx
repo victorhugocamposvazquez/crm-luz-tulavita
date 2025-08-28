@@ -106,7 +106,7 @@ export function useRealtimeNotifications() {
       
       // Mark requests as having duplicates if there are multiple visits for the same client today
       const processedApprovals = approvals.map(approval => {
-        const hasDuplicateToday = (clientVisitCounts.get(approval.client_id) || 0) >= 1;
+        const hasDuplicateToday = (clientVisitCounts.get(approval.client_id) || 0) > 1;
         
         return {
           ...approval,
