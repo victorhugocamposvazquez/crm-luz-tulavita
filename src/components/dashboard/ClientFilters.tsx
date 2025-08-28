@@ -75,12 +75,12 @@ export default function ClientFilters({ filters, onFilterChange, onClearFilters 
           className="h-8 text-sm"
         />
 
-        <Select value={filters.status} onValueChange={(value) => onFilterChange('status', value)}>
+        <Select value={filters.status || "all"} onValueChange={(value) => onFilterChange('status', value === 'all' ? '' : value)}>
           <SelectTrigger className="h-8 text-sm">
             <SelectValue placeholder="Estado..." />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Todos</SelectItem>
+            <SelectItem value="all">Todos</SelectItem>
             <SelectItem value="active">Activo</SelectItem>
             <SelectItem value="inactive">Inactivo</SelectItem>
           </SelectContent>
