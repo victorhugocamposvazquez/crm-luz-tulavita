@@ -588,11 +588,13 @@ export default function AdminDashboard() {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Visitas (30 días)</CardTitle>
+              <CardTitle className="text-sm font-medium">Visitas con ventas</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{visits.length}</div>
-              <p className="text-xs text-muted-foreground">{approvedVisits} aprobadas</p>
+              <div className="text-2xl font-bold">{visits.filter(v => v.sales && v.sales.length > 0).length}</div>
+              <p className="text-xs text-muted-foreground">
+                {visits.length > 0 ? (((visits.filter(v => v.sales && v.sales.length > 0).length / visits.length) * 100).toFixed(1)) : '0'}% del total
+              </p>
             </CardContent>
           </Card>
 
@@ -610,11 +612,12 @@ export default function AdminDashboard() {
         {/* Visit States Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           {(() => {
+            const completedVisitsOnly = visits.filter(visit => visit.status === 'completed');
             const visitStatesCounts = {
-              nulo: visits.filter(v => v.visit_state_code === 'not_interested').length,
-              ausente: visits.filter(v => v.visit_state_code === 'no_answer').length,
-              oficina: visits.filter(v => v.visit_state_code === 'postponed').length,
-              confirmado: visits.filter(v => v.visit_state_code === 'completed').length
+              nulo: completedVisitsOnly.filter(v => v.visit_state_code === 'not_interested').length,
+              ausente: completedVisitsOnly.filter(v => v.visit_state_code === 'no_answer').length,
+              oficina: completedVisitsOnly.filter(v => v.visit_state_code === 'postponed').length,
+              confirmado: completedVisitsOnly.filter(v => v.visit_state_code === 'completed').length
             };
             
             const visitsWithSales = visits.filter(v => v.sales && v.sales.length > 0).length;
@@ -629,7 +632,7 @@ export default function AdminDashboard() {
                   <CardContent>
                     <div className="text-2xl font-bold">{visitStatesCounts.nulo}</div>
                     <p className="text-xs text-muted-foreground">
-                      {visits.length > 0 ? ((visitStatesCounts.nulo / visits.length) * 100).toFixed(1) : '0'}% del total
+                      {completedVisitsOnly.length > 0 ? ((visitStatesCounts.nulo / completedVisitsOnly.length) * 100).toFixed(1) : '0'}% de completadas
                     </p>
                   </CardContent>
                 </Card>
@@ -641,7 +644,7 @@ export default function AdminDashboard() {
                   <CardContent>
                     <div className="text-2xl font-bold">{visitStatesCounts.ausente}</div>
                     <p className="text-xs text-muted-foreground">
-                      {visits.length > 0 ? ((visitStatesCounts.ausente / visits.length) * 100).toFixed(1) : '0'}% del total
+                      {completedVisitsOnly.length > 0 ? ((visitStatesCounts.ausente / completedVisitsOnly.length) * 100).toFixed(1) : '0'}% de completadas
                     </p>
                   </CardContent>
                 </Card>
@@ -653,7 +656,7 @@ export default function AdminDashboard() {
                   <CardContent>
                     <div className="text-2xl font-bold">{visitStatesCounts.oficina}</div>
                     <p className="text-xs text-muted-foreground">
-                      {visits.length > 0 ? ((visitStatesCounts.oficina / visits.length) * 100).toFixed(1) : '0'}% del total
+                      {completedVisitsOnly.length > 0 ? ((visitStatesCounts.oficina / completedVisitsOnly.length) * 100).toFixed(1) : '0'}% de completadas
                     </p>
                   </CardContent>
                 </Card>
@@ -665,7 +668,7 @@ export default function AdminDashboard() {
                   <CardContent>
                     <div className="text-2xl font-bold">{visitStatesCounts.confirmado}</div>
                     <p className="text-xs text-muted-foreground">
-                      {visits.length > 0 ? ((visitStatesCounts.confirmado / visits.length) * 100).toFixed(1) : '0'}% del total
+                      {completedVisitsOnly.length > 0 ? ((visitStatesCounts.confirmado / completedVisitsOnly.length) * 100).toFixed(1) : '0'}% de completadas
                     </p>
                   </CardContent>
                 </Card>
@@ -715,16 +718,16 @@ export default function AdminDashboard() {
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
-                  <Pie
-                    data={visitDistributionData}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={({ name, value }) => `${name}: ${value}`}
-                    outerRadius={80}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
+                   <Pie
+                     data={visitDistributionData}
+                     cx="50%"
+                     cy="50%"
+                     labelLine={false}
+                     label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(1)}%)`}
+                     outerRadius={80}
+                     fill="#8884d8"
+                     dataKey="value"
+                   >
                     {visitDistributionData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={entry.color} />
                     ))}
@@ -747,13 +750,14 @@ export default function AdminDashboard() {
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie
-                     data={(() => {
-                       const visitStatesCounts = {
-                         nulo: visits.filter(v => v.visit_state_code === 'not_interested').length,
-                         ausente: visits.filter(v => v.visit_state_code === 'no_answer').length,
-                         oficina: visits.filter(v => v.visit_state_code === 'postponed').length,
-                         confirmado: visits.filter(v => v.visit_state_code === 'completed').length
-                       };
+                      data={(() => {
+                        const completedVisitsOnly = visits.filter(visit => visit.status === 'completed');
+                        const visitStatesCounts = {
+                          nulo: completedVisitsOnly.filter(v => v.visit_state_code === 'not_interested').length,
+                          ausente: completedVisitsOnly.filter(v => v.visit_state_code === 'no_answer').length,
+                          oficina: completedVisitsOnly.filter(v => v.visit_state_code === 'postponed').length,
+                          confirmado: completedVisitsOnly.filter(v => v.visit_state_code === 'completed').length
+                        };
 
                       const stateColors = {
                         nulo: '#ef4444',
@@ -773,17 +777,18 @@ export default function AdminDashboard() {
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ name, value }) => `${name}: ${value}`}
+                    label={({ name, value, percent }) => `${name}: ${value} (${(percent * 100).toFixed(1)}%)`}
                     outerRadius={80}
                     fill="#8884d8"
                     dataKey="value"
                   >
                      {(() => {
+                       const completedVisitsOnly = visits.filter(visit => visit.status === 'completed');
                        const visitStatesCounts = {
-                         nulo: visits.filter(v => v.visit_state_code === 'not_interested').length,
-                         ausente: visits.filter(v => v.visit_state_code === 'no_answer').length,
-                         oficina: visits.filter(v => v.visit_state_code === 'postponed').length,
-                         confirmado: visits.filter(v => v.visit_state_code === 'completed').length
+                         nulo: completedVisitsOnly.filter(v => v.visit_state_code === 'not_interested').length,
+                         ausente: completedVisitsOnly.filter(v => v.visit_state_code === 'no_answer').length,
+                         oficina: completedVisitsOnly.filter(v => v.visit_state_code === 'postponed').length,
+                         confirmado: completedVisitsOnly.filter(v => v.visit_state_code === 'completed').length
                        };
 
                       const stateColors = {
