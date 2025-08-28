@@ -77,13 +77,39 @@ export default function AdminNotifications() {
 
       {/* Client Access Approval Requests */}
       {pendingApprovals.map((request) => (
-        <div key={request.id} className="p-3 border rounded-lg bg-orange-50 dark:bg-orange-950 space-y-2">
-          <h4 className="font-medium text-orange-900 dark:text-orange-100 text-sm">
-            Solicitud de acceso
-          </h4>
-          <p className="text-xs text-orange-700 dark:text-orange-300 line-clamp-2">
+        <div 
+          key={request.id} 
+          className={`p-3 border rounded-lg space-y-2 ${
+            request.hasDuplicateToday 
+              ? 'bg-red-100 dark:bg-red-900 border-red-500 border-2 shadow-lg animate-pulse' 
+              : 'bg-orange-50 dark:bg-orange-950'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <h4 className={`font-medium text-sm ${
+              request.hasDuplicateToday 
+                ? 'text-red-900 dark:text-red-100' 
+                : 'text-orange-900 dark:text-orange-100'
+            }`}>
+              {request.hasDuplicateToday && (
+                <span className="mr-2 text-red-600 font-bold text-xs bg-red-200 px-2 py-1 rounded-full animate-bounce">
+                  ⚠️ MÚLTIPLES PETICIONES HOY
+                </span>
+              )}
+              Solicitud de acceso
+            </h4>
+          </div>
+          <p className={`text-xs line-clamp-2 ${
+            request.hasDuplicateToday 
+              ? 'text-red-700 dark:text-red-300' 
+              : 'text-orange-700 dark:text-orange-300'
+          }`}>
             {request.commercial?.first_name} {request.commercial?.last_name} solicita acceso a{' '}
-            <span className="font-medium text-orange-900 dark:text-orange-100">
+            <span className={`font-medium ${
+              request.hasDuplicateToday 
+                ? 'text-red-900 dark:text-red-100' 
+                : 'text-orange-900 dark:text-orange-100'
+            }`}>
               {request.client?.nombre_apellidos}
             </span>
           </p>

@@ -28,6 +28,7 @@ interface ApprovalRequest {
   commercial_id: string;
   status: 'pending' | 'approved' | 'rejected';
   created_at: string;
+  hasDuplicateToday?: boolean; // New field to track duplicate requests
   client?: {
     nombre_apellidos: string;
   };
@@ -82,7 +83,32 @@ export function useRealtimeNotifications() {
       .order('created_at', { ascending: false });
 
     if (approvals) {
-      setPendingApprovals(approvals as ApprovalRequest[]);
+      // Check for duplicate requests for the same client on the same day
+      const today = new Date().toDateString();
+      const clientRequestCounts = new Map<string, number>();
+      
+      // Count requests per client today
+      approvals.forEach(approval => {
+        const requestDate = new Date(approval.created_at).toDateString();
+        if (requestDate === today) {
+          const currentCount = clientRequestCounts.get(approval.client_id) || 0;
+          clientRequestCounts.set(approval.client_id, currentCount + 1);
+        }
+      });
+      
+      // Mark requests as duplicated if there are multiple for the same client today
+      const processedApprovals = approvals.map(approval => {
+        const requestDate = new Date(approval.created_at).toDateString();
+        const hasDuplicateToday = requestDate === today && 
+          (clientRequestCounts.get(approval.client_id) || 0) > 1;
+        
+        return {
+          ...approval,
+          hasDuplicateToday
+        } as ApprovalRequest;
+      });
+      
+      setPendingApprovals(processedApprovals);
     }
   };
 
