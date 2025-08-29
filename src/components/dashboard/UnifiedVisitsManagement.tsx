@@ -18,10 +18,14 @@ interface Client {
   nombre_apellidos: string;
   dni: string;
   direccion: string;
+  localidad: string;
+  codigo_postal: string;
   telefono1?: string;
   telefono2?: string;
   email?: string;
   note?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 interface Company {
@@ -89,6 +93,8 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
     nombre_apellidos: '',
     dni: '',
     direccion: '',
+    localidad: '',
+    codigo_postal: '',
     telefono1: '',
     telefono2: '',
     email: '',
@@ -703,10 +709,10 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
   };
 
   const handleCreateClient = async () => {
-    if (!clientData.nombre_apellidos || !clientData.direccion) {
+    if (!clientData.nombre_apellidos || !clientData.direccion || !clientData.localidad || !clientData.codigo_postal) {
       toast({
         title: "Error",
-        description: "Completa los campos obligatorios",
+        description: "Completa los campos obligatorios (Nombre, Dirección, Localidad y Código Postal)",
         variant: "destructive"
       });
       return;
@@ -1124,6 +1130,23 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
+            <Label htmlFor="localidad">Localidad *</Label>
+            <Input id="localidad" value={clientData.localidad} onChange={e => setClientData(prev => ({
+            ...prev,
+            localidad: e.target.value
+          }))} required />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="codigo_postal">Código Postal *</Label>
+            <Input id="codigo_postal" value={clientData.codigo_postal} onChange={e => setClientData(prev => ({
+            ...prev,
+            codigo_postal: e.target.value
+          }))} required />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
             <Label htmlFor="telefono1">Teléfono 1</Label>
             <Input id="telefono1" value={clientData.telefono1} onChange={e => setClientData(prev => ({
             ...prev,
@@ -1211,7 +1234,37 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <p className="text-green-700 font-medium">{existingClient.nombre_apellidos}</p>
-                  <p className="text-green-600">{existingClient.direccion}</p>
+                  {(() => {
+                    const fullAddress = [existingClient.direccion, existingClient.localidad, existingClient.codigo_postal]
+                      .filter(Boolean)
+                      .join(', ');
+                    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`;
+                    return (
+                      <p className="text-green-600">
+                        <a 
+                          href={mapsUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="hover:underline underline"
+                        >
+                          {fullAddress}
+                        </a>
+                      </p>
+                    );
+                  })()}
+                  {existingClient.latitude && existingClient.longitude && (
+                    <p className="text-green-600">
+                      Coordenadas: 
+                      <a 
+                        href={`https://www.google.com/maps/search/?api=1&query=${existingClient.latitude},${existingClient.longitude}`}
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="hover:underline underline ml-1"
+                      >
+                        {formatCoordinates(existingClient.latitude, existingClient.longitude)}
+                      </a>
+                    </p>
+                  )}
                   {existingClient.dni && <p className="text-green-600">DNI: {existingClient.dni}</p>}
                   {existingClient.telefono1 && <p className="text-green-600">Tel: {existingClient.telefono1}</p>}
                   {existingClient.telefono2 && <p className="text-green-600">Tel 2: {existingClient.telefono2}</p>}
@@ -1313,6 +1366,9 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
                 placeholder="Describe cómo fue la visita..." 
                 disabled={isReadOnly}
                 required
+                rows={8}
+                autoFocus
+                className="min-h-[200px]"
               />
             </div>
 

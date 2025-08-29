@@ -109,12 +109,14 @@ export type Database = {
       }
       clients: {
         Row: {
+          codigo_postal: string | null
           created_at: string
           direccion: string
           dni: string | null
           email: string | null
           id: string
           latitude: number | null
+          localidad: string | null
           longitude: number | null
           nombre_apellidos: string
           note: string | null
@@ -124,12 +126,14 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          codigo_postal?: string | null
           created_at?: string
           direccion: string
           dni?: string | null
           email?: string | null
           id?: string
           latitude?: number | null
+          localidad?: string | null
           longitude?: number | null
           nombre_apellidos: string
           note?: string | null
@@ -139,12 +143,14 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          codigo_postal?: string | null
           created_at?: string
           direccion?: string
           dni?: string | null
           email?: string | null
           id?: string
           latitude?: number | null
+          localidad?: string | null
           longitude?: number | null
           nombre_apellidos?: string
           note?: string | null

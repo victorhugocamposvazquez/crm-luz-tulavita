@@ -8,6 +8,7 @@ const getAllowedOrigin = (requestOrigin: string | null) => {
     'https://lovable.dev',
     'https://crm.ilustracioneslarum.com', // Tu dominio personalizado
     /^https:\/\/.*\.lovable\.dev$/,
+    /^https:\/\/.*\.lovable\.app$/,
     /^https:\/\/.*\.sandbox\.lovable\.dev$/,
     /^https:\/\/.*\.vercel\.app$/,
   ];

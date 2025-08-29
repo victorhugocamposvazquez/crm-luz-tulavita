@@ -23,6 +23,8 @@ interface Client {
   id: string;
   nombre_apellidos: string;
   direccion: string;
+  localidad?: string;
+  codigo_postal?: string;
   telefono1?: string;
   telefono2?: string;
   email?: string;
@@ -402,12 +404,12 @@ const fetchVisits = async () => {
             <div className="flex items-center gap-3 p-4 bg-muted/30 rounded-lg border">
               <MapPinIcon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
               <a 
-                href={`https://maps.google.com/?q=${encodeURIComponent(client.direccion)}`}
+                href={`https://maps.google.com/?q=${encodeURIComponent([client.direccion, client.localidad, client.codigo_postal].filter(Boolean).join(', '))}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer hover:underline flex items-center gap-1"
               >
-                {client.direccion}
+                {[client.direccion, client.localidad, client.codigo_postal].filter(Boolean).join(', ')}
                 <MapPinIcon className="h-3 w-3" />
               </a>
             </div>

@@ -23,11 +23,13 @@ import ReminderDialog from '@/components/reminders/ReminderDialog';
 interface Client {
   id: string;
   nombre_apellidos: string;
-  dni?: string;
   direccion: string;
+  localidad?: string;
+  codigo_postal?: string;
   telefono1?: string;
   telefono2?: string;
   email?: string;
+  dni?: string;
   latitude?: number;
   longitude?: number;
   created_at: string;
@@ -57,7 +59,8 @@ export default function ClientManagement() {
   const [filters, setFilters] = useState({
     nombre: '',
     dni: '',
-    direccion: '',
+    localidad: '',
+    codigo_postal: '',
     telefono: '',
     email: '',
     status: ''
@@ -107,8 +110,11 @@ export default function ClientManagement() {
       if (filters.dni.trim()) {
         query = query.ilike('dni', `%${filters.dni.trim()}%`);
       }
-      if (filters.direccion.trim()) {
-        query = query.ilike('direccion', `%${filters.direccion.trim()}%`);
+      if (filters.localidad.trim()) {
+        query = query.ilike('localidad', `%${filters.localidad.trim()}%`);
+      }
+      if (filters.codigo_postal.trim()) {
+        query = query.ilike('codigo_postal', `%${filters.codigo_postal.trim()}%`);
       }
       if (filters.telefono.trim()) {
         query = query.or(`telefono1.ilike.%${filters.telefono.trim()}%,telefono2.ilike.%${filters.telefono.trim()}%`);
@@ -170,6 +176,8 @@ export default function ClientManagement() {
       nombre_apellidos: formData.get('nombre_apellidos') as string,
       dni: formData.get('dni') as string || null,
       direccion: formData.get('direccion') as string,
+      localidad: formData.get('localidad') as string,
+      codigo_postal: formData.get('codigo_postal') as string,
       telefono1: formData.get('telefono1') as string || null,
       telefono2: formData.get('telefono2') as string || null,
       email: formData.get('email') as string || null,
@@ -362,7 +370,8 @@ export default function ClientManagement() {
     setFilters({
       nombre: '',
       dni: '',
-      direccion: '',
+      localidad: '',
+      codigo_postal: '',
       telefono: '',
       email: '',
       status: ''
@@ -503,6 +512,26 @@ export default function ClientManagement() {
                       defaultValue={editingClient?.direccion || ''}
                       required 
                     />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="localidad">Localidad *</Label>
+                      <Input 
+                        id="localidad" 
+                        name="localidad" 
+                        defaultValue={editingClient?.localidad || ''}
+                        required 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="codigo_postal">Código Postal *</Label>
+                      <Input 
+                        id="codigo_postal" 
+                        name="codigo_postal" 
+                        defaultValue={editingClient?.codigo_postal || ''}
+                        required 
+                      />
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
@@ -662,7 +691,28 @@ export default function ClientManagement() {
                            disabled={!isAdmin}
                          />
                        </TableCell>
-                      <TableCell>{client.direccion}</TableCell>
+                      <TableCell>
+                        {(() => {
+                          // Construir dirección completa
+                          const parts = [client.direccion];
+                          if (client.localidad) parts.push(client.localidad);
+                          if (client.codigo_postal) parts.push(client.codigo_postal);
+                          const fullAddress = parts.filter(part => part?.trim()).join(', ');
+                          
+                          // Usar siempre la dirección completa para Google Maps
+                          return (
+                            <a
+                              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline cursor-pointer"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {fullAddress}
+                            </a>
+                          );
+                        })()}
+                      </TableCell>
                      <TableCell className="max-w-[150px]">
                        {client.latitude && client.longitude ? (
                          editingCoordinates?.id === client.id ? (

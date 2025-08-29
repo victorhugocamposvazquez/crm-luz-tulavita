@@ -307,6 +307,10 @@ export default function RemindersManagement() {
     if (!visitCreationDialog.reminder || !selectedCommercial || !selectedCompany) return;
 
     try {
+      // Prepare notes from reminder with proper formatting
+      const reminderNotes = visitCreationDialog.reminder.notes || '';
+      const visitNotes = reminderNotes ? `${reminderNotes}\n\n--\n\n` : '--\n\n';
+
       // Create approved and in_progress visit
       const { data: visitData, error: visitError } = await supabase
         .from('visits')
@@ -316,7 +320,7 @@ export default function RemindersManagement() {
           company_id: selectedCompany,
           status: 'in_progress',
           approval_status: 'approved',
-          notes: '',
+          notes: visitNotes,
           visit_date: new Date().toISOString()
         })
         .select()
