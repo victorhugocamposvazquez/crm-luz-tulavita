@@ -8,7 +8,8 @@ interface ClientFiltersProps {
   filters: {
     nombre: string;
     dni: string;
-    direccion: string;
+    localidad: string;
+    codigo_postal: string;
     telefono: string;
     email: string;
     status: string;
@@ -55,9 +56,16 @@ export default function ClientFilters({ filters, onFilterChange, onClearFilters 
         />
         
         <Input
-          placeholder="Dirección..."
-          value={filters.direccion}
-          onChange={(e) => onFilterChange('direccion', e.target.value)}
+          placeholder="Localidad..."
+          value={filters.localidad}
+          onChange={(e) => onFilterChange('localidad', e.target.value)}
+          className="h-8 text-sm"
+        />
+        
+        <Input
+          placeholder="CP..."
+          value={filters.codigo_postal}
+          onChange={(e) => onFilterChange('codigo_postal', e.target.value)}
           className="h-8 text-sm"
         />
         
@@ -80,7 +88,7 @@ export default function ClientFilters({ filters, onFilterChange, onClearFilters 
             <SelectValue placeholder="Estado..." />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="all">Todos los estados</SelectItem>
             <SelectItem value="active">Activo</SelectItem>
             <SelectItem value="inactive">Inactivo</SelectItem>
           </SelectContent>
