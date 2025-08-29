@@ -219,37 +219,61 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
   };
 
   const handleCreateVisit = async () => {
-    if (!visitCreationDialog.reminder || !selectedCommercial || !selectedCompany) return;
+    console.log('=== STARTING handleCreateVisit ===');
+    console.log('visitCreationDialog:', visitCreationDialog);
+    console.log('selectedCommercial:', selectedCommercial);
+    console.log('selectedCompany:', selectedCompany);
+    
+    if (!visitCreationDialog.reminder || !selectedCommercial || !selectedCompany) {
+      console.log('=== MISSING REQUIRED DATA ===');
+      console.log('reminder exists:', !!visitCreationDialog.reminder);
+      console.log('selectedCommercial exists:', !!selectedCommercial);
+      console.log('selectedCompany exists:', !!selectedCompany);
+      return;
+    }
 
     try {
       // Prepare notes from reminder
-      const reminderNotes = visitCreationDialog.reminder.notes || '';
+      const reminder = visitCreationDialog.reminder;
+      console.log('=== PROCESSING REMINDER ===');
+      console.log('Full reminder object:', reminder);
+      console.log('reminder.notes:', reminder.notes);
+      console.log('typeof reminder.notes:', typeof reminder.notes);
+      
+      const reminderNotes = reminder.notes || '';
       const visitNotes = reminderNotes ? `${reminderNotes}\n\n--\n\n` : '--\n\n';
       
-      console.log('Creating visit with notes from reminder:', {
-        reminderNotes,
-        visitNotes,
-        reminder: visitCreationDialog.reminder
-      });
+      console.log('=== PREPARED NOTES ===');
+      console.log('reminderNotes:', JSON.stringify(reminderNotes));
+      console.log('visitNotes:', JSON.stringify(visitNotes));
 
       // Create approved and in_progress visit
-      const { data: visitData, error: visitError } = await supabase
+      const visitData = {
+        client_id: clientId,
+        commercial_id: selectedCommercial,
+        company_id: selectedCompany,
+        status: 'in_progress' as const,
+        approval_status: 'approved' as const,
+        notes: visitNotes,
+        visit_date: new Date().toISOString()
+      };
+      
+      console.log('=== INSERTING VISIT WITH DATA ===');
+      console.log('visitData:', visitData);
+      
+      const { data: createdVisit, error: visitError } = await supabase
         .from('visits')
-        .insert({
-          client_id: clientId,
-          commercial_id: selectedCommercial,
-          company_id: selectedCompany,
-          status: 'in_progress',
-          approval_status: 'approved',
-          notes: visitNotes,
-          visit_date: new Date().toISOString()
-        })
+        .insert(visitData)
         .select()
-        .single();
+        .maybeSingle();
 
-      if (visitError) throw visitError;
+      if (visitError) {
+        console.error('=== VISIT INSERT ERROR ===', visitError);
+        throw visitError;
+      }
 
-      console.log('Visit created successfully:', visitData);
+      console.log('=== VISIT CREATED SUCCESSFULLY ===');
+      console.log('Created visit:', createdVisit);
 
       // Delete reminder after creating visit (without confirmation)
       await handleDelete(visitCreationDialog.reminder.id, false);
@@ -265,7 +289,7 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
       fetchReminders();
       onReminderUpdate();
     } catch (error: any) {
-      console.error('Error creating visit:', error);
+      console.error('=== ERROR IN handleCreateVisit ===', error);
       toast({
         title: "Error",
         description: "No se pudo crear la visita",
