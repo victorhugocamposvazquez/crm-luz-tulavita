@@ -1245,7 +1245,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
                           href={mapsUrl} 
                           target="_blank" 
                           rel="noopener noreferrer"
-                          className="hover:underline"
+                          className="hover:underline underline"
                         >
                           {fullAddress}
                         </a>
@@ -1259,7 +1259,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
                         href={`https://www.google.com/maps/search/?api=1&query=${existingClient.latitude},${existingClient.longitude}`}
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="hover:underline ml-1"
+                        className="hover:underline underline ml-1"
                       >
                         {formatCoordinates(existingClient.latitude, existingClient.longitude)}
                       </a>
