@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon, X } from 'lucide-react';
-import { format, addWeeks, addMonths, addYears, startOfDay, setHours } from 'date-fns';
+import { format, addDays, addMonths, addYears, startOfDay, setHours } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -32,10 +32,8 @@ export default function ReminderDialog({
 }: ReminderDialogProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [reminderType, setReminderType] = useState<'specific' | 'weekly' | 'monthly' | 'biannual' | 'yearly'>('specific');
+  const [reminderType, setReminderType] = useState<'specific' | 'tomorrow' | 'six_months' | 'eleven_months' | 'five_years'>('specific');
   const [specificDate, setSpecificDate] = useState<Date>();
-  const [startDate, setStartDate] = useState<Date>();
-  const [occurrences, setOccurrences] = useState(12);
   const [notes, setNotes] = useState('');
   const [selectedClient, setSelectedClient] = useState<{id: string, name: string} | null>(null);
   const [clients, setClients] = useState<Array<{id: string, nombre_apellidos: string}>>([]);
@@ -69,6 +67,23 @@ export default function ReminderDialog({
     return selectedClient;
   };
 
+  // Auto-calculate date based on reminder type
+  const getCalculatedDate = () => {
+    const today = new Date();
+    switch (reminderType) {
+      case 'tomorrow':
+        return addDays(today, 1);
+      case 'six_months':
+        return addMonths(today, 6);
+      case 'eleven_months':
+        return addMonths(today, 11);
+      case 'five_years':
+        return addYears(today, 5);
+      default:
+        return specificDate;
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -83,100 +98,41 @@ export default function ReminderDialog({
       return;
     }
 
+    const finalDate = getCalculatedDate();
+    if (!finalDate) {
+      toast({
+        title: "Error",
+        description: "Selecciona una fecha para el recordatorio",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     try {
-      const reminders = [];
-
-      if (reminderType === 'specific') {
-        if (!specificDate) {
-          toast({
-            title: "Error",
-            description: "Selecciona una fecha para el recordatorio",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        // Set time to 9:00 AM
-        const reminderDate = setHours(startOfDay(specificDate), 9);
-        reminders.push({
+      // Set time to 9:00 AM
+      const reminderDate = setHours(startOfDay(finalDate), 9);
+      
+      const { error } = await supabase
+        .from('renewal_reminders')
+        .insert([{
           client_id: effectiveClient.id,
           reminder_date: reminderDate.toISOString(),
           notes: notes || null,
           created_by: user.id
-        });
-      } else {
-        if (!startDate) {
-          toast({
-            title: "Error",
-            description: "Selecciona una fecha de inicio",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        let baseDate = startOfDay(startDate);
-        
-        // For weekly, always start on Monday at 9 AM
-        if (reminderType === 'weekly') {
-          const dayOfWeek = baseDate.getDay();
-          const daysToMonday = dayOfWeek === 0 ? 1 : 1 - dayOfWeek;
-          baseDate = addWeeks(baseDate, daysToMonday >= 0 ? 0 : 1);
-          if (daysToMonday > 0) {
-            baseDate = new Date(baseDate.getTime() + daysToMonday * 24 * 60 * 60 * 1000);
-          }
-        }
-        // For monthly, biannual and yearly, set to day 1 at 9 AM
-        else if (reminderType === 'monthly') {
-          baseDate = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
-        } else if (reminderType === 'biannual') {
-          baseDate = new Date(baseDate.getFullYear(), baseDate.getMonth(), 1);
-        } else if (reminderType === 'yearly') {
-          baseDate = new Date(baseDate.getFullYear(), 0, 1);
-        }
-
-        // Set time to 9:00 AM
-        baseDate = setHours(baseDate, 9);
-
-        for (let i = 0; i < occurrences; i++) {
-          let reminderDate = baseDate;
-          
-          if (reminderType === 'weekly') {
-            reminderDate = addWeeks(baseDate, i);
-          } else if (reminderType === 'monthly') {
-            reminderDate = addMonths(baseDate, i);
-          } else if (reminderType === 'biannual') {
-            reminderDate = addMonths(baseDate, i * 6);
-          } else if (reminderType === 'yearly') {
-            reminderDate = addYears(baseDate, i);
-          }
-
-          reminders.push({
-            client_id: effectiveClient.id,
-            reminder_date: reminderDate.toISOString(),
-            notes: notes || null,
-            created_by: user.id
-          });
-        }
-      }
-
-      const { error } = await supabase
-        .from('renewal_reminders')
-        .insert(reminders);
+        }]);
 
       if (error) throw error;
 
       toast({
         title: "Recordatorio creado",
-        description: `Se ${reminders.length > 1 ? 'han creado' : 'ha creado'} ${reminders.length} recordatorio${reminders.length > 1 ? 's' : ''} para ${effectiveClient.name}`,
+        description: `Se ha creado el recordatorio para ${effectiveClient.name}`,
       });
 
       onReminderCreated();
       onOpenChange(false);
       setReminderType('specific');
       setSpecificDate(undefined);
-      setStartDate(undefined);
-      setOccurrences(12);
       setNotes('');
       setSelectedClient(null);
       setClientSearch('');
@@ -194,10 +150,10 @@ export default function ReminderDialog({
 
   const typeLabels = {
     specific: 'Fecha específica',
-    weekly: 'Semanal (lunes a las 09:00)',
-    monthly: 'Mensual (día 1 a las 09:00)',
-    biannual: 'Cada 6 meses (día 1 a las 09:00)',
-    yearly: 'Anual (1 enero a las 09:00)'
+    tomorrow: 'Al día siguiente',
+    six_months: 'Dentro de 6 meses',
+    eleven_months: 'Dentro de 11 meses',
+    five_years: 'Dentro de 5 años'
   };
 
   const filteredClients = clients.filter(client =>
@@ -283,22 +239,22 @@ export default function ReminderDialog({
             </Select>
           </div>
 
-          {reminderType === 'specific' ? (
-            <div className="space-y-2">
-              <Label>Fecha del recordatorio</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !specificDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {specificDate ? format(specificDate, 'PPP', { locale: es }) : 'Seleccionar fecha'}
-                  </Button>
-                </PopoverTrigger>
+          <div className="space-y-2">
+            <Label>Fecha del recordatorio</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !getCalculatedDate() && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {getCalculatedDate() ? format(getCalculatedDate()!, 'PPP', { locale: es }) : 'Seleccionar fecha'}
+                </Button>
+              </PopoverTrigger>
+              {reminderType === 'specific' && (
                 <PopoverContent className="w-auto p-0" align="start">
                   <Calendar
                     mode="single"
@@ -309,51 +265,14 @@ export default function ReminderDialog({
                     className="p-3 pointer-events-auto"
                   />
                 </PopoverContent>
-              </Popover>
-            </div>
-          ) : (
-            <>
-              <div className="space-y-2">
-                <Label>Fecha de inicio</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !startDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {startDate ? format(startDate, 'PPP', { locale: es }) : 'Seleccionar fecha'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={startDate}
-                      onSelect={setStartDate}
-                      disabled={(date) => date < new Date()}
-                      initialFocus
-                      className="p-3 pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="occurrences">Número de ocurrencias</Label>
-                <Input
-                  id="occurrences"
-                  type="number"
-                  min="1"
-                  max="100"
-                  value={occurrences}
-                  onChange={(e) => setOccurrences(parseInt(e.target.value) || 1)}
-                />
-              </div>
-            </>
-          )}
+              )}
+            </Popover>
+            {reminderType !== 'specific' && (
+              <p className="text-sm text-muted-foreground">
+                Fecha automáticamente calculada basada en la selección
+              </p>
+            )}
+          </div>
 
           <div className="space-y-2">
             <Label htmlFor="notes">Notas (opcional)</Label>
