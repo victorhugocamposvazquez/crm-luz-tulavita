@@ -219,7 +219,15 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
   };
 
   const handleCreateVisit = async () => {
-    if (!visitCreationDialog.reminder || !selectedCommercial || !selectedCompany) return;
+    console.log('🚀 INICIANDO handleCreateVisit');
+    console.log('Dialog state:', visitCreationDialog);
+    console.log('Selected commercial:', selectedCommercial);
+    console.log('Selected company:', selectedCompany);
+
+    if (!visitCreationDialog.reminder || !selectedCommercial || !selectedCompany) {
+      console.log('❌ Faltan datos requeridos');
+      return;
+    }
 
     try {
       // Prepare notes from reminder
