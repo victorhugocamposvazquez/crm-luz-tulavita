@@ -226,8 +226,12 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
       const reminderNotes = visitCreationDialog.reminder.notes || '';
       const visitNotes = reminderNotes ? `${reminderNotes}\n\n--\n\n` : '--\n\n';
 
-      // Create approved and in_progress visit
-      const { error: visitError } = await supabase
+      console.log('DEBUG - Original reminder notes:', visitCreationDialog.reminder.notes);
+      console.log('DEBUG - Processed reminder notes:', reminderNotes);
+      console.log('DEBUG - Final visit notes:', visitNotes);
+
+      // Create approved and in_progress visit with select to get the created record
+      const { data: createdVisit, error: visitError } = await supabase
         .from('visits')
         .insert({
           client_id: clientId,
@@ -237,9 +241,13 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
           approval_status: 'approved',
           notes: visitNotes,
           visit_date: new Date().toISOString()
-        });
+        })
+        .select()
+        .single();
 
       if (visitError) throw visitError;
+
+      console.log('DEBUG - Created visit with notes:', createdVisit?.notes);
 
       // Delete reminder after creating visit (without confirmation)
       await handleDelete(visitCreationDialog.reminder.id, false);
