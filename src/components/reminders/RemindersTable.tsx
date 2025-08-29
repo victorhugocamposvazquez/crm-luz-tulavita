@@ -219,6 +219,9 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
   };
 
   const handleCreateVisit = async () => {
+    console.log('🔥🔥🔥 SUPER MEGA LOG DE PRUEBA - SI VES ESTO EL CÓDIGO SE ACTUALIZÓ 🔥🔥🔥');
+    alert('FUNCIÓN EJECUTADA - BORRAR ESTE ALERT');
+    
     console.log('🚀 INICIANDO handleCreateVisit');
     console.log('Dialog state:', visitCreationDialog);
     console.log('Selected commercial:', selectedCommercial);
