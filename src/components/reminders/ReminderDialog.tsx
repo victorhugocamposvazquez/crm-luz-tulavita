@@ -84,6 +84,14 @@ export default function ReminderDialog({
     }
   };
 
+  // Update specificDate when reminder type changes
+  useEffect(() => {
+    if (reminderType !== 'specific') {
+      const calculatedDate = getCalculatedDate();
+      setSpecificDate(calculatedDate);
+    }
+  }, [reminderType]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -98,7 +106,7 @@ export default function ReminderDialog({
       return;
     }
 
-    const finalDate = getCalculatedDate();
+    const finalDate = specificDate;
     if (!finalDate) {
       toast({
         title: "Error",
@@ -247,31 +255,24 @@ export default function ReminderDialog({
                   variant="outline"
                   className={cn(
                     "w-full justify-start text-left font-normal",
-                    !getCalculatedDate() && "text-muted-foreground"
+                    !specificDate && "text-muted-foreground"
                   )}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {getCalculatedDate() ? format(getCalculatedDate()!, 'PPP', { locale: es }) : 'Seleccionar fecha'}
+                  {specificDate ? format(specificDate, 'PPP', { locale: es }) : 'Seleccionar fecha'}
                 </Button>
               </PopoverTrigger>
-              {reminderType === 'specific' && (
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={specificDate}
-                    onSelect={setSpecificDate}
-                    disabled={(date) => date < new Date()}
-                    initialFocus
-                    className="p-3 pointer-events-auto"
-                  />
-                </PopoverContent>
-              )}
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={specificDate}
+                  onSelect={setSpecificDate}
+                  disabled={(date) => date < new Date()}
+                  initialFocus
+                  className="p-3 pointer-events-auto"
+                />
+              </PopoverContent>
             </Popover>
-            {reminderType !== 'specific' && (
-              <p className="text-sm text-muted-foreground">
-                Fecha automáticamente calculada basada en la selección
-              </p>
-            )}
           </div>
 
           <div className="space-y-2">
