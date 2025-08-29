@@ -231,7 +231,7 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
           company_id: selectedCompany,
           status: 'in_progress',
           approval_status: 'approved',
-          notes: '',
+          notes: visitCreationDialog.reminder.notes ? `${visitCreationDialog.reminder.notes}\n\n--\n\n` : '--\n\n',
           visit_date: new Date().toISOString()
         })
         .select()
