@@ -45,7 +45,7 @@ export default function ClientFilters({ filters, onFilterChange, onClearFilters 
           placeholder="Nombre..."
           value={filters.nombre}
           onChange={(e) => onFilterChange('nombre', e.target.value)}
-          className="h-8 text-sm col-span-3"
+          className="h-8 text-sm col-span-2"
         />
         
         <Input
@@ -84,11 +84,11 @@ export default function ClientFilters({ filters, onFilterChange, onClearFilters 
         />
 
         <Select value={filters.status || "all"} onValueChange={(value) => onFilterChange('status', value === 'all' ? '' : value)}>
-          <SelectTrigger className="h-8 text-sm col-span-1">
+          <SelectTrigger className="h-8 text-sm col-span-2">
             <SelectValue placeholder="Estado..." />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="all">Todos los estados</SelectItem>
             <SelectItem value="active">Activo</SelectItem>
             <SelectItem value="inactive">Inactivo</SelectItem>
           </SelectContent>
