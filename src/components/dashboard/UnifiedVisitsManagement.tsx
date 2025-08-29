@@ -18,6 +18,8 @@ interface Client {
   nombre_apellidos: string;
   dni: string;
   direccion: string;
+  localidad: string;
+  codigo_postal: string;
   telefono1?: string;
   telefono2?: string;
   email?: string;
@@ -89,6 +91,8 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
     nombre_apellidos: '',
     dni: '',
     direccion: '',
+    localidad: '',
+    codigo_postal: '',
     telefono1: '',
     telefono2: '',
     email: '',
@@ -703,10 +707,10 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
   };
 
   const handleCreateClient = async () => {
-    if (!clientData.nombre_apellidos || !clientData.direccion) {
+    if (!clientData.nombre_apellidos || !clientData.direccion || !clientData.localidad || !clientData.codigo_postal) {
       toast({
         title: "Error",
-        description: "Completa los campos obligatorios",
+        description: "Completa los campos obligatorios (Nombre, Dirección, Localidad y Código Postal)",
         variant: "destructive"
       });
       return;
@@ -1120,6 +1124,23 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
           ...prev,
           direccion: e.target.value
         }))} required />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="localidad">Localidad *</Label>
+            <Input id="localidad" value={clientData.localidad} onChange={e => setClientData(prev => ({
+            ...prev,
+            localidad: e.target.value
+          }))} required />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="codigo_postal">Código Postal *</Label>
+            <Input id="codigo_postal" value={clientData.codigo_postal} onChange={e => setClientData(prev => ({
+            ...prev,
+            codigo_postal: e.target.value
+          }))} required />
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">

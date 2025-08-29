@@ -23,11 +23,13 @@ import ReminderDialog from '@/components/reminders/ReminderDialog';
 interface Client {
   id: string;
   nombre_apellidos: string;
-  dni?: string;
   direccion: string;
+  localidad?: string;
+  codigo_postal?: string;
   telefono1?: string;
   telefono2?: string;
   email?: string;
+  dni?: string;
   latitude?: number;
   longitude?: number;
   created_at: string;
@@ -170,6 +172,8 @@ export default function ClientManagement() {
       nombre_apellidos: formData.get('nombre_apellidos') as string,
       dni: formData.get('dni') as string || null,
       direccion: formData.get('direccion') as string,
+      localidad: formData.get('localidad') as string,
+      codigo_postal: formData.get('codigo_postal') as string,
       telefono1: formData.get('telefono1') as string || null,
       telefono2: formData.get('telefono2') as string || null,
       email: formData.get('email') as string || null,
@@ -503,6 +507,26 @@ export default function ClientManagement() {
                       defaultValue={editingClient?.direccion || ''}
                       required 
                     />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="localidad">Localidad *</Label>
+                      <Input 
+                        id="localidad" 
+                        name="localidad" 
+                        defaultValue={editingClient?.localidad || ''}
+                        required 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="codigo_postal">Código Postal *</Label>
+                      <Input 
+                        id="codigo_postal" 
+                        name="codigo_postal" 
+                        defaultValue={editingClient?.codigo_postal || ''}
+                        required 
+                      />
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
