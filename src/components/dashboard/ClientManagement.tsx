@@ -697,35 +697,20 @@ export default function ClientManagement() {
                           const parts = [client.direccion];
                           if (client.localidad) parts.push(client.localidad);
                           if (client.codigo_postal) parts.push(client.codigo_postal);
-                          const fullAddress = parts.join(', ');
+                          const fullAddress = parts.filter(part => part?.trim()).join(', ');
                           
-                          // Si tiene coordenadas, hacer enlace con coordenadas
-                          if (client.latitude && client.longitude) {
-                            return (
-                              <a
-                                href={`https://www.google.com/maps?q=${client.latitude},${client.longitude}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-primary hover:underline cursor-pointer"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                {fullAddress}
-                              </a>
-                            );
-                          } else {
-                            // Sin coordenadas, enlace con dirección de texto
-                            return (
-                              <a
-                                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-primary hover:underline cursor-pointer"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                {fullAddress}
-                              </a>
-                            );
-                          }
+                          // Usar siempre la dirección completa para Google Maps
+                          return (
+                            <a
+                              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline cursor-pointer"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {fullAddress}
+                            </a>
+                          );
                         })()}
                       </TableCell>
                      <TableCell className="max-w-[150px]">

@@ -88,7 +88,7 @@ export default function ClientFilters({ filters, onFilterChange, onClearFilters 
             <SelectValue placeholder="Estado..." />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">Todos los estados</SelectItem>
+            <SelectItem value="all">Todos</SelectItem>
             <SelectItem value="active">Activo</SelectItem>
             <SelectItem value="inactive">Inactivo</SelectItem>
           </SelectContent>
