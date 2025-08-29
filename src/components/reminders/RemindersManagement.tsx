@@ -316,7 +316,7 @@ export default function RemindersManagement() {
           company_id: selectedCompany,
           status: 'in_progress',
           approval_status: 'approved',
-          notes: '',
+          notes: visitCreationDialog.reminder.notes || '',
           visit_date: new Date().toISOString()
         })
         .select()
