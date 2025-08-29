@@ -219,27 +219,12 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
   };
 
   const handleCreateVisit = async () => {
-    console.log('🔥🔥🔥 SUPER MEGA LOG DE PRUEBA - SI VES ESTO EL CÓDIGO SE ACTUALIZÓ 🔥🔥🔥');
-    alert('FUNCIÓN EJECUTADA - BORRAR ESTE ALERT');
-    
-    console.log('🚀 INICIANDO handleCreateVisit');
-    console.log('Dialog state:', visitCreationDialog);
-    console.log('Selected commercial:', selectedCommercial);
-    console.log('Selected company:', selectedCompany);
-
-    if (!visitCreationDialog.reminder || !selectedCommercial || !selectedCompany) {
-      console.log('❌ Faltan datos requeridos');
-      return;
-    }
+    if (!visitCreationDialog.reminder || !selectedCommercial || !selectedCompany) return;
 
     try {
       // Prepare notes from reminder
       const reminderNotes = visitCreationDialog.reminder.notes || '';
       const visitNotes = reminderNotes ? `${reminderNotes}\n\n--\n\n` : '--\n\n';
-
-      console.log('DEBUG - Original reminder notes:', visitCreationDialog.reminder.notes);
-      console.log('DEBUG - Processed reminder notes:', reminderNotes);
-      console.log('DEBUG - Final visit notes:', visitNotes);
 
       // Create approved and in_progress visit with select to get the created record
       const { data: createdVisit, error: visitError } = await supabase
@@ -257,8 +242,6 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
         .single();
 
       if (visitError) throw visitError;
-
-      console.log('DEBUG - Created visit with notes:', createdVisit?.notes);
 
       // Delete reminder after creating visit (without confirmation)
       await handleDelete(visitCreationDialog.reminder.id, false);
