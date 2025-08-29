@@ -222,6 +222,16 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
     if (!visitCreationDialog.reminder || !selectedCommercial || !selectedCompany) return;
 
     try {
+      // Prepare notes from reminder
+      const reminderNotes = visitCreationDialog.reminder.notes || '';
+      const visitNotes = reminderNotes ? `${reminderNotes}\n\n--\n\n` : '--\n\n';
+      
+      console.log('Creating visit with notes from reminder:', {
+        reminderNotes,
+        visitNotes,
+        reminder: visitCreationDialog.reminder
+      });
+
       // Create approved and in_progress visit
       const { data: visitData, error: visitError } = await supabase
         .from('visits')
@@ -231,13 +241,15 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
           company_id: selectedCompany,
           status: 'in_progress',
           approval_status: 'approved',
-          notes: visitCreationDialog.reminder.notes ? `${visitCreationDialog.reminder.notes}\n\n--\n\n` : '--\n\n',
+          notes: visitNotes,
           visit_date: new Date().toISOString()
         })
         .select()
         .single();
 
       if (visitError) throw visitError;
+
+      console.log('Visit created successfully:', visitData);
 
       // Delete reminder after creating visit (without confirmation)
       await handleDelete(visitCreationDialog.reminder.id, false);
