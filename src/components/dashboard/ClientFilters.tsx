@@ -40,51 +40,51 @@ export default function ClientFilters({ filters, onFilterChange, onClearFilters 
         )}
       </div>
       
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-12 gap-2">
         <Input
           placeholder="Nombre..."
           value={filters.nombre}
           onChange={(e) => onFilterChange('nombre', e.target.value)}
-          className="h-8 text-sm"
+          className="h-8 text-sm col-span-3"
         />
         
         <Input
           placeholder="DNI..."
           value={filters.dni}
           onChange={(e) => onFilterChange('dni', e.target.value)}
-          className="h-8 text-sm"
+          className="h-8 text-sm col-span-1"
         />
         
         <Input
           placeholder="Localidad..."
           value={filters.localidad}
           onChange={(e) => onFilterChange('localidad', e.target.value)}
-          className="h-8 text-sm"
+          className="h-8 text-sm col-span-2"
         />
         
         <Input
           placeholder="CP..."
           value={filters.codigo_postal}
           onChange={(e) => onFilterChange('codigo_postal', e.target.value)}
-          className="h-8 text-sm"
+          className="h-8 text-sm col-span-1"
         />
         
         <Input
           placeholder="Teléfono..."
           value={filters.telefono}
           onChange={(e) => onFilterChange('telefono', e.target.value)}
-          className="h-8 text-sm"
+          className="h-8 text-sm col-span-2"
         />
         
         <Input
           placeholder="Email..."
           value={filters.email}
           onChange={(e) => onFilterChange('email', e.target.value)}
-          className="h-8 text-sm"
+          className="h-8 text-sm col-span-2"
         />
 
         <Select value={filters.status || "all"} onValueChange={(value) => onFilterChange('status', value === 'all' ? '' : value)}>
-          <SelectTrigger className="h-8 text-sm">
+          <SelectTrigger className="h-8 text-sm col-span-1">
             <SelectValue placeholder="Estado..." />
           </SelectTrigger>
           <SelectContent>
