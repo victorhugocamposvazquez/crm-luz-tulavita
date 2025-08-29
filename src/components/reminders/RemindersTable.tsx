@@ -446,7 +446,16 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
             <Button variant="outline" onClick={() => setVisitCreationDialog({ open: false, reminder: null })}>
               Cancelar
             </Button>
-            <Button onClick={handleCreateVisit} disabled={!selectedCommercial || !selectedCompany}>
+            <Button 
+              onClick={() => {
+                console.log('🎯 BOTÓN CREAR VISITA CLICKEADO');
+                console.log('Comercial seleccionado:', selectedCommercial);
+                console.log('Empresa seleccionada:', selectedCompany);
+                console.log('Botón habilitado:', !(!selectedCommercial || !selectedCompany));
+                handleCreateVisit();
+              }} 
+              disabled={!selectedCommercial || !selectedCompany}
+            >
               Crear visita
             </Button>
           </DialogFooter>
