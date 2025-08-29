@@ -1366,6 +1366,9 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
                 placeholder="Describe cómo fue la visita..." 
                 disabled={isReadOnly}
                 required
+                rows={8}
+                autoFocus
+                className="min-h-[200px]"
               />
             </div>
 
