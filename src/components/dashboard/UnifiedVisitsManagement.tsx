@@ -24,6 +24,8 @@ interface Client {
   telefono2?: string;
   email?: string;
   note?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 interface Company {
@@ -1232,7 +1234,37 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <p className="text-green-700 font-medium">{existingClient.nombre_apellidos}</p>
-                  <p className="text-green-600">{existingClient.direccion}</p>
+                  {(() => {
+                    const fullAddress = [existingClient.direccion, existingClient.localidad, existingClient.codigo_postal]
+                      .filter(Boolean)
+                      .join(', ');
+                    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`;
+                    return (
+                      <p className="text-green-600">
+                        <a 
+                          href={mapsUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="hover:underline"
+                        >
+                          {fullAddress}
+                        </a>
+                      </p>
+                    );
+                  })()}
+                  {existingClient.latitude && existingClient.longitude && (
+                    <p className="text-green-600">
+                      Coordenadas: 
+                      <a 
+                        href={`https://www.google.com/maps/search/?api=1&query=${existingClient.latitude},${existingClient.longitude}`}
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="hover:underline ml-1"
+                      >
+                        {formatCoordinates(existingClient.latitude, existingClient.longitude)}
+                      </a>
+                    </p>
+                  )}
                   {existingClient.dni && <p className="text-green-600">DNI: {existingClient.dni}</p>}
                   {existingClient.telefono1 && <p className="text-green-600">Tel: {existingClient.telefono1}</p>}
                   {existingClient.telefono2 && <p className="text-green-600">Tel 2: {existingClient.telefono2}</p>}
