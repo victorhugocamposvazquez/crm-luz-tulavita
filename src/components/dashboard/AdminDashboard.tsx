@@ -17,6 +17,7 @@ import { format, subDays, startOfMonth, endOfMonth, eachMonthOfInterval, subMont
 import { es } from 'date-fns/locale';
 import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
 import ReminderDialog from '@/components/reminders/ReminderDialog';
+import ClientPagination from '@/components/dashboard/ClientPagination';
 
 interface Sale {
   id: string;
@@ -86,6 +87,13 @@ export default function AdminDashboard() {
   const [commercials, setCommercials] = useState<any[]>([]);
   const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
   const [selectedClientForReminder, setSelectedClientForReminder] = useState<{id: string, name: string} | null>(null);
+  
+  // Pagination state for completed visits
+  const [completedVisitsPagination, setCompletedVisitsPagination] = useState({
+    currentPage: 1,
+    pageSize: 10,
+    totalItems: 0
+  });
 
   useEffect(() => {
     if (user) {
@@ -460,6 +468,22 @@ export default function AdminDashboard() {
   const completedVisits = visits.filter(visit => visit.status === 'completed');
   const inProgressVisits = visits.filter(visit => visit.status === 'in_progress');
   const rejectedVisits = visits.filter(visit => visit.approval_status === 'rejected');
+  
+  // Paginated completed visits
+  const paginatedCompletedVisits = completedVisits.slice(
+    (completedVisitsPagination.currentPage - 1) * completedVisitsPagination.pageSize,
+    completedVisitsPagination.currentPage * completedVisitsPagination.pageSize
+  );
+  
+  const totalCompletedVisitsPages = Math.ceil(completedVisits.length / completedVisitsPagination.pageSize);
+  
+  // Update pagination total items if necessary
+  if (completedVisits.length !== completedVisitsPagination.totalItems) {
+    setCompletedVisitsPagination(prev => ({
+      ...prev,
+      totalItems: completedVisits.length
+    }));
+  }
   
   // Status distribution data for all visit statuses
   const statusLabels = {
@@ -901,7 +925,7 @@ export default function AdminDashboard() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {completedVisits.map((visit) => {
+                {paginatedCompletedVisits.map((visit) => {
                   const totalSalesAmount = visit.sales?.reduce((sum, sale) => sum + sale.amount, 0) || 0;
                   const totalCommission = visit.sales?.reduce((sum, sale) => sum + sale.commission_amount, 0) || 0;
                   
@@ -972,15 +996,28 @@ export default function AdminDashboard() {
                     </TableRow>
                   );
                 })}
-                {completedVisits.length === 0 && (
+                {paginatedCompletedVisits.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={9} className="text-center text-muted-foreground">
-                      No hay visitas completadas en los últimos 30 días
+                      {completedVisits.length === 0 ? "No hay visitas completadas en los últimos 30 días" : "No hay más visitas en esta página"}
                     </TableCell>
                   </TableRow>
                 )}
               </TableBody>
             </Table>
+            {/* Pagination for completed visits */}
+            {completedVisits.length > completedVisitsPagination.pageSize && (
+              <div className="mt-4">
+                <ClientPagination
+                  currentPage={completedVisitsPagination.currentPage}
+                  totalPages={totalCompletedVisitsPages}
+                  pageSize={completedVisitsPagination.pageSize}
+                  totalItems={completedVisits.length}
+                  onPageChange={(page) => setCompletedVisitsPagination(prev => ({ ...prev, currentPage: page }))}
+                  onPageSizeChange={(pageSize) => setCompletedVisitsPagination(prev => ({ ...prev, pageSize, currentPage: 1 }))}
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

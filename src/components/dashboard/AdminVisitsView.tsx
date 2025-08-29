@@ -11,6 +11,7 @@ import { toast } from '@/hooks/use-toast';
 import VisitsTable from '@/components/visits/VisitsTable';
 import VisitDetailsDialog from '@/components/visits/VisitDetailsDialog';
 import { calculateCommission } from '@/lib/commission';
+import ClientPagination from '@/components/dashboard/ClientPagination';
 
 interface Visit {
   id: string;
@@ -96,6 +97,13 @@ export default function AdminVisitsView() {
     startDate: new Date().toISOString().split('T')[0], // Fecha de hoy por defecto
     endDate: '',
     status: '' // Nuevo filtro de estado
+  });
+  
+  // Pagination state for visits view
+  const [visitsPagination, setVisitsPagination] = useState({
+    currentPage: 1,
+    pageSize: 20,
+    totalItems: 0
   });
 
   // Redirect if not admin
@@ -248,6 +256,12 @@ export default function AdminVisitsView() {
       }
 
       setVisits(enrichedVisits as Visit[]);
+      
+      // Update pagination total items
+      setVisitsPagination(prev => ({
+        ...prev,
+        totalItems: enrichedVisits.length
+      }));
     } catch (error) {
       console.error('Error fetching visits:', error);
       toast({
@@ -302,6 +316,14 @@ export default function AdminVisitsView() {
   if (userRole?.role !== 'admin') {
     return null;
   }
+
+  // Paginated visits
+  const paginatedVisits = visits.slice(
+    (visitsPagination.currentPage - 1) * visitsPagination.pageSize,
+    visitsPagination.currentPage * visitsPagination.pageSize
+  );
+  
+  const totalPages = Math.ceil(visits.length / visitsPagination.pageSize);
 
   return (
     <div className="space-y-6">
@@ -406,13 +428,26 @@ export default function AdminVisitsView() {
         </CardHeader>
         <CardContent>
           <VisitsTable
-            visits={visits as any}
+            visits={paginatedVisits as any}
             sales={sales}
             onViewVisit={handleViewVisit as any}
             loading={loading}
             showClientColumns={true}
             emptyMessage="No se encontraron visitas con los filtros aplicados"
           />
+          {/* Pagination for visits */}
+          {visits.length > visitsPagination.pageSize && (
+            <div className="mt-4">
+              <ClientPagination
+                currentPage={visitsPagination.currentPage}
+                totalPages={totalPages}
+                pageSize={visitsPagination.pageSize}
+                totalItems={visits.length}
+                onPageChange={(page) => setVisitsPagination(prev => ({ ...prev, currentPage: page }))}
+                onPageSizeChange={(pageSize) => setVisitsPagination(prev => ({ ...prev, pageSize, currentPage: 1 }))}
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
 
