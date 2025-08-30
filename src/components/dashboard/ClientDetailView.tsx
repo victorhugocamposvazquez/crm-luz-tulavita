@@ -369,28 +369,20 @@ const fetchVisits = async () => {
   }, [] as Array<{ month: string; monthLabel: string; amount: number; count: number }>)
   .sort((a, b) => a.month.localeCompare(b.month));
 
-  const productData = sales.flatMap(sale => sale.sale_lines || [])
-    .flatMap(line => line.products.map(product => ({ 
-      ...product, 
-      quantity: line.quantity, 
-      unit_price: line.unit_price 
-    })))
-    .reduce((acc, product) => {
-      const existing = acc.find(item => item.name === product.product_name);
-      if (existing) {
-        existing.quantity += product.quantity;
-        existing.revenue += product.quantity * product.unit_price;
-      } else {
-        acc.push({
-          name: product.product_name,
-          quantity: product.quantity,
-          revenue: product.quantity * product.unit_price
-        });
-      }
-      return acc;
-    }, [] as Array<{ name: string; quantity: number; revenue: number }>)
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 5);
+  const productData = sales.flatMap(sale => 
+    (sale.sale_lines || []).map(line => 
+      line.products.map(product => ({ 
+        name: product.product_name,
+        quantity: line.quantity, 
+        unit_price: line.unit_price,
+        revenue: line.quantity * line.unit_price,
+        saleId: sale.id,
+        saleDate: sale.sale_date
+      }))
+    ).flat()
+  )
+  .sort((a, b) => b.revenue - a.revenue)
+  .slice(0, 10); // Aumentamos el límite para mostrar más productos individuales
 
   if (loading) {
     return (
