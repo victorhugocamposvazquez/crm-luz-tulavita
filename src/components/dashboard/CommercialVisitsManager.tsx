@@ -374,9 +374,16 @@ export default function CommercialVisitsManager() {
             sale_lines: []
           };
         }
+        
+        // Transform sale lines to match expected format
+        const transformedLines = (linesData || []).map(line => ({
+          ...line,
+          products: line.sale_lines_products || []
+        }));
+        
         return {
           ...sale,
-          sale_lines: linesData || []
+          sale_lines: transformedLines
         };
       }));
       setVisitSales(salesWithLines);

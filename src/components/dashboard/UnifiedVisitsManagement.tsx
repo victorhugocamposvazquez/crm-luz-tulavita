@@ -852,7 +852,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
     setSaleLines([...saleLines, {
       type: 'pack',
       products: [{ product_name: '' }],
-      quantity: 1,
+      quantity: 1, // Always 1 for packs
       unit_price: 0,
       financiada: false,
       transferencia: false,
@@ -1614,28 +1614,16 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
                             )}
                           </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label>Cantidad de Packs</Label>
-                            <Input 
-                              type="number" 
-                              min="1" 
-                              value={line.quantity} 
-                              onChange={e => updateSaleLine(index, 'quantity', parseInt(e.target.value) || 1)} 
-                              disabled={isReadOnly} 
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label>Precio Total del Pack</Label>
-                            <Input 
-                              type="number" 
-                              min="0" 
-                              step="0.01" 
-                              value={line.unit_price} 
-                              onChange={e => updateSaleLine(index, 'unit_price', parseFloat(e.target.value) || 0)} 
-                              disabled={isReadOnly} 
-                            />
-                          </div>
+                        <div className="space-y-2">
+                          <Label>Precio total del pack</Label>
+                          <Input 
+                            type="number" 
+                            min="0" 
+                            step="0.01" 
+                            value={line.unit_price} 
+                            onChange={e => updateSaleLine(index, 'unit_price', parseFloat(e.target.value) || 0)} 
+                            disabled={isReadOnly} 
+                          />
                         </div>
                       </div>
                     )}
