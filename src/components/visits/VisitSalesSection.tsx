@@ -6,7 +6,7 @@ interface Sale {
   amount: number;
   sale_date: string;
   sale_lines?: {
-    product_name: string;
+    products: { product_name: string }[];
     quantity: number;
     unit_price: number;
     financiada: boolean;
@@ -43,7 +43,7 @@ export default function VisitSalesSection({ visitSales }: VisitSalesSectionProps
                   <div key={index} className="text-xs space-y-1">
                     <div className="flex justify-between items-center">
                       <span className="text-muted-foreground">
-                        {line.quantity}x {line.product_name} - €{line.unit_price.toFixed(2)}
+                        {line.quantity}x ({line.products.map(p => p.product_name).join(', ') || 'Sin productos'}) - €{line.unit_price.toFixed(2)}
                       </span>
                     </div>
                     <div className="flex gap-3 text-xs">

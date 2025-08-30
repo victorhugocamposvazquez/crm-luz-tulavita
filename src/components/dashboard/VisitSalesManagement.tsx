@@ -50,7 +50,7 @@ interface Visit {
 
 interface SaleLine {
   id?: string;
-  product_name: string;
+  products: { product_name: string }[];
   quantity: number;
   unit_price: number;
   financiada: boolean;
@@ -108,7 +108,7 @@ export default function VisitSalesManagement() {
   const [editingVisit, setEditingVisit] = useState<Visit | null>(null);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
   const [activeTab, setActiveTab] = useState('visits');
-  const [saleLines, setSaleLines] = useState<SaleLine[]>([{ product_name: '', quantity: 1, unit_price: 0, financiada: false, transferencia: false, nulo: false }]);
+  const [saleLines, setSaleLines] = useState<SaleLine[]>([{ products: [], quantity: 1, unit_price: 0, financiada: false, transferencia: false, nulo: false }]);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
 
   const isAdmin = userRole?.role === 'admin';
@@ -231,15 +231,28 @@ export default function VisitSalesManagement() {
       return;
     }
 
-    // Obtener líneas de venta para cada venta
-    const salesWithLines = await Promise.all((data || []).map(async (sale) => {
-      const { data: lines } = await supabase
-        .from('sale_lines')
-        .select('*')
-        .eq('sale_id', sale.id);
-      
-      return { ...sale, sale_lines: lines || [] };
-    }));
+      // Obtener líneas de venta para cada venta con productos
+      const salesWithLines = await Promise.all((data || []).map(async (sale) => {
+        const { data: lines } = await supabase
+          .from('sale_lines')
+          .select(`
+            quantity, unit_price, financiada, transferencia, nulo,
+            sale_lines_products(product_name)
+          `)
+          .eq('sale_id', sale.id);
+        
+        return { 
+          ...sale, 
+          sale_lines: (lines || []).map(line => ({
+            products: line.sale_lines_products || [],
+            quantity: line.quantity,
+            unit_price: line.unit_price,
+            financiada: line.financiada,
+            transferencia: line.transferencia,
+            nulo: line.nulo
+          }))
+        };
+      }));
 
     setSales(salesWithLines);
   };
@@ -360,7 +373,12 @@ export default function VisitSalesManagement() {
     }
 
     // Validar que al menos haya una línea de producto
-    const validLines = saleLines.filter(line => line.product_name.trim() && line.quantity > 0 && line.unit_price > 0);
+    const validLines = saleLines.filter(line => 
+      line.products.length > 0 && 
+      line.products.some(p => p.product_name.trim()) && 
+      line.quantity > 0 && 
+      line.unit_price > 0
+    );
     if (validLines.length === 0) {
       toast({
         title: "Error",
@@ -465,7 +483,7 @@ export default function VisitSalesManagement() {
 
       setSaleDialogOpen(false);
       setEditingSale(null);
-      setSaleLines([{ product_name: '', quantity: 1, unit_price: 0, financiada: false, transferencia: false, nulo: false }]);
+      setSaleLines([{ products: [], quantity: 1, unit_price: 0, financiada: false, transferencia: false, nulo: false }]);
       await fetchSales();
     } catch (error: any) {
       console.error('Error saving sale:', error);
@@ -547,7 +565,7 @@ export default function VisitSalesManagement() {
   };
 
   const addSaleLine = () => {
-    setSaleLines([...saleLines, { product_name: '', quantity: 1, unit_price: 0, financiada: false, transferencia: false, nulo: false }]);
+    setSaleLines([...saleLines, { products: [], quantity: 1, unit_price: 0, financiada: false, transferencia: false, nulo: false }]);
   };
 
   const removeSaleLine = (index: number) => {
@@ -573,10 +591,10 @@ export default function VisitSalesManagement() {
   const openSaleDialog = (sale?: Sale) => {
     if (sale) {
       setEditingSale(sale);
-      setSaleLines(sale.sale_lines || [{ product_name: '', quantity: 1, unit_price: 0, financiada: false, transferencia: false, nulo: false }]);
+      setSaleLines(sale.sale_lines || [{ products: [], quantity: 1, unit_price: 0, financiada: false, transferencia: false, nulo: false }]);
     } else {
       setEditingSale(null);
-      setSaleLines([{ product_name: '', quantity: 1, unit_price: 0, financiada: false, transferencia: false, nulo: false }]);
+      setSaleLines([{ products: [], quantity: 1, unit_price: 0, financiada: false, transferencia: false, nulo: false }]);
     }
     setSaleDialogOpen(true);
   };
@@ -867,8 +885,12 @@ export default function VisitSalesManagement() {
                                 <Label className="text-xs">Producto</Label>
                                 <Input
                                   placeholder="Nombre del producto"
-                                  value={line.product_name}
-                                  onChange={(e) => updateSaleLine(index, 'product_name', e.target.value)}
+                                  value={line.products[0]?.product_name || ''}
+                                  onChange={(e) => {
+                                    const newProducts = line.products.length > 0 ? [...line.products] : [{ product_name: '' }];
+                                    newProducts[0] = { product_name: e.target.value };
+                                    updateSaleLine(index, 'products', newProducts);
+                                  }}
                                 />
                               </div>
                               <div className="col-span-2">

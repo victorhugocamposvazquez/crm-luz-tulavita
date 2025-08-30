@@ -57,7 +57,7 @@ interface Sale {
   commission_amount: number;
   visit_id: string;
   sale_lines?: {
-    product_name: string;
+    products: { product_name: string }[];
     quantity: number;
     unit_price: number;
     financiada: boolean;
@@ -157,7 +157,10 @@ export default function AdminVisitsView() {
       const salesWithLines = await Promise.all((salesData || []).map(async (sale) => {
         const { data: linesData, error: linesError } = await supabase
           .from('sale_lines')
-          .select('product_name, quantity, unit_price, financiada, transferencia, nulo')
+          .select(`
+            quantity, unit_price, financiada, transferencia, nulo,
+            sale_lines_products(product_name)
+          `)
           .eq('sale_id', sale.id);
 
         // Calculate commission using the new system
@@ -166,7 +169,14 @@ export default function AdminVisitsView() {
 
         return {
           ...sale,
-          sale_lines: linesError ? [] : (linesData || []),
+          sale_lines: linesError ? [] : (linesData || []).map(line => ({
+            products: line.sale_lines_products || [],
+            quantity: line.quantity,
+            unit_price: line.unit_price,
+            financiada: line.financiada,
+            transferencia: line.transferencia,
+            nulo: line.nulo
+          })),
           commission_amount: calculatedCommission
         };
       }));
