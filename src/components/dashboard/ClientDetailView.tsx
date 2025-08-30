@@ -370,19 +370,19 @@ const fetchVisits = async () => {
   .sort((a, b) => a.month.localeCompare(b.month));
 
   const productData = sales.flatMap(sale => 
-    (sale.sale_lines || []).map(line => 
-      line.products.map(product => ({ 
-        name: product.product_name,
-        quantity: line.quantity, 
-        unit_price: line.unit_price,
-        revenue: line.quantity * line.unit_price,
-        saleId: sale.id,
-        saleDate: sale.sale_date
-      }))
-    ).flat()
+    (sale.sale_lines || []).map((line, lineIndex) => ({
+      saleLineId: `${sale.id}-${lineIndex}`, // Usar un ID único basado en venta e índice
+      products: line.products,
+      quantity: line.quantity,
+      unit_price: line.unit_price,
+      revenue: line.quantity * line.unit_price,
+      saleId: sale.id,
+      saleDate: sale.sale_date,
+      isPack: line.products.length > 1
+    }))
   )
   .sort((a, b) => b.revenue - a.revenue)
-  .slice(0, 10); // Aumentamos el límite para mostrar más productos individuales
+  .slice(0, 10);
 
   if (loading) {
     return (
@@ -627,19 +627,35 @@ const fetchVisits = async () => {
                 <CardDescription>Productos vendidos con su coste total</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {productData.map((product, index) => (
-                    <div key={index} className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
-                      <div>
-                        <p className="font-medium">{product.name}</p>
-                        <p className="text-sm text-muted-foreground">Cantidad: {product.quantity}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold text-green-600">€{product.revenue.toFixed(2)}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                 <div className="space-y-3">
+                   {productData.map((item, index) => (
+                     <div key={index} className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
+                       <div>
+                         {item.isPack ? (
+                           // Pack: mostrar todos los productos
+                           <div>
+                             <p className="font-medium">Pack ({item.products.length} productos)</p>
+                             <div className="text-xs text-muted-foreground ml-2 space-y-1">
+                               {item.products.map((product, productIndex) => (
+                                 <div key={productIndex}>• {product.product_name}</div>
+                               ))}
+                             </div>
+                             <p className="text-sm text-muted-foreground">Cantidad: {item.quantity}</p>
+                           </div>
+                         ) : (
+                           // Producto individual
+                           <div>
+                             <p className="font-medium">{item.products[0]?.product_name || 'Sin nombre'}</p>
+                             <p className="text-sm text-muted-foreground">Cantidad: {item.quantity}</p>
+                           </div>
+                         )}
+                       </div>
+                       <div className="text-right">
+                         <p className="font-bold text-green-600">€{item.revenue.toFixed(2)}</p>
+                       </div>
+                     </div>
+                   ))}
+                 </div>
               </CardContent>
             </Card>
           )}
