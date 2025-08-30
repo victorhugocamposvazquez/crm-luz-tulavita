@@ -86,7 +86,7 @@ export default function CommercialVisitsManager() {
     completed: 0
   });
   useEffect(() => {
-    console.log('[CVM] MOUNT');
+    console.log('[CVM] MOUNT/RESUB for approval-updates. currentView:', currentView);
     fetchVisits();
     fetchCompanies();
     
@@ -102,8 +102,11 @@ export default function CommercialVisitsManager() {
         },
         (payload) => {
           console.log('Approval request updated:', payload);
-          // Refresh visits when any approval request is updated
-          fetchVisits();
+          if (currentView === 'list') {
+            fetchVisits();
+          } else {
+            console.log('[CVM] Skipping visits refresh (approval-updates) - user is in creation flow');
+          }
         }
       )
       .on(
@@ -115,17 +118,20 @@ export default function CommercialVisitsManager() {
         },
         (payload) => {
           console.log('Visit updated:', payload);
-          // Refresh visits when any visit is updated
-          fetchVisits();
+          if (currentView === 'list') {
+            fetchVisits();
+          } else {
+            console.log('[CVM] Skipping visits refresh (approval-updates visits) - user is in creation flow');
+          }
         }
       )
       .subscribe();
 
     return () => {
-      console.log('[CVM] UNMOUNT: removing approvalChannel');
+      console.log('[CVM] CLEANUP approval-updates: removing approvalChannel');
       supabase.removeChannel(approvalChannel);
     };
-  }, []);
+  }, [currentView]);
   useEffect(() => {
     const cleanup = setupRealtimeSubscription();
     console.log('[CVM] setupRealtimeSubscription called. currentView:', currentView, 'userId:', user?.id);
@@ -363,7 +369,10 @@ export default function CommercialVisitsManager() {
         const {
           data: linesData,
           error: linesError
-        } = await supabase.from('sale_lines').select('id, product_name, quantity, unit_price, line_total, financiada, transferencia, nulo').eq('sale_id', sale.id);
+        } = await supabase.from('sale_lines').select(`
+          id, quantity, unit_price, line_total, financiada, transferencia, nulo,
+          sale_lines_products(product_name)
+        `).eq('sale_id', sale.id);
         if (linesError) {
           console.error('Error fetching sale lines:', linesError);
           return {
@@ -371,9 +380,16 @@ export default function CommercialVisitsManager() {
             sale_lines: []
           };
         }
+        
+        // Transform sale lines to match expected format
+        const transformedLines = (linesData || []).map(line => ({
+          ...line,
+          products: line.sale_lines_products || []
+        }));
+        
         return {
           ...sale,
-          sale_lines: linesData || []
+          sale_lines: transformedLines
         };
       }));
       setVisitSales(salesWithLines);
@@ -676,8 +692,27 @@ export default function CommercialVisitsManager() {
                               {sale.sale_lines.slice(0, 3).map((line: any) => (
                                 <div key={line.id} className="text-xs space-y-1 mb-2">
                                   <div className="flex justify-between">
-                                    <span>{line.quantity}x {line.product_name} - €{line.unit_price}</span>
-                                    <span>€{line.line_total}</span>
+                                    <div>
+                                      {line.products && line.products.length > 1 ? (
+                                        // Pack: mostrar productos en líneas separadas
+                                        <div className="space-y-1">
+                                          <div className="font-medium">
+                                            {line.quantity}x Pack - €{line.unit_price}
+                                          </div>
+                                          {line.products.map((product: any, productIndex: number) => (
+                                            <div key={productIndex} className="ml-2 text-muted-foreground">
+                                              • {product.product_name || 'Sin nombre'}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        // Producto individual
+                                        <span>
+                                          {line.quantity}x {line.products?.[0]?.product_name || 'Sin producto'} - €{line.unit_price}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span>€{line.line_total || (line.quantity * line.unit_price)}</span>
                                   </div>
                                   <div className="flex gap-2 text-xs">
                                    <span className={`px-2 py-1 rounded ${line.financiada ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
@@ -686,7 +721,7 @@ export default function CommercialVisitsManager() {
                                    <span className={`px-2 py-1 rounded ${line.transferencia ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
                                      {line.transferencia ? '✓' : '✗'} Transferencia
                                    </span>
-                                   <span className={`px-2 py-1 rounded ${line.nulo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                   <span className={`px-2 py-1 rounded ${line.nulo ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600'}`}>
                                      {line.nulo ? '✓' : '✗'} Nulo
                                    </span>
                                   </div>

@@ -268,7 +268,6 @@ export type Database = {
           id: string
           line_total: number | null
           nulo: boolean
-          product_name: string
           quantity: number
           sale_id: string
           transferencia: boolean
@@ -281,7 +280,6 @@ export type Database = {
           id?: string
           line_total?: number | null
           nulo?: boolean
-          product_name: string
           quantity?: number
           sale_id: string
           transferencia?: boolean
@@ -294,14 +292,53 @@ export type Database = {
           id?: string
           line_total?: number | null
           nulo?: boolean
-          product_name?: string
           quantity?: number
           sale_id?: string
           transferencia?: boolean
           unit_price?: number
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_sale_lines_sale_id"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sale_lines_products: {
+        Row: {
+          created_at: string
+          id: string
+          product_name: string
+          sale_line_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          product_name: string
+          sale_line_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          product_name?: string
+          sale_line_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_sale_lines_products_sale_line_id"
+            columns: ["sale_line_id"]
+            isOneToOne: false
+            referencedRelation: "sale_lines"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales: {
         Row: {
@@ -357,17 +394,17 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "fk_sales_client_id"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "fk_sales_visit_id"
             columns: ["visit_id"]
             isOneToOne: true
             referencedRelation: "visits"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "sales_client_id_fkey"
-            columns: ["client_id"]
-            isOneToOne: false
-            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
           {

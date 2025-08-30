@@ -6,7 +6,7 @@ interface Sale {
   amount: number;
   sale_date: string;
   sale_lines?: {
-    product_name: string;
+    products: { product_name: string }[];
     quantity: number;
     unit_price: number;
     financiada: boolean;
@@ -40,23 +40,51 @@ export default function VisitSalesSection({ visitSales }: VisitSalesSectionProps
               <div className="mt-2">
                 <p className="text-xs font-medium text-muted-foreground">Productos:</p>
                 {sale.sale_lines.map((line, index: number) => (
-                  <div key={index} className="text-xs space-y-1">
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">
-                        {line.quantity}x {line.product_name} - €{line.unit_price.toFixed(2)}
-                      </span>
-                    </div>
-                    <div className="flex gap-3 text-xs">
-                      <span className={`px-2 py-1 rounded ${line.financiada ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                        {line.financiada ? '✓' : '✗'} Financiada
-                      </span>
-                      <span className={`px-2 py-1 rounded ${line.transferencia ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                        {line.transferencia ? '✓' : '✗'} Transferencia
-                      </span>
-                      <span className={`px-2 py-1 rounded ${line.nulo ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600'}`}>
-                        {line.nulo ? '✓' : '✗'} Nulo
-                      </span>
-                    </div>
+                  <div key={index} className="text-xs space-y-2">
+                    {line.products && line.products.length > 1 ? (
+                      // Pack: mostrar productos en filas separadas
+                      <div className="space-y-1">
+                        {line.products.map((product, productIndex: number) => (
+                          <div key={productIndex} className="text-muted-foreground">
+                            {product.product_name || 'Sin nombre'}
+                          </div>
+                        ))}
+                        <div className="flex gap-3 mt-2">
+                          <span className={`px-2 py-1 rounded ${line.financiada ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                            {line.financiada ? '✓' : '✗'} Financiada
+                          </span>
+                          <span className={`px-2 py-1 rounded ${line.transferencia ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                            {line.transferencia ? '✓' : '✗'} Transferencia
+                          </span>
+                          <span className={`px-2 py-1 rounded ${line.nulo ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600'}`}>
+                            {line.nulo ? '✓' : '✗'} Nulo
+                          </span>
+                        </div>
+                        <div className="text-right font-medium text-sm">
+                          €{line.unit_price.toFixed(2)}
+                        </div>
+                      </div>
+                    ) : (
+                      // Producto individual
+                      <div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">
+                            {line.quantity}x ({line.products.map(p => p.product_name).join(', ') || 'Sin productos'}) - €{line.unit_price.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="flex gap-3 mt-1">
+                          <span className={`px-2 py-1 rounded ${line.financiada ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                            {line.financiada ? '✓' : '✗'} Financiada
+                          </span>
+                          <span className={`px-2 py-1 rounded ${line.transferencia ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                            {line.transferencia ? '✓' : '✗'} Transferencia
+                          </span>
+                          <span className={`px-2 py-1 rounded ${line.nulo ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600'}`}>
+                            {line.nulo ? '✓' : '✗'} Nulo
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

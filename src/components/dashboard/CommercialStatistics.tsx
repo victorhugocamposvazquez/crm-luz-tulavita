@@ -223,7 +223,10 @@ export default function CommercialStatistics() {
       const salesWithLines = await Promise.all((salesData || []).map(async sale => {
         const { data: linesData, error: linesError } = await supabase
           .from('sale_lines')
-          .select('id, product_name, quantity, unit_price, line_total')
+          .select(`
+            id, quantity, unit_price, line_total, financiada, transferencia, nulo,
+            sale_lines_products(product_name)
+          `)
           .eq('sale_id', sale.id);
         
         if (linesError) {
@@ -570,64 +573,70 @@ export default function CommercialStatistics() {
                 </p>
               </div>
 
-              {/* Resumen de Ventas */}
-              <div className="border-t pt-4">
-                <Label>Ventas</Label>
-                {visitSales.length > 0 ? (
-                  <div className="mt-2 space-y-3">
-                    <div className="max-h-48 overflow-y-auto">
-                      {visitSales.map(sale => (
-                        <div key={sale.id} className="border rounded-lg p-3 mb-2">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <p className="font-medium">{formatCurrency(sale.amount)}</p>
-                              <p className="text-sm text-muted-foreground">
-                                {new Date(sale.sale_date).toLocaleDateString('es-ES')}
-                              </p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-sm text-muted-foreground">
-                                {sale.sale_lines?.length || 0} productos
-                              </p>
-                            </div>
+              {visitSales.length > 0 && (
+                <div>
+                  <Label>Ventas</Label>
+                  <div className="mt-2 space-y-4">
+                    {visitSales.map((sale, index) => (
+                      <div key={sale.id} className="border rounded p-3">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <p className="font-medium">Venta #{index + 1}</p>
+                            <p className="text-sm text-muted-foreground">{formatDate(sale.sale_date)}</p>
                           </div>
-                          {sale.sale_lines && sale.sale_lines.length > 0 && (
-                            <div className="mt-2 pt-2 border-t">
-                              <p className="text-xs text-muted-foreground mb-2">Productos:</p>
-                              {sale.sale_lines.slice(0, 3).map((line: any) => (
-                                <div key={line.id} className="text-xs space-y-1 mb-2">
+                          <p className="font-bold text-green-600">{formatCurrency(sale.amount)}</p>
+                        </div>
+                        
+                        {sale.sale_lines && sale.sale_lines.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-sm font-medium mb-1">Productos:</p>
+                            <div className="space-y-1">
+                              {sale.sale_lines.map((line: any, lineIndex: number) => (
+                                <div key={lineIndex} className="text-xs bg-muted/50 p-2 rounded">
                                   <div className="flex justify-between">
-                                    <span>{line.quantity}x {line.product_name} - {formatCurrency(line.unit_price)}</span>
-                                    <span>{formatCurrency(line.line_total)}</span>
+                                    <div>
+                                      {line.sale_lines_products && line.sale_lines_products.length > 1 ? (
+                                        // Pack: mostrar productos en líneas separadas
+                                        <div className="space-y-1">
+                                          <div className="font-medium">
+                                            {line.quantity}x Pack - {formatCurrency(line.unit_price)}
+                                          </div>
+                                          {line.sale_lines_products.map((product: any, productIndex: number) => (
+                                            <div key={productIndex} className="ml-2 text-muted-foreground">
+                                              • {product.product_name || 'Sin nombre'}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        // Producto individual
+                                        <span>
+                                          {line.quantity}x {line.sale_lines_products?.[0]?.product_name || 'Sin producto'} - {formatCurrency(line.unit_price)}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span>{formatCurrency(line.line_total || (line.quantity * line.unit_price))}</span>
                                   </div>
-                                  <div className="flex gap-2 text-xs">
+                                  <div className="flex gap-2 mt-1 text-xs">
                                    <span className={`px-2 py-1 rounded ${line.financiada ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
                                      {line.financiada ? '✓' : '✗'} Financiada
                                    </span>
                                    <span className={`px-2 py-1 rounded ${line.transferencia ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
                                      {line.transferencia ? '✓' : '✗'} Transferencia
                                    </span>
-                                   <span className={`px-2 py-1 rounded ${line.nulo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                   <span className={`px-2 py-1 rounded ${line.nulo ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600'}`}>
                                      {line.nulo ? '✓' : '✗'} Nulo
                                    </span>
                                   </div>
                                 </div>
                               ))}
-                              {sale.sale_lines.length > 3 && (
-                                <p className="text-xs text-muted-foreground">
-                                  +{sale.sale_lines.length - 3} productos más
-                                </p>
-                              )}
                             </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                ) : (
-                  <p className="mt-2 text-muted-foreground">No hay ventas registradas para esta visita</p>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </DialogContent>
         </Dialog>

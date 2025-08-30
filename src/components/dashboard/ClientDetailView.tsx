@@ -7,6 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { ArrowLeft, MapPin, Calendar, DollarSign, TrendingUp, Building2, Phone, Mail, MapPinIcon, Eye, Euro, Bell } from 'lucide-react';
 import { format } from 'date-fns';
@@ -14,7 +16,6 @@ import { es } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { formatCoordinates } from '@/lib/coordinates';
 import VisitsTable from '@/components/visits/VisitsTable';
-import VisitDetailsDialog from '@/components/visits/VisitDetailsDialog';
 import { calculateCommission } from '@/lib/commission';
 import RemindersTable from '@/components/reminders/RemindersTable';
 import ReminderDialog from '@/components/reminders/ReminderDialog';
@@ -70,12 +71,12 @@ interface Sale {
     email: string;
   } | null;
   sale_lines?: Array<{
-    product_name: string;
+    products: { product_name: string }[];
     quantity: number;
     unit_price: number;
-  financiada: boolean;
-  transferencia: boolean;
-  nulo: boolean;
+    financiada: boolean;
+    transferencia: boolean;
+    nulo: boolean;
   }>;
 }
 
@@ -240,7 +241,10 @@ const fetchVisits = async () => {
       const [{ data: lines }, { data: commercial }] = await Promise.all([
         supabase
           .from('sale_lines')
-          .select('*')
+          .select(`
+            quantity, unit_price, financiada, transferencia, nulo,
+            sale_lines_products(product_name)
+          `)
           .eq('sale_id', sale.id),
         supabase
           .from('profiles')
@@ -255,7 +259,14 @@ const fetchVisits = async () => {
       
       return { 
         ...sale, 
-        sale_lines: lines || [], 
+        sale_lines: (lines || []).map(line => ({
+          products: line.sale_lines_products || [],
+          quantity: line.quantity,
+          unit_price: line.unit_price,
+          financiada: line.financiada,
+          transferencia: line.transferencia,
+          nulo: line.nulo
+        })), 
         commercial,
         commission_amount: calculatedCommission
       };
@@ -284,7 +295,10 @@ const fetchVisits = async () => {
       const salesWithLines = await Promise.all((salesData || []).map(async (sale) => {
         const { data: linesData, error: linesError } = await supabase
           .from('sale_lines')
-          .select('id, product_name, quantity, unit_price, line_total')
+          .select(`
+            id, quantity, unit_price, line_total, financiada, transferencia, nulo,
+            sale_lines_products(product_name)
+          `)
           .eq('sale_id', sale.id);
 
         if (linesError) {
@@ -292,7 +306,19 @@ const fetchVisits = async () => {
           return { ...sale, sale_lines: [] };
         }
 
-        return { ...sale, sale_lines: linesData || [] };
+        return { 
+          ...sale, 
+          sale_lines: (linesData || []).map(line => ({
+            id: line.id,
+            products: line.sale_lines_products || [],
+            quantity: line.quantity,
+            unit_price: line.unit_price,
+            line_total: line.line_total,
+            financiada: line.financiada,
+            transferencia: line.transferencia,
+            nulo: line.nulo
+          }))
+        };
       }));
 
       setVisitSales(salesWithLines);
@@ -343,23 +369,20 @@ const fetchVisits = async () => {
   }, [] as Array<{ month: string; monthLabel: string; amount: number; count: number }>)
   .sort((a, b) => a.month.localeCompare(b.month));
 
-  const productData = sales.flatMap(sale => sale.sale_lines || [])
-    .reduce((acc, line) => {
-      const existing = acc.find(item => item.name === line.product_name);
-      if (existing) {
-        existing.quantity += line.quantity;
-        existing.revenue += line.quantity * line.unit_price;
-      } else {
-        acc.push({
-          name: line.product_name,
-          quantity: line.quantity,
-          revenue: line.quantity * line.unit_price
-        });
-      }
-      return acc;
-    }, [] as Array<{ name: string; quantity: number; revenue: number }>)
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 5);
+  const productData = sales.flatMap(sale => 
+    (sale.sale_lines || []).map((line, lineIndex) => ({
+      saleLineId: `${sale.id}-${lineIndex}`, // Usar un ID único basado en venta e índice
+      products: line.products,
+      quantity: line.quantity,
+      unit_price: line.unit_price,
+      revenue: line.quantity * line.unit_price,
+      saleId: sale.id,
+      saleDate: sale.sale_date,
+      isPack: line.products.length > 1
+    }))
+  )
+  .sort((a, b) => b.revenue - a.revenue)
+  .slice(0, 10);
 
   if (loading) {
     return (
@@ -604,19 +627,35 @@ const fetchVisits = async () => {
                 <CardDescription>Productos vendidos con su coste total</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  {productData.map((product, index) => (
-                    <div key={index} className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
-                      <div>
-                        <p className="font-medium">{product.name}</p>
-                        <p className="text-sm text-muted-foreground">Cantidad: {product.quantity}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold text-green-600">€{product.revenue.toFixed(2)}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                 <div className="space-y-3">
+                   {productData.map((item, index) => (
+                     <div key={index} className="flex justify-between items-center p-3 bg-muted/50 rounded-lg">
+                       <div>
+                         {item.isPack ? (
+                           // Pack: mostrar todos los productos
+                           <div>
+                             <p className="font-medium">Pack ({item.products.length} productos)</p>
+                             <div className="text-xs text-muted-foreground ml-2 space-y-1">
+                               {item.products.map((product, productIndex) => (
+                                 <div key={productIndex}>• {product.product_name}</div>
+                               ))}
+                             </div>
+                             <p className="text-sm text-muted-foreground">Cantidad: {item.quantity}</p>
+                           </div>
+                         ) : (
+                           // Producto individual
+                           <div>
+                             <p className="font-medium">{item.products[0]?.product_name || 'Sin nombre'}</p>
+                             <p className="text-sm text-muted-foreground">Cantidad: {item.quantity}</p>
+                           </div>
+                         )}
+                       </div>
+                       <div className="text-right">
+                         <p className="font-bold text-green-600">€{item.revenue.toFixed(2)}</p>
+                       </div>
+                     </div>
+                   ))}
+                 </div>
               </CardContent>
             </Card>
           )}
@@ -673,12 +712,111 @@ const fetchVisits = async () => {
       </div>
 
       {/* Visit Detail Dialog */}
-      <VisitDetailsDialog
-        selectedVisit={selectedVisit}
-        visitSales={visitSales}
-        onClose={() => setSelectedVisit(null)}
-        showClientInfo={false}
-      />
+      {selectedVisit && (
+        <Dialog open={!!selectedVisit} onOpenChange={() => setSelectedVisit(null)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Detalles de la Visita</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Comercial</Label>
+                  <p>{selectedVisit.commercial ? `${selectedVisit.commercial.first_name} ${selectedVisit.commercial.last_name}` : 'N/A'}</p>
+                </div>
+                <div>
+                  <Label>Empresa</Label>
+                  <p>{selectedVisit.company?.name || 'N/A'}</p>
+                </div>
+                <div>
+                  <Label>Fecha</Label>
+                  <p>{format(new Date(selectedVisit.visit_date), "dd/MM/yyyy HH:mm", { locale: es })}</p>
+                </div>
+                <div>
+                  <Label>Estado</Label>
+                  <div>
+                    <Badge className={statusColors[selectedVisit.status as keyof typeof statusColors] || 'bg-gray-100 text-gray-800'}>
+                      {statusLabels[selectedVisit.status as keyof typeof statusLabels] || selectedVisit.status}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              {selectedVisit.notes && (
+                <div>
+                  <Label>Notas</Label>
+                  <p className="text-sm bg-muted p-2 rounded">{selectedVisit.notes}</p>
+                </div>
+              )}
+
+              {visitSales.length > 0 && (
+                <div>
+                  <Label>Ventas</Label>
+                  <div className="mt-2 space-y-4">
+                    {visitSales.map((sale, index) => (
+                      <div key={sale.id} className="border rounded p-3">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <p className="font-medium">Venta #{index + 1}</p>
+                            <p className="text-sm text-muted-foreground">{format(new Date(sale.sale_date), "dd/MM/yyyy HH:mm", { locale: es })}</p>
+                          </div>
+                          <p className="font-bold text-green-600">€{sale.amount.toFixed(2)}</p>
+                        </div>
+                        
+                        {sale.sale_lines && sale.sale_lines.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-sm font-medium mb-1">Productos:</p>
+                            <div className="space-y-1">
+                              {sale.sale_lines.map((line: any, lineIndex: number) => (
+                                <div key={lineIndex} className="text-xs bg-muted/50 p-2 rounded">
+                                  <div className="flex justify-between">
+                                    <div>
+                                      {line.products && line.products.length > 1 ? (
+                                        // Pack: mostrar productos en líneas separadas
+                                        <div className="space-y-1">
+                                          <div className="font-medium">
+                                            {line.quantity}x Pack - €{line.unit_price.toFixed(2)}
+                                          </div>
+                                          {line.products.map((product: any, productIndex: number) => (
+                                            <div key={productIndex} className="ml-2 text-muted-foreground">
+                                              • {product.product_name || 'Sin nombre'}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        // Producto individual
+                                        <span>
+                                          {line.quantity}x {line.products?.[0]?.product_name || 'Sin producto'} - €{line.unit_price.toFixed(2)}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span>€{(line.quantity * line.unit_price).toFixed(2)}</span>
+                                  </div>
+                                  <div className="flex gap-2 mt-1 text-xs">
+                                   <span className={`px-2 py-1 rounded ${line.financiada ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                     {line.financiada ? '✓' : '✗'} Financiada
+                                   </span>
+                                   <span className={`px-2 py-1 rounded ${line.transferencia ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                     {line.transferencia ? '✓' : '✗'} Transferencia
+                                   </span>
+                                   <span className={`px-2 py-1 rounded ${line.nulo ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600'}`}>
+                                     {line.nulo ? '✓' : '✗'} Nulo
+                                   </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Reminder Dialog */}
       <ReminderDialog

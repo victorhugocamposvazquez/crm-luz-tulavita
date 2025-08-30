@@ -33,8 +33,13 @@ interface Company {
   name: string;
 }
 
-interface SaleLine {
+interface SaleLineProduct {
   product_name: string;
+}
+
+interface SaleLine {
+  type: 'product' | 'pack';
+  products: SaleLineProduct[];
   quantity: number;
   unit_price: number;
   financiada: boolean;
@@ -48,7 +53,7 @@ interface ClientPurchase {
   sale_date: string;
   product_description: string;
   sale_lines: {
-    product_name: string;
+    products: SaleLineProduct[];
     quantity: number;
     unit_price: number;
   }[];
@@ -128,15 +133,15 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       requestLocation();
     }
 
-    // Check for continue visit data in sessionStorage
+    // Check for continue visit data in sessionStorage (rehydration-safe)
     const continueVisitData = sessionStorage.getItem('continueVisitData');
     if (continueVisitData) {
       console.log('=== FOUND CONTINUE VISIT DATA IN SESSION STORAGE ===');
       const data = JSON.parse(continueVisitData);
       console.log('Visit data:', data);
 
-      // Clear the data from session storage
-      sessionStorage.removeItem('continueVisitData');
+      // DO NOT clear here; keep until visit is finalized or user leaves voluntarily
+      // sessionStorage.removeItem('continueVisitData');
 
       // Process the continue visit data
       handleContinueVisit(data);
@@ -360,13 +365,22 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
         const {
           data: linesData,
           error: linesError
-        } = await supabase.from('sale_lines').select('product_name, quantity, unit_price').eq('sale_id', sale.id);
+        } = await supabase.from('sale_lines').select(`
+          quantity, unit_price,
+          sale_lines_products(product_name)
+        `).eq('sale_id', sale.id);
+        
         if (linesError) {
           console.error('Sale lines fetch error:', linesError);
         }
+        
         return {
           ...sale,
-          sale_lines: linesError ? [] : linesData || []
+          sale_lines: linesError ? [] : (linesData || []).map(line => ({
+            products: line.sale_lines_products || [],
+            quantity: line.quantity,
+            unit_price: line.unit_price
+          }))
         };
       }));
       console.log('Sales with lines:', salesWithLines);
@@ -420,7 +434,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       const {
         data: salesData,
         error: salesError
-      } = await supabase.from('sales').select('id').eq('visit_id', visitId).single();
+      } = await supabase.from('sales').select('id').eq('visit_id', visitId).maybeSingle();
       
       if (salesError) {
         if (salesError.code === 'PGRST116') {
@@ -436,11 +450,14 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       if (salesData) {
         const saleId = salesData.id;
 
-        // Load sale lines for this sale
+        // Load sale lines for this sale with their products
         const {
           data: saleLinesData,
           error: saleLinesError
-        } = await supabase.from('sale_lines').select('product_name, quantity, unit_price, financiada, transferencia, nulo').eq('sale_id', saleId);
+        } = await supabase.from('sale_lines').select(`
+          id, quantity, unit_price, financiada, transferencia, nulo,
+          sale_lines_products(product_name)
+        `).eq('sale_id', saleId);
         
         if (saleLinesError) {
           console.error('Error fetching sale lines:', saleLinesError);
@@ -448,8 +465,17 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
         }
         
         if (saleLinesData && saleLinesData.length > 0) {
-          console.log('Loaded existing sale lines:', saleLinesData);
-          setSaleLines(saleLinesData);
+          const formattedSaleLines = saleLinesData.map(line => ({
+            type: line.sale_lines_products && line.sale_lines_products.length > 1 ? 'pack' as const : 'product' as const,
+            products: line.sale_lines_products || [],
+            quantity: line.quantity,
+            unit_price: line.unit_price,
+            financiada: line.financiada,
+            transferencia: line.transferencia,
+            nulo: line.nulo
+          }));
+          console.log('Loaded existing sale lines:', formattedSaleLines);
+          setSaleLines(formattedSaleLines);
         } else {
           setSaleLines([]);
         }
@@ -797,6 +823,8 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       // Dispatch events to navigate back to visits list (same pattern as when completing a visit)
       window.dispatchEvent(new CustomEvent('visitCreated', { detail: newVisit }));
       window.dispatchEvent(new CustomEvent('navigateToVisitsList'));
+      // Clear any persisted continue visit data since this is a new completed creation
+      sessionStorage.removeItem('continueVisitData');
       
     } catch (error) {
       console.error('Error creating client:', error);
@@ -810,10 +838,23 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
     }
   };
 
-  const addSaleLine = () => {
+  const addSaleLineProduct = () => {
     setSaleLines([...saleLines, {
-      product_name: '',
+      type: 'product',
+      products: [{ product_name: '' }],
       quantity: 1,
+      unit_price: 0,
+      financiada: false,
+      transferencia: false,
+      nulo: false
+    }]);
+  };
+
+  const addSaleLinePack = () => {
+    setSaleLines([...saleLines, {
+      type: 'pack',
+      products: [{ product_name: '' }],
+      quantity: 1, // Always 1 for packs
       unit_price: 0,
       financiada: false,
       transferencia: false,
@@ -832,6 +873,22 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       [field]: value
     };
     setSaleLines(updated);
+    // Persist partial form state for resilience on remount
+    try {
+      const persisted = sessionStorage.getItem('continueVisitData');
+      if (persisted) {
+        const data = JSON.parse(persisted);
+        sessionStorage.setItem('continueVisitData', JSON.stringify({
+          ...data,
+          draft: {
+            visitData,
+            saleLines: updated,
+            hasApproval,
+            editingVisitId
+          }
+        }));
+      }
+    } catch {}
   };
 
   const handleSaveVisit = async (isComplete: boolean) => {
@@ -987,9 +1044,8 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
           saleId = sale.id;
         }
 
-        // Insert new sale lines (excluding line_total as it's a generated column)
+        // Insert new sale lines without product names (they go to sale_lines_products)
         const saleLinesPayload = saleLines.map(line => ({
-          product_name: line.product_name,
           quantity: line.quantity,
           unit_price: line.unit_price,
           financiada: line.financiada,
@@ -997,10 +1053,37 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
           nulo: line.nulo,
           sale_id: saleId
         }));
-        const {
-          error: linesError
-        } = await supabase.from('sale_lines').insert(saleLinesPayload);
+        
+        const { data: insertedSaleLines, error: linesError } = await supabase
+          .from('sale_lines')
+          .insert(saleLinesPayload)
+          .select('id');
+        
         if (linesError) throw linesError;
+
+        // Insert products for each sale line
+        if (insertedSaleLines) {
+          const productInserts = [];
+          for (let i = 0; i < insertedSaleLines.length; i++) {
+            const saleLineId = insertedSaleLines[i].id;
+            const products = saleLines[i].products;
+            
+            for (const product of products) {
+              productInserts.push({
+                sale_line_id: saleLineId,
+                product_name: product.product_name
+              });
+            }
+          }
+          
+          if (productInserts.length > 0) {
+            const { error: productsError } = await supabase
+              .from('sale_lines_products')
+              .insert(productInserts);
+            
+            if (productsError) throw productsError;
+          }
+        }
       }
 
       // Add client comment if provided (simplified for now)
@@ -1025,6 +1108,8 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
 
       // Reset form only if completing visit
       if (isComplete) {
+        // Clear persisted continue data on successful completion
+        sessionStorage.removeItem('continueVisitData');
         setCurrentStep('nif-input');
         setClientNIF('');
         setExistingClient(null);
@@ -1309,9 +1394,13 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
                       </div>
                       {purchase.sale_lines && purchase.sale_lines.length > 0 && <div className="mt-2">
                           <p className="text-xs font-medium text-gray-700">Productos:</p>
-                          {purchase.sale_lines.map((line, idx) => <p key={idx} className="text-xs text-gray-600">
-                              {line.quantity}x {line.product_name} - €{line.unit_price}
-                            </p>)}
+                           {purchase.sale_lines.map((line, idx) => (
+                             <div key={idx} className="text-xs text-gray-600">
+                               {line.quantity}x (
+                               {line.products.map(p => p.product_name).join(', ') || 'Sin productos'}
+                               ) - €{line.unit_price}
+                             </div>
+                           ))}
                         </div>}
                     </div>)}
                 </div>
@@ -1381,7 +1470,25 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
               <Textarea 
                 id="notes" 
                 value={visitData.notes} 
-                onChange={(e) => setVisitData(prev => ({ ...prev, notes: e.target.value }))} 
+                onChange={(e) => {
+                  const next = { ...visitData, notes: e.target.value };
+                  setVisitData(next);
+                  try {
+                    const persisted = sessionStorage.getItem('continueVisitData');
+                    if (persisted) {
+                      const data = JSON.parse(persisted);
+                      sessionStorage.setItem('continueVisitData', JSON.stringify({
+                        ...data,
+                        draft: {
+                          visitData: next,
+                          saleLines,
+                          hasApproval,
+                          editingVisitId
+                        }
+                      }));
+                    }
+                  } catch {}
+                }} 
                 placeholder="Describe cómo fue la visita..." 
                 disabled={isReadOnly}
                 required
@@ -1425,10 +1532,14 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               Ventas Realizadas
-              {!isReadOnly && <Button size="sm" onClick={addSaleLine}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Añadir producto
-                </Button>}
+              {!isReadOnly && (
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={addSaleLinePack}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Añadir Pack
+                  </Button>
+                </div>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -1437,26 +1548,119 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
               </p> : <div className="space-y-4">
                 {saleLines.map((line, index) => <div key={index} className="border rounded-lg p-4 space-y-4">
                     <div className="flex justify-between items-start">
-                      <h4 className="font-medium">Producto {index + 1}</h4>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-medium">
+                          {line.type === 'product' ? `Producto ${index + 1}` : `Pack ${index + 1}`}
+                        </h4>
+                        <span className={`px-2 py-1 rounded text-xs ${
+                          line.type === 'product' 
+                            ? 'bg-blue-100 text-blue-800' 
+                            : 'bg-green-100 text-green-800'
+                        }`}>
+                          {line.type === 'product' ? 'Producto' : 'Pack'}
+                        </span>
+                      </div>
                       {!isReadOnly && <Button size="sm" variant="outline" onClick={() => removeSaleLine(index)}>
                           <Minus className="w-4 h-4" />
                         </Button>}
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label>Producto</Label>
-                        <Input value={line.product_name} onChange={e => updateSaleLine(index, 'product_name', e.target.value)} placeholder="Nombre del producto" disabled={isReadOnly} />
+                    {line.type === 'product' ? (
+                      // Formulario para producto individual
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <Label>Nombre del Producto</Label>
+                          <Input 
+                            value={line.products[0]?.product_name || ''} 
+                            onChange={e => {
+                              const newProducts = [{ product_name: e.target.value }];
+                              updateSaleLine(index, 'products', newProducts);
+                            }} 
+                            placeholder="Nombre del producto" 
+                            disabled={isReadOnly} 
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Cantidad</Label>
+                          <Input 
+                            type="number" 
+                            min="1" 
+                            value={line.quantity} 
+                            onChange={e => updateSaleLine(index, 'quantity', parseInt(e.target.value) || 1)} 
+                            disabled={isReadOnly} 
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Precio Total</Label>
+                          <Input 
+                            type="number" 
+                            min="0" 
+                            step="0.01" 
+                            value={line.unit_price} 
+                            onChange={e => updateSaleLine(index, 'unit_price', parseFloat(e.target.value) || 0)} 
+                            disabled={isReadOnly} 
+                          />
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label>Cantidad</Label>
-                        <Input type="number" min="1" value={line.quantity} onChange={e => updateSaleLine(index, 'quantity', parseInt(e.target.value) || 1)} disabled={isReadOnly} />
+                    ) : (
+                      // Formulario para pack
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>Productos del Pack</Label>
+                          <div className="space-y-2">
+                            {line.products.map((product, productIndex) => (
+                              <div key={productIndex} className="flex gap-2">
+                                <Input 
+                                  value={product.product_name} 
+                                  onChange={e => {
+                                    const newProducts = [...line.products];
+                                    newProducts[productIndex] = { product_name: e.target.value };
+                                    updateSaleLine(index, 'products', newProducts);
+                                  }} 
+                                  placeholder="Nombre del producto" 
+                                  disabled={isReadOnly} 
+                                />
+                                {!isReadOnly && line.products.length > 1 && (
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    onClick={() => {
+                                      const newProducts = line.products.filter((_, i) => i !== productIndex);
+                                      updateSaleLine(index, 'products', newProducts);
+                                    }}
+                                  >
+                                    <Minus className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            ))}
+                            {!isReadOnly && (
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                onClick={() => {
+                                  const newProducts = [...line.products, { product_name: '' }];
+                                  updateSaleLine(index, 'products', newProducts);
+                                }}
+                              >
+                                <Plus className="w-4 h-4" /> Añadir Producto al Pack
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Precio total del pack</Label>
+                          <Input 
+                            type="number" 
+                            min="0" 
+                            step="0.01" 
+                            value={line.unit_price} 
+                            onChange={e => updateSaleLine(index, 'unit_price', parseFloat(e.target.value) || 0)} 
+                            disabled={isReadOnly} 
+                          />
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label>Precio Unitario</Label>
-                        <Input type="number" min="0" step="0.01" value={line.unit_price} onChange={e => updateSaleLine(index, 'unit_price', parseFloat(e.target.value) || 0)} disabled={isReadOnly} />
-                      </div>
-                    </div>
+                    )}
 
                     <div className="flex gap-4 text-sm">
                       <label className="flex items-center gap-2">
