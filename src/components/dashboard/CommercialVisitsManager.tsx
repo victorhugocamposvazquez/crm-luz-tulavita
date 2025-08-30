@@ -363,7 +363,10 @@ export default function CommercialVisitsManager() {
         const {
           data: linesData,
           error: linesError
-        } = await supabase.from('sale_lines').select('id, product_name, quantity, unit_price, line_total, financiada, transferencia, nulo').eq('sale_id', sale.id);
+        } = await supabase.from('sale_lines').select(`
+          id, quantity, unit_price, line_total, financiada, transferencia, nulo,
+          sale_lines_products(product_name)
+        `).eq('sale_id', sale.id);
         if (linesError) {
           console.error('Error fetching sale lines:', linesError);
           return {

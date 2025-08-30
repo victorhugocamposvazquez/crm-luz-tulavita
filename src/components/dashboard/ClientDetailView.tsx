@@ -70,12 +70,12 @@ interface Sale {
     email: string;
   } | null;
   sale_lines?: Array<{
-    product_name: string;
+    products: { product_name: string }[];
     quantity: number;
     unit_price: number;
-  financiada: boolean;
-  transferencia: boolean;
-  nulo: boolean;
+    financiada: boolean;
+    transferencia: boolean;
+    nulo: boolean;
   }>;
 }
 
@@ -240,7 +240,10 @@ const fetchVisits = async () => {
       const [{ data: lines }, { data: commercial }] = await Promise.all([
         supabase
           .from('sale_lines')
-          .select('*')
+          .select(`
+            quantity, unit_price, financiada, transferencia, nulo,
+            sale_lines_products(product_name)
+          `)
           .eq('sale_id', sale.id),
         supabase
           .from('profiles')
@@ -255,7 +258,14 @@ const fetchVisits = async () => {
       
       return { 
         ...sale, 
-        sale_lines: lines || [], 
+        sale_lines: (lines || []).map(line => ({
+          products: line.sale_lines_products || [],
+          quantity: line.quantity,
+          unit_price: line.unit_price,
+          financiada: line.financiada,
+          transferencia: line.transferencia,
+          nulo: line.nulo
+        })), 
         commercial,
         commission_amount: calculatedCommission
       };
@@ -284,7 +294,10 @@ const fetchVisits = async () => {
       const salesWithLines = await Promise.all((salesData || []).map(async (sale) => {
         const { data: linesData, error: linesError } = await supabase
           .from('sale_lines')
-          .select('id, product_name, quantity, unit_price, line_total')
+          .select(`
+            id, quantity, unit_price, line_total, financiada, transferencia, nulo,
+            sale_lines_products(product_name)
+          `)
           .eq('sale_id', sale.id);
 
         if (linesError) {
@@ -292,7 +305,19 @@ const fetchVisits = async () => {
           return { ...sale, sale_lines: [] };
         }
 
-        return { ...sale, sale_lines: linesData || [] };
+        return { 
+          ...sale, 
+          sale_lines: (linesData || []).map(line => ({
+            id: line.id,
+            products: line.sale_lines_products || [],
+            quantity: line.quantity,
+            unit_price: line.unit_price,
+            line_total: line.line_total,
+            financiada: line.financiada,
+            transferencia: line.transferencia,
+            nulo: line.nulo
+          }))
+        };
       }));
 
       setVisitSales(salesWithLines);
@@ -344,16 +369,21 @@ const fetchVisits = async () => {
   .sort((a, b) => a.month.localeCompare(b.month));
 
   const productData = sales.flatMap(sale => sale.sale_lines || [])
-    .reduce((acc, line) => {
-      const existing = acc.find(item => item.name === line.product_name);
+    .flatMap(line => line.products.map(product => ({ 
+      ...product, 
+      quantity: line.quantity, 
+      unit_price: line.unit_price 
+    })))
+    .reduce((acc, product) => {
+      const existing = acc.find(item => item.name === product.product_name);
       if (existing) {
-        existing.quantity += line.quantity;
-        existing.revenue += line.quantity * line.unit_price;
+        existing.quantity += product.quantity;
+        existing.revenue += product.quantity * product.unit_price;
       } else {
         acc.push({
-          name: line.product_name,
-          quantity: line.quantity,
-          revenue: line.quantity * line.unit_price
+          name: product.product_name,
+          quantity: product.quantity,
+          revenue: product.quantity * product.unit_price
         });
       }
       return acc;
