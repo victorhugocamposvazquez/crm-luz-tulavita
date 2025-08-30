@@ -268,7 +268,6 @@ export type Database = {
           id: string
           line_total: number | null
           nulo: boolean
-          product_name: string
           quantity: number
           sale_id: string
           transferencia: boolean
@@ -281,7 +280,6 @@ export type Database = {
           id?: string
           line_total?: number | null
           nulo?: boolean
-          product_name: string
           quantity?: number
           sale_id: string
           transferencia?: boolean
@@ -294,7 +292,6 @@ export type Database = {
           id?: string
           line_total?: number | null
           nulo?: boolean
-          product_name?: string
           quantity?: number
           sale_id?: string
           transferencia?: boolean
@@ -302,6 +299,38 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      sale_lines_products: {
+        Row: {
+          created_at: string
+          id: string
+          product_name: string
+          sale_line_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          product_name: string
+          sale_line_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          product_name?: string
+          sale_line_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fk_sale_lines_products_sale_line_id"
+            columns: ["sale_line_id"]
+            isOneToOne: false
+            referencedRelation: "sale_lines"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales: {
         Row: {
