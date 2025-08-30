@@ -133,15 +133,15 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       requestLocation();
     }
 
-    // Check for continue visit data in sessionStorage
+    // Check for continue visit data in sessionStorage (rehydration-safe)
     const continueVisitData = sessionStorage.getItem('continueVisitData');
     if (continueVisitData) {
       console.log('=== FOUND CONTINUE VISIT DATA IN SESSION STORAGE ===');
       const data = JSON.parse(continueVisitData);
       console.log('Visit data:', data);
 
-      // Clear the data from session storage
-      sessionStorage.removeItem('continueVisitData');
+      // DO NOT clear here; keep until visit is finalized or user leaves voluntarily
+      // sessionStorage.removeItem('continueVisitData');
 
       // Process the continue visit data
       handleContinueVisit(data);
@@ -823,6 +823,8 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       // Dispatch events to navigate back to visits list (same pattern as when completing a visit)
       window.dispatchEvent(new CustomEvent('visitCreated', { detail: newVisit }));
       window.dispatchEvent(new CustomEvent('navigateToVisitsList'));
+      // Clear any persisted continue visit data since this is a new completed creation
+      sessionStorage.removeItem('continueVisitData');
       
     } catch (error) {
       console.error('Error creating client:', error);
@@ -871,6 +873,22 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       [field]: value
     };
     setSaleLines(updated);
+    // Persist partial form state for resilience on remount
+    try {
+      const persisted = sessionStorage.getItem('continueVisitData');
+      if (persisted) {
+        const data = JSON.parse(persisted);
+        sessionStorage.setItem('continueVisitData', JSON.stringify({
+          ...data,
+          draft: {
+            visitData,
+            saleLines: updated,
+            hasApproval,
+            editingVisitId
+          }
+        }));
+      }
+    } catch {}
   };
 
   const handleSaveVisit = async (isComplete: boolean) => {
@@ -1090,6 +1108,8 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
 
       // Reset form only if completing visit
       if (isComplete) {
+        // Clear persisted continue data on successful completion
+        sessionStorage.removeItem('continueVisitData');
         setCurrentStep('nif-input');
         setClientNIF('');
         setExistingClient(null);
@@ -1450,7 +1470,25 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
               <Textarea 
                 id="notes" 
                 value={visitData.notes} 
-                onChange={(e) => setVisitData(prev => ({ ...prev, notes: e.target.value }))} 
+                onChange={(e) => {
+                  const next = { ...visitData, notes: e.target.value };
+                  setVisitData(next);
+                  try {
+                    const persisted = sessionStorage.getItem('continueVisitData');
+                    if (persisted) {
+                      const data = JSON.parse(persisted);
+                      sessionStorage.setItem('continueVisitData', JSON.stringify({
+                        ...data,
+                        draft: {
+                          visitData: next,
+                          saleLines,
+                          hasApproval,
+                          editingVisitId
+                        }
+                      }));
+                    }
+                  } catch {}
+                }} 
                 placeholder="Describe cómo fue la visita..." 
                 disabled={isReadOnly}
                 required

@@ -86,7 +86,7 @@ export default function CommercialVisitsManager() {
     completed: 0
   });
   useEffect(() => {
-    console.log('[CVM] MOUNT');
+    console.log('[CVM] MOUNT/RESUB for approval-updates. currentView:', currentView);
     fetchVisits();
     fetchCompanies();
     
@@ -102,8 +102,11 @@ export default function CommercialVisitsManager() {
         },
         (payload) => {
           console.log('Approval request updated:', payload);
-          // Refresh visits when any approval request is updated
-          fetchVisits();
+          if (currentView === 'list') {
+            fetchVisits();
+          } else {
+            console.log('[CVM] Skipping visits refresh (approval-updates) - user is in creation flow');
+          }
         }
       )
       .on(
@@ -115,17 +118,20 @@ export default function CommercialVisitsManager() {
         },
         (payload) => {
           console.log('Visit updated:', payload);
-          // Refresh visits when any visit is updated
-          fetchVisits();
+          if (currentView === 'list') {
+            fetchVisits();
+          } else {
+            console.log('[CVM] Skipping visits refresh (approval-updates visits) - user is in creation flow');
+          }
         }
       )
       .subscribe();
 
     return () => {
-      console.log('[CVM] UNMOUNT: removing approvalChannel');
+      console.log('[CVM] CLEANUP approval-updates: removing approvalChannel');
       supabase.removeChannel(approvalChannel);
     };
-  }, []);
+  }, [currentView]);
   useEffect(() => {
     const cleanup = setupRealtimeSubscription();
     console.log('[CVM] setupRealtimeSubscription called. currentView:', currentView, 'userId:', user?.id);
