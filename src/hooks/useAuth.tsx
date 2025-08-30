@@ -78,6 +78,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('[AUTH] onAuthStateChange event:', event, 'user:', session?.user?.id);
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -95,6 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('[AUTH] getSession initial user:', session?.user?.id);
       setSession(session);
       setUser(session?.user ?? null);
       
@@ -106,7 +108,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log('[AUTH] unsubscribe onAuthStateChange');
+      subscription.unsubscribe();
+    }
   }, []);
 
   const signUp = async (email: string, password: string, firstName?: string, lastName?: string) => {
