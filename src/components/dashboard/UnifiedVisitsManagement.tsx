@@ -1496,10 +1496,6 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
               Ventas Realizadas
               {!isReadOnly && (
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={addSaleLineProduct} variant="outline">
-                    <Plus className="w-4 h-4 mr-2" />
-                    Añadir Producto
-                  </Button>
                   <Button size="sm" onClick={addSaleLinePack}>
                     <Plus className="w-4 h-4 mr-2" />
                     Añadir Pack
