@@ -1118,14 +1118,21 @@ export default function AdminDashboard() {
                             <div className="space-y-1">
                               {sale.sale_lines.map((line: any) => (
                                 <div key={line.id} className="text-xs bg-muted/50 p-2 rounded">
-                                  <div className="flex justify-between">
-                                    <span>
-                                      {line.quantity}x (
-                                      {line.sale_lines_products?.map((p: any) => p.product_name).join(', ') || 'Sin productos'}
-                                      ) - {formatCurrency(line.unit_price)}
-                                    </span>
-                                    <span>{formatCurrency(line.line_total || (line.quantity * line.unit_price))}</span>
-                                  </div>
+                                  {line.sale_lines_products && line.sale_lines_products.length > 1 ? (
+                                    // Pack: mostrar productos en líneas separadas
+                                    <div className="space-y-1">
+                                      {line.sale_lines_products.map((product: any, productIndex: number) => (
+                                        <div key={productIndex}>
+                                          {product.product_name || 'Sin nombre'}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    // Producto individual
+                                    <div>
+                                      {line.quantity}x {line.sale_lines_products?.[0]?.product_name || 'Sin producto'}
+                                    </div>
+                                  )}
                                   <div className="flex gap-2 mt-1 text-xs">
                                    <span className={`px-2 py-1 rounded ${line.financiada ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
                                      {line.financiada ? '✓' : '✗'} Financiada
