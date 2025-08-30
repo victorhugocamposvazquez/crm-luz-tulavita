@@ -40,7 +40,7 @@ interface Sale {
   amount: number;
   sale_date: string;
   sale_lines?: {
-    product_name: string;
+    products: { product_name: string }[];
     quantity: number;
     unit_price: number;
     financiada: boolean;
