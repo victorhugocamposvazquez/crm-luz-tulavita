@@ -373,7 +373,10 @@ export default function AdminDashboard() {
       const salesWithLines = await Promise.all((salesData || []).map(async sale => {
         const { data: linesData, error: linesError } = await supabase
           .from('sale_lines')
-          .select('id, product_name, quantity, unit_price, line_total')
+          .select(`
+            id, quantity, unit_price, line_total, financiada, transferencia, nulo,
+            sale_lines_products(product_name)
+          `)
           .eq('sale_id', sale.id);
         
         if (linesError) {
@@ -1116,7 +1119,11 @@ export default function AdminDashboard() {
                               {sale.sale_lines.map((line: any) => (
                                 <div key={line.id} className="text-xs bg-muted/50 p-2 rounded">
                                   <div className="flex justify-between">
-                                    <span>{line.quantity}x {line.product_name} - {formatCurrency(line.unit_price)}</span>
+                                    <span>
+                                      {line.quantity}x (
+                                      {line.sale_lines_products?.map((p: any) => p.product_name).join(', ') || 'Sin productos'}
+                                      ) - {formatCurrency(line.unit_price)}
+                                    </span>
                                     <span>{formatCurrency(line.line_total || (line.quantity * line.unit_price))}</span>
                                   </div>
                                   <div className="flex gap-2 mt-1 text-xs">
@@ -1126,7 +1133,7 @@ export default function AdminDashboard() {
                                    <span className={`px-2 py-1 rounded ${line.transferencia ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
                                      {line.transferencia ? '✓' : '✗'} Transferencia
                                    </span>
-                                   <span className={`px-2 py-1 rounded ${line.nulo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                   <span className={`px-2 py-1 rounded ${line.nulo ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600'}`}>
                                      {line.nulo ? '✓' : '✗'} Nulo
                                    </span>
                                   </div>
