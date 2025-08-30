@@ -214,6 +214,25 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
     };
   }, []);
 
+  // Debug lifecycle: mount/unmount and key state changes
+  useEffect(() => {
+    console.log('[UVM] MOUNT');
+    return () => {
+      console.log('[UVM] UNMOUNT');
+    };
+  }, []);
+
+  useEffect(() => {
+    console.log('[UVM] currentStep changed:', currentStep);
+    if (currentStep === 'nif-input') {
+      console.log('[UVM] currentStep is nif-input. existingClient:', existingClient, 'editingVisitId:', editingVisitId);
+    }
+  }, [currentStep, existingClient, editingVisitId]);
+
+  useEffect(() => {
+    console.log('[UVM] editingVisitId changed:', editingVisitId);
+  }, [editingVisitId]);
+
   // Debug: Log companies state
   useEffect(() => {
     console.log('Companies loaded:', companies);

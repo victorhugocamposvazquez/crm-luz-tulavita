@@ -86,6 +86,7 @@ export default function CommercialVisitsManager() {
     completed: 0
   });
   useEffect(() => {
+    console.log('[CVM] MOUNT');
     fetchVisits();
     fetchCompanies();
     
@@ -121,18 +122,20 @@ export default function CommercialVisitsManager() {
       .subscribe();
 
     return () => {
+      console.log('[CVM] UNMOUNT: removing approvalChannel');
       supabase.removeChannel(approvalChannel);
     };
   }, []);
   useEffect(() => {
     const cleanup = setupRealtimeSubscription();
+    console.log('[CVM] setupRealtimeSubscription called. currentView:', currentView, 'userId:', user?.id);
     return cleanup;
   }, [currentView, user?.id]); // Re-setup when currentView or user changes
 
   useEffect(() => {
     // Listen for visit creation events from other components
     const handleVisitCreated = (event: any) => {
-      console.log('=== VISIT CREATED EVENT RECEIVED ===');
+      console.log('[CVM] VISIT CREATED EVENT RECEIVED');
       console.log('Event detail:', event.detail);
       console.log('Current view:', currentView);
 
@@ -147,7 +150,7 @@ export default function CommercialVisitsManager() {
 
     // Listen for navigation back to visits list
     const handleNavigateToVisitsList = () => {
-      console.log('=== NAVIGATE TO VISITS LIST EVENT RECEIVED ===');
+      console.log('[CVM] NAVIGATE TO VISITS LIST EVENT RECEIVED');
       setCurrentView('list');
       fetchVisits();
     };
@@ -160,28 +163,28 @@ export default function CommercialVisitsManager() {
   }, [currentView]); // Add currentView as dependency
 
   const setupRealtimeSubscription = () => {
-    console.log('Setting up realtime subscription for user:', user?.id);
+    console.log('[CVM] Setting up realtime subscription for user:', user?.id);
     const channel = supabase.channel('visits_changes').on('postgres_changes', {
       event: '*',
       schema: 'public',
       table: 'visits',
       filter: `commercial_id=eq.${user?.id}`
     }, payload => {
-      console.log('Visit change detected in realtime:', payload);
-      console.log('Current view during realtime event:', currentView);
+      console.log('[CVM] Visit change detected in realtime:', payload);
+      console.log('[CVM] Current view during realtime event:', currentView);
 
       // CRITICAL FIX: Only refresh if we're in list view
       if (currentView === 'list') {
-        console.log('Refreshing visits due to realtime change...');
+        console.log('[CVM] Refreshing visits due to realtime change...');
         fetchVisits();
       } else {
-        console.log('Skipping realtime refresh - user is in creation flow');
+        console.log('[CVM] Skipping realtime refresh - user is in creation flow');
       }
     }).subscribe(status => {
-      console.log('Realtime subscription status:', status);
+      console.log('[CVM] Realtime subscription status:', status);
     });
     return () => {
-      console.log('Removing realtime channel');
+      console.log('[CVM] Removing realtime channel');
       supabase.removeChannel(channel);
     };
   };
@@ -200,13 +203,13 @@ export default function CommercialVisitsManager() {
   const fetchVisits = async () => {
     try {
       setLoading(true);
-      console.log('Fetching visits for user:', user?.id);
+      console.log('[CVM] Fetching visits for user:', user?.id);
 
       // Debug: First check total visits for this user
       const {
         data: debugData
       } = await supabase.from('visits').select('id, status, approval_status, created_at').eq('commercial_id', user?.id);
-      console.log('Debug - All visits for user:', debugData);
+      console.log('[CVM] Debug - All visits for user:', debugData);
       const {
         data,
         error
@@ -240,7 +243,7 @@ export default function CommercialVisitsManager() {
         console.error('Error fetching visits:', error);
         throw error;
       }
-      console.log('Raw visits data:', data);
+      console.log('[CVM] Raw visits data:', data);
       const formattedVisits = data?.map(visit => ({
         ...visit,
         client: visit.client || {
