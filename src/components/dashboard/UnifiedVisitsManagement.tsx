@@ -38,6 +38,7 @@ interface SaleLineProduct {
 }
 
 interface SaleLine {
+  type: 'product' | 'pack';
   products: SaleLineProduct[];
   quantity: number;
   unit_price: number;
@@ -465,6 +466,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
         
         if (saleLinesData && saleLinesData.length > 0) {
           const formattedSaleLines = saleLinesData.map(line => ({
+            type: line.sale_lines_products && line.sale_lines_products.length > 1 ? 'pack' as const : 'product' as const,
             products: line.sale_lines_products || [],
             quantity: line.quantity,
             unit_price: line.unit_price,
@@ -834,9 +836,22 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
     }
   };
 
-  const addSaleLine = () => {
+  const addSaleLineProduct = () => {
     setSaleLines([...saleLines, {
-      products: [],
+      type: 'product',
+      products: [{ product_name: '' }],
+      quantity: 1,
+      unit_price: 0,
+      financiada: false,
+      transferencia: false,
+      nulo: false
+    }]);
+  };
+
+  const addSaleLinePack = () => {
+    setSaleLines([...saleLines, {
+      type: 'pack',
+      products: [{ product_name: '' }],
       quantity: 1,
       unit_price: 0,
       financiada: false,
@@ -1479,10 +1494,18 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               Ventas Realizadas
-              {!isReadOnly && <Button size="sm" onClick={addSaleLine}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Añadir producto
-                </Button>}
+              {!isReadOnly && (
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={addSaleLineProduct} variant="outline">
+                    <Plus className="w-4 h-4 mr-2" />
+                    Añadir Producto
+                  </Button>
+                  <Button size="sm" onClick={addSaleLinePack}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Añadir Pack
+                  </Button>
+                </div>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -1491,65 +1514,131 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
               </p> : <div className="space-y-4">
                 {saleLines.map((line, index) => <div key={index} className="border rounded-lg p-4 space-y-4">
                     <div className="flex justify-between items-start">
-                      <h4 className="font-medium">Producto {index + 1}</h4>
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-medium">
+                          {line.type === 'product' ? `Producto ${index + 1}` : `Pack ${index + 1}`}
+                        </h4>
+                        <span className={`px-2 py-1 rounded text-xs ${
+                          line.type === 'product' 
+                            ? 'bg-blue-100 text-blue-800' 
+                            : 'bg-green-100 text-green-800'
+                        }`}>
+                          {line.type === 'product' ? 'Producto' : 'Pack'}
+                        </span>
+                      </div>
                       {!isReadOnly && <Button size="sm" variant="outline" onClick={() => removeSaleLine(index)}>
                           <Minus className="w-4 h-4" />
                         </Button>}
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="space-y-2">
-                        <Label>Productos</Label>
+                    {line.type === 'product' ? (
+                      // Formulario para producto individual
+                      <div className="grid grid-cols-3 gap-4">
                         <div className="space-y-2">
-                          {line.products.map((product, productIndex) => (
-                            <div key={productIndex} className="flex gap-2">
-                              <Input 
-                                value={product.product_name} 
-                                onChange={e => {
-                                  const newProducts = [...line.products];
-                                  newProducts[productIndex] = { product_name: e.target.value };
-                                  updateSaleLine(index, 'products', newProducts);
-                                }} 
-                                placeholder="Nombre del producto" 
-                                disabled={isReadOnly} 
-                              />
-                              {!isReadOnly && (
-                                <Button 
-                                  size="sm" 
-                                  variant="outline" 
-                                  onClick={() => {
-                                    const newProducts = line.products.filter((_, i) => i !== productIndex);
-                                    updateSaleLine(index, 'products', newProducts);
-                                  }}
-                                >
-                                  <Minus className="w-4 h-4" />
-                                </Button>
-                              )}
-                            </div>
-                          ))}
-                          {!isReadOnly && (
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              onClick={() => {
-                                const newProducts = [...line.products, { product_name: '' }];
-                                updateSaleLine(index, 'products', newProducts);
-                              }}
-                            >
-                              <Plus className="w-4 h-4" /> Añadir Producto
-                            </Button>
-                          )}
+                          <Label>Nombre del Producto</Label>
+                          <Input 
+                            value={line.products[0]?.product_name || ''} 
+                            onChange={e => {
+                              const newProducts = [{ product_name: e.target.value }];
+                              updateSaleLine(index, 'products', newProducts);
+                            }} 
+                            placeholder="Nombre del producto" 
+                            disabled={isReadOnly} 
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Cantidad</Label>
+                          <Input 
+                            type="number" 
+                            min="1" 
+                            value={line.quantity} 
+                            onChange={e => updateSaleLine(index, 'quantity', parseInt(e.target.value) || 1)} 
+                            disabled={isReadOnly} 
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Precio Total</Label>
+                          <Input 
+                            type="number" 
+                            min="0" 
+                            step="0.01" 
+                            value={line.unit_price} 
+                            onChange={e => updateSaleLine(index, 'unit_price', parseFloat(e.target.value) || 0)} 
+                            disabled={isReadOnly} 
+                          />
                         </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label>Cantidad</Label>
-                        <Input type="number" min="1" value={line.quantity} onChange={e => updateSaleLine(index, 'quantity', parseInt(e.target.value) || 1)} disabled={isReadOnly} />
+                    ) : (
+                      // Formulario para pack
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>Productos del Pack</Label>
+                          <div className="space-y-2">
+                            {line.products.map((product, productIndex) => (
+                              <div key={productIndex} className="flex gap-2">
+                                <Input 
+                                  value={product.product_name} 
+                                  onChange={e => {
+                                    const newProducts = [...line.products];
+                                    newProducts[productIndex] = { product_name: e.target.value };
+                                    updateSaleLine(index, 'products', newProducts);
+                                  }} 
+                                  placeholder="Nombre del producto" 
+                                  disabled={isReadOnly} 
+                                />
+                                {!isReadOnly && line.products.length > 1 && (
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline" 
+                                    onClick={() => {
+                                      const newProducts = line.products.filter((_, i) => i !== productIndex);
+                                      updateSaleLine(index, 'products', newProducts);
+                                    }}
+                                  >
+                                    <Minus className="w-4 h-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            ))}
+                            {!isReadOnly && (
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                onClick={() => {
+                                  const newProducts = [...line.products, { product_name: '' }];
+                                  updateSaleLine(index, 'products', newProducts);
+                                }}
+                              >
+                                <Plus className="w-4 h-4" /> Añadir Producto al Pack
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label>Cantidad de Packs</Label>
+                            <Input 
+                              type="number" 
+                              min="1" 
+                              value={line.quantity} 
+                              onChange={e => updateSaleLine(index, 'quantity', parseInt(e.target.value) || 1)} 
+                              disabled={isReadOnly} 
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Precio Total del Pack</Label>
+                            <Input 
+                              type="number" 
+                              min="0" 
+                              step="0.01" 
+                              value={line.unit_price} 
+                              onChange={e => updateSaleLine(index, 'unit_price', parseFloat(e.target.value) || 0)} 
+                              disabled={isReadOnly} 
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <Label>Precio Total</Label>
-                        <Input type="number" min="0" step="0.01" value={line.unit_price} onChange={e => updateSaleLine(index, 'unit_price', parseFloat(e.target.value) || 0)} disabled={isReadOnly} />
-                      </div>
-                    </div>
+                    )}
 
                     <div className="flex gap-4 text-sm">
                       <label className="flex items-center gap-2">
