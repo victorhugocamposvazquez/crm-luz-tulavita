@@ -44,7 +44,7 @@ export default function VisitSalesSection({ visitSales }: VisitSalesSectionProps
                     {line.products && line.products.length > 1 ? (
                       // Pack: mostrar productos en filas separadas
                       <div className="space-y-1">
-                        {line.products?.map((product, productIndex: number) => (
+                        {line.products.map((product, productIndex: number) => (
                           <div key={productIndex} className="text-muted-foreground">
                             {product.product_name || 'Sin nombre'}
                           </div>
@@ -69,7 +69,7 @@ export default function VisitSalesSection({ visitSales }: VisitSalesSectionProps
                       <div>
                         <div className="flex justify-between items-center">
                           <span className="text-muted-foreground">
-                            {line.quantity}x ({line.products?.map(p => p.product_name).join(', ') || 'Sin productos'}) - €{line.unit_price.toFixed(2)}
+                            {line.quantity}x ({line.products.map(p => p.product_name).join(', ') || 'Sin productos'}) - €{line.unit_price.toFixed(2)}
                           </span>
                         </div>
                         <div className="flex gap-3 mt-1">
