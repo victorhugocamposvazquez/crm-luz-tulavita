@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Loader2, MapPin, Plus, Minus } from 'lucide-react';
 import { formatCoordinates } from '@/lib/coordinates';
-import { normalizeDNI, normalizeClientData } from '@/lib/clientUtils';
+import { normalizeDNI, normalizeClientData, validateDNI } from '@/lib/clientUtils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Client {
@@ -515,17 +515,17 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
     
     try {
        // If only one NIF, handle as before
-       if (nifs.length === 1) {
-         const normalizedDNI = normalizeDNI(nifs[0]);
-         if (!normalizedDNI) {
-           toast({
-             title: "Error",
-             description: "DNI inválido",
-             variant: "destructive"
-           });
-           setLoading(false);
-           return;
-         }
+        if (nifs.length === 1) {
+          const normalizedDNI = normalizeDNI(nifs[0]);
+          if (!normalizedDNI || !validateDNI(nifs[0])) {
+            toast({
+              title: "Error",
+              description: "DNI inválido. Debe tener al menos 8 caracteres y contener al menos una letra",
+              variant: "destructive"
+            });
+            setLoading(false);
+            return;
+          }
          
          const { data: clientData, error } = await supabase
            .from('clients')
@@ -580,8 +580,18 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
            return;
          }
 
-         // Normalize all DNIs before search
-         const normalizedNIFs = nifs.map(nif => normalizeDNI(nif)).filter(Boolean) as string[];
+          // Normalize and validate all DNIs before search
+          const validNIFs = nifs.filter(nif => validateDNI(nif));
+          const normalizedNIFs = validNIFs.map(nif => normalizeDNI(nif)).filter(Boolean) as string[];
+          
+          const invalidCount = nifs.length - validNIFs.length;
+          if (invalidCount > 0) {
+            toast({
+              title: "DNIs inválidos detectados",
+              description: `${invalidCount} DNI(s) no cumplen los requisitos (mínimo 8 caracteres con al menos una letra) y fueron omitidos`,
+              variant: "destructive"
+            });
+          }
          
          if (normalizedNIFs.length === 0) {
            toast({
@@ -788,6 +798,16 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       return;
     }
     
+    // Validate DNI if provided
+    if (clientData.dni && !validateDNI(clientData.dni)) {
+      toast({
+        title: "Error",
+        description: "El DNI debe tener al menos 8 caracteres y contener al menos una letra",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     if (!selectedCompany) {
       toast({
         title: "Error",
@@ -854,11 +874,20 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       // Clear any persisted continue visit data since this is a new completed creation
       sessionStorage.removeItem('continueVisitData');
       
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating client:', error);
+      let errorMessage = "Error al crear el cliente";
+      
+      // Check for DNI duplicate error
+      if (error?.message?.includes('duplicate key') || error?.code === '23505') {
+        errorMessage = "Ya existe otro usuario con ese mismo DNI";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Error",
-        description: "Error al crear el cliente",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {

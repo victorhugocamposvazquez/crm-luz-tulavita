@@ -14,7 +14,7 @@ import { UserPlus, Edit, Trash2, Upload, Loader2, Eye, Bell, ToggleLeft, ToggleR
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { formatCoordinates, parseCoordinates } from '@/lib/coordinates';
-import { normalizeClientData, normalizeDNI } from '@/lib/clientUtils';
+import { normalizeClientData, normalizeDNI, validateDNI } from '@/lib/clientUtils';
 import ClientDetailView from './ClientDetailView';
 import ClientFilters from './ClientFilters';
 import ClientPagination from './ClientPagination';
@@ -190,6 +190,16 @@ export default function ClientManagement() {
       note: formData.get('note') as string || null,
     };
 
+    // Validate DNI if provided
+    if (rawClientData.dni && !validateDNI(rawClientData.dni)) {
+      toast({
+        title: "Error",
+        description: "El DNI debe tener al menos 8 caracteres y contener al menos una letra",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Normalize client data
     console.log('Raw DNI before normalization:', rawClientData.dni);
     console.log('Raw nombre before normalization:', rawClientData.nombre_apellidos);
@@ -235,9 +245,18 @@ export default function ClientManagement() {
       fetchClients();
     } catch (error: any) {
       console.error('Error saving client:', error);
+      let errorMessage = "No se pudo guardar el cliente";
+      
+      // Check for DNI duplicate error
+      if (error?.message?.includes('duplicate key') || error?.code === '23505') {
+        errorMessage = "Ya existe otro usuario con ese mismo DNI";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Error",
-        description: error.message || "No se pudo guardar el cliente",
+        description: errorMessage,
         variant: "destructive",
       });
     }

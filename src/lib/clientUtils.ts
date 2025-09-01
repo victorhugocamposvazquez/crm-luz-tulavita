@@ -3,6 +3,21 @@
  */
 
 /**
+ * Validates DNI format (minimum 8 characters with at least 1 letter)
+ * @param dni - The DNI string to validate
+ * @returns True if valid, false otherwise
+ */
+export function validateDNI(dni: string | null | undefined): boolean {
+  if (!dni) return false;
+  
+  const trimmed = dni.trim();
+  if (trimmed.length < 8) return false;
+  
+  // Must contain at least one letter
+  return /[a-zA-Z]/.test(trimmed);
+}
+
+/**
  * Normalizes a DNI by trimming whitespace and converting letter to uppercase
  * @param dni - The DNI string to normalize
  * @returns The normalized DNI or null if empty
