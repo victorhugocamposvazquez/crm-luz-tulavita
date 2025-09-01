@@ -8,12 +8,22 @@
  * @returns The normalized DNI or null if empty
  */
 export function normalizeDNI(dni: string | null | undefined): string | null {
-  if (!dni) return null;
+  console.log('normalizeDNI called with:', dni, typeof dni);
+  if (!dni) {
+    console.log('DNI is null/undefined, returning null');
+    return null;
+  }
   
   const trimmed = dni.trim();
-  if (!trimmed) return null;
+  console.log('DNI after trim:', `"${trimmed}"`);
+  if (!trimmed) {
+    console.log('DNI is empty after trim, returning null');
+    return null;
+  }
   
-  return trimmed.toUpperCase();
+  const result = trimmed.toUpperCase();
+  console.log('DNI final result:', `"${result}"`);
+  return result;
 }
 
 /**
