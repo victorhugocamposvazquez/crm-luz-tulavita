@@ -289,7 +289,15 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
   };
 
   const isPastDue = (reminderDate: string, status: string) => {
-    return status === 'pending' && new Date(reminderDate) < new Date();
+    if (status !== 'pending') return false;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Start of today
+    
+    const reminderDateObj = new Date(reminderDate);
+    reminderDateObj.setHours(0, 0, 0, 0); // Start of reminder date
+    
+    return reminderDateObj < today; // Only past dates, not today
   };
 
   if (loading) {
