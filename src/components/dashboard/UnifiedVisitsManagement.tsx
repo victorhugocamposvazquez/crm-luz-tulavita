@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Loader2, MapPin, Plus, Minus } from 'lucide-react';
 import { formatCoordinates } from '@/lib/coordinates';
+import { normalizeDNI, normalizeClientData } from '@/lib/clientUtils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Client {
@@ -513,13 +514,24 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
     setLoading(true);
     
     try {
-      // If only one NIF, handle as before
-      if (nifs.length === 1) {
-        const { data: clientData, error } = await supabase
-          .from('clients')
-          .select('*')
-          .eq('dni', nifs[0])
-          .maybeSingle();
+       // If only one NIF, handle as before
+       if (nifs.length === 1) {
+         const normalizedDNI = normalizeDNI(nifs[0]);
+         if (!normalizedDNI) {
+           toast({
+             title: "Error",
+             description: "DNI inválido",
+             variant: "destructive"
+           });
+           setLoading(false);
+           return;
+         }
+         
+         const { data: clientData, error } = await supabase
+           .from('clients')
+           .select('*')
+           .eq('dni', normalizedDNI)
+           .maybeSingle();
 
         if (error) throw error;
 
@@ -549,29 +561,42 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
             await requestClientApproval(clientData.id);
           }
         } else {
-          // Client doesn't exist, create new
-          setClientData(prev => ({
-            ...prev,
-            dni: nifs[0]
-          }));
+         // Client doesn't exist, create new
+         setClientData(prev => ({
+           ...prev,
+           dni: normalizedDNI
+         }));
           setCurrentStep('client-form');
         }
-      } else {
-        // Multiple NIFs - handle bulk creation
-        if (!selectedCompany) {
-          toast({
-            title: "Error", 
-            description: "Selecciona una empresa antes de crear visitas en lote",
-            variant: "destructive"
-          });
-          setLoading(false);
-          return;
-        }
+       } else {
+         // Multiple NIFs - handle bulk creation
+         if (!selectedCompany) {
+           toast({
+             title: "Error", 
+             description: "Selecciona una empresa antes de crear visitas en lote",
+             variant: "destructive"
+           });
+           setLoading(false);
+           return;
+         }
 
-        const { data: existingClients, error: clientError } = await supabase
-          .from('clients')
-          .select('id, dni, nombre_apellidos, status')
-          .in('dni', nifs);
+         // Normalize all DNIs before search
+         const normalizedNIFs = nifs.map(nif => normalizeDNI(nif)).filter(Boolean) as string[];
+         
+         if (normalizedNIFs.length === 0) {
+           toast({
+             title: "Error",
+             description: "No se encontraron DNIs válidos",
+             variant: "destructive"
+           });
+           setLoading(false);
+           return;
+         }
+
+         const { data: existingClients, error: clientError } = await supabase
+           .from('clients')
+           .select('id, dni, nombre_apellidos, status')
+           .in('dni', normalizedNIFs);
 
         if (clientError) throw clientError;
 
@@ -587,8 +612,8 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
           });
         }
 
-        const existingNIFs = activeClients?.map(c => c.dni) || [];
-        const missingNIFs = nifs.filter(nif => !existingNIFs.includes(nif));
+         const existingNIFs = activeClients?.map(c => c.dni) || [];
+         const missingNIFs = normalizedNIFs.filter(nif => !existingNIFs.includes(nif));
 
         // Create visits for existing active clients
         if (activeClients && activeClients.length > 0) {
@@ -774,17 +799,20 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
     
     setLoading(true);
     try {
-      // Include coordinates in client data
-      const clientPayload = {
-        ...clientData,
-        latitude: location?.latitude || null,
-        longitude: location?.longitude || null
-      };
-      
-      const {
-        data: newClient,
-        error
-      } = await supabase.from('clients').insert(clientPayload).select().single();
+       // Include coordinates in client data
+       const rawClientPayload = {
+         ...clientData,
+         latitude: location?.latitude || null,
+         longitude: location?.longitude || null
+       };
+       
+       // Normalize client data before inserting
+       const clientPayload = normalizeClientData(rawClientPayload);
+       
+       const {
+         data: newClient,
+         error
+       } = await supabase.from('clients').insert(clientPayload).select().single();
       if (error) throw error;
       
       // Automatically create the visit for the new client

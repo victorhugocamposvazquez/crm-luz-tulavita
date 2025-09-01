@@ -14,6 +14,7 @@ import { UserPlus, Edit, Trash2, Upload, Loader2, Eye, Bell, ToggleLeft, ToggleR
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { formatCoordinates, parseCoordinates } from '@/lib/coordinates';
+import { normalizeClientData, normalizeDNI } from '@/lib/clientUtils';
 import ClientDetailView from './ClientDetailView';
 import ClientFilters from './ClientFilters';
 import ClientPagination from './ClientPagination';
@@ -108,7 +109,10 @@ export default function ClientManagement() {
         query = query.ilike('nombre_apellidos', `%${filters.nombre.trim()}%`);
       }
       if (filters.dni.trim()) {
-        query = query.ilike('dni', `%${filters.dni.trim()}%`);
+        const normalizedDniFilter = normalizeDNI(filters.dni.trim());
+        if (normalizedDniFilter) {
+          query = query.ilike('dni', `%${normalizedDniFilter}%`);
+        }
       }
       if (filters.localidad.trim()) {
         query = query.ilike('localidad', `%${filters.localidad.trim()}%`);
@@ -172,7 +176,7 @@ export default function ClientManagement() {
       }
     }
     
-    const clientData = {
+    const rawClientData = {
       nombre_apellidos: formData.get('nombre_apellidos') as string,
       dni: formData.get('dni') as string || null,
       direccion: formData.get('direccion') as string,
@@ -185,6 +189,9 @@ export default function ClientManagement() {
       longitude,
       note: formData.get('note') as string || null,
     };
+
+    // Normalize client data
+    const clientData = normalizeClientData(rawClientData);
 
     try {
       if (editingClient) {
@@ -302,7 +309,9 @@ export default function ClientManagement() {
 
                 // Only add if we have required fields
                 if (client.nombre_apellidos && client.direccion) {
-                  clients.push(client);
+                  // Normalize client data before adding
+                  const normalizedClient = normalizeClientData(client);
+                  clients.push(normalizedClient);
                 }
               }
             }
@@ -534,14 +543,16 @@ export default function ClientManagement() {
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="dni">DNI</Label>
-                      <Input 
-                        id="dni" 
-                        name="dni" 
-                        defaultValue={editingClient?.dni || ''}
-                      />
-                    </div>
+                     <div className="space-y-2">
+                       <Label htmlFor="dni">DNI {editingClient && "(Solo lectura)"}</Label>
+                       <Input 
+                         id="dni" 
+                         name="dni" 
+                         defaultValue={editingClient?.dni || ''}
+                         readOnly={!!editingClient}
+                         className={editingClient ? 'bg-muted cursor-not-allowed' : ''}
+                       />
+                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="email">Email</Label>
                       <Input 
