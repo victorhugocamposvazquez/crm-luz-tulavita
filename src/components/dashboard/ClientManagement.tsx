@@ -200,6 +200,9 @@ export default function ClientManagement() {
 
     try {
       if (editingClient) {
+        console.log('=== DATOS ENVIADOS A SUPABASE PARA UPDATE ===');
+        console.log('clientData:', JSON.stringify(clientData, null, 2));
+        console.log('DNI específico:', `"${clientData.dni}"`);
         const { error } = await supabase
           .from('clients')
           .update(clientData)
@@ -212,6 +215,9 @@ export default function ClientManagement() {
           description: "El cliente ha sido actualizado exitosamente",
         });
       } else {
+        console.log('=== DATOS ENVIADOS A SUPABASE PARA INSERT ===');
+        console.log('clientData:', JSON.stringify(clientData, null, 2));
+        console.log('DNI específico:', `"${clientData.dni}"`);
         const { error } = await supabase
           .from('clients')
           .insert(clientData);
