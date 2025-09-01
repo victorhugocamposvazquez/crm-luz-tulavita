@@ -21,7 +21,11 @@ export function normalizeDNI(dni: string | null | undefined): string | null {
     return null;
   }
   
-  const result = trimmed.toUpperCase();
+  // ELIMINAR TODOS LOS ESPACIOS, no solo trim
+  const withoutSpaces = trimmed.replace(/\s+/g, '');
+  console.log('DNI after removing all spaces:', `"${withoutSpaces}"`);
+  
+  const result = withoutSpaces.toUpperCase();
   console.log('DNI final result:', `"${result}"`);
   return result;
 }
