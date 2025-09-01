@@ -32,7 +32,7 @@ export default function ReminderDialog({
 }: ReminderDialogProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [reminderType, setReminderType] = useState<'specific' | 'tomorrow' | 'six_months' | 'eleven_months' | 'five_years'>('specific');
+  const [reminderType, setReminderType] = useState<'specific' | 'today' | 'tomorrow' | 'six_months' | 'eleven_months' | 'five_years'>('specific');
   const [specificDate, setSpecificDate] = useState<Date>();
   const [notes, setNotes] = useState('');
   const [selectedClient, setSelectedClient] = useState<{id: string, name: string} | null>(null);
@@ -71,6 +71,8 @@ export default function ReminderDialog({
   const getCalculatedDate = () => {
     const today = new Date();
     switch (reminderType) {
+      case 'today':
+        return today;
       case 'tomorrow':
         return addDays(today, 1);
       case 'six_months':
@@ -158,6 +160,7 @@ export default function ReminderDialog({
 
   const typeLabels = {
     specific: 'Fecha específica',
+    today: 'Hoy',
     tomorrow: 'Al día siguiente',
     six_months: 'Dentro de 6 meses',
     eleven_months: 'Dentro de 11 meses',
@@ -267,7 +270,11 @@ export default function ReminderDialog({
                   mode="single"
                   selected={specificDate}
                   onSelect={setSpecificDate}
-                  disabled={(date) => date < new Date()}
+                  disabled={(date) => {
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    return date < today;
+                  }}
                   initialFocus
                   className="p-3 pointer-events-auto"
                 />
