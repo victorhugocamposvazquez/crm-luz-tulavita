@@ -1383,19 +1383,20 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
             nombre_apellidos: e.target.value
           }))} required />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="dni">DNI/NIF (Opcional)</Label>
-            <Input 
-              id="dni" 
-              value={clientData.dni} 
-              onChange={e => setClientData(prev => ({
-                ...prev,
-                dni: e.target.value
-              }))} 
-              disabled={clientData.prospect}
-              placeholder="Introduce el DNI (opcional)"
-            />
-          </div>
+          {!clientData.prospect && (
+            <div className="space-y-2">
+              <Label htmlFor="dni">DNI/NIF</Label>
+              <Input 
+                id="dni" 
+                value={clientData.dni} 
+                onChange={e => setClientData(prev => ({
+                  ...prev,
+                  dni: e.target.value
+                }))} 
+                placeholder="Introduce el DNI"
+              />
+            </div>
+          )}
         </div>
 
         <div className="space-y-2">
