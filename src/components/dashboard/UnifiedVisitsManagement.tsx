@@ -1354,8 +1354,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
               </Button>
               <Button 
                 onClick={() => {
-                  setNoDNIMode(false);
-                  setFullName('');
+                  resetToInitialState();
                 }} 
                 variant="outline"
                 disabled={loading}
