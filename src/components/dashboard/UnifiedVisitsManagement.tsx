@@ -153,6 +153,10 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
 
       // Process the continue visit data
       handleContinueVisit(data);
+    } else {
+      // No continue data found, ensure we start fresh
+      console.log('=== NO CONTINUE VISIT DATA - STARTING FRESH ===');
+      resetToInitialState();
     }
     
     async function handleContinueVisit(data: any) {
@@ -219,7 +223,46 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
         console.log('editingVisitId:', visitId);
       } catch (error) {
         console.error('Error in continue visit:', error);
+        resetToInitialState();
       }
+    }
+
+    function resetToInitialState() {
+      console.log('=== RESETTING TO INITIAL STATE ===');
+      setCurrentStep('nif-input');
+      setClientNIF('');
+      setMultipleNIFs([]);
+      setExistingClient(null);
+      setSelectedCompany('');
+      setNoDNIMode(false);
+      setFullName('');
+      setClientData({
+        nombre_apellidos: '',
+        dni: '',
+        direccion: '',
+        localidad: '',
+        codigo_postal: '',
+        telefono1: '',
+        telefono2: '',
+        email: '',
+        note: '',
+        prospect: false
+      });
+      setVisitData({
+        notes: '',
+        status: 'in_progress' as 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed',
+        company_id: '',
+        permission: 'pending',
+        visitStateCode: ''
+      });
+      setSaleLines([]);
+      setClientComment('');
+      setClientPurchases([]);
+      setClientVisits([]);
+      setHasApproval(false);
+      setEditingVisitId(null);
+      setCurrentVisitStatus(null);
+      setIsReadOnly(false);
     }
     ;
     window.addEventListener('continueVisit', handleContinueVisit as EventListener);
