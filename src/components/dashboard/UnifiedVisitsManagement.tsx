@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -97,8 +98,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
   
   // No DNI mode state
   const [noDNIMode, setNoDNIMode] = useState(false);
-  const [clientName, setClientName] = useState('');
-  const [clientSurnames, setClientSurnames] = useState('');
+  const [fullName, setFullName] = useState('');
 
   // Form data
   const [clientData, setClientData] = useState({
@@ -542,11 +542,10 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
   };
 
   const handleNameSubmit = async () => {
-    const fullName = `${clientName.trim()} ${clientSurnames.trim()}`.trim();
-    if (!fullName || !clientName.trim() || !clientSurnames.trim()) {
+    if (!fullName.trim()) {
       toast({
         title: "Error",
-        description: "Introduce nombre y apellidos",
+        description: "Introduce nombre y apellidos completo",
         variant: "destructive"
       });
       return;
@@ -556,7 +555,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
     
     try {
       // Search for existing client by name (normalized)
-      const normalizedFullName = fullName.toUpperCase();
+      const normalizedFullName = fullName.trim().toUpperCase();
       console.log('Searching for client by name:', normalizedFullName);
       
       const { data: existingClients, error } = await supabase
@@ -571,32 +570,50 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
         const client = existingClients[0];
         setExistingClient(client);
         
-        if (userRole === 'admin') {
-          // Request approval for existing client
-          const { data: approvalRequest, error: approvalError } = await supabase
-            .from('client_approval_requests')
-            .insert({
-              client_id: client.id,
-              commercial_id: user?.id,
-              status: 'pending'
-            })
-            .select('id')
-            .single();
-
-          if (approvalError) throw approvalError;
-
-          setApprovalRequestId(approvalRequest.id);
-          setCurrentStep('pending-approval');
-          
-          toast({
-            title: "Cliente encontrado",
-            description: "Solicitud de acceso enviada al administrador",
-          });
-        } else {
-          setHasApproval(true);
-          setCurrentStep('visit-form');
-          fetchClientData(client.id);
+        // Always create the visit first, then send admin notification for approval
+        if (!user?.id || !selectedCompany) {
+          throw new Error('Usuario o empresa no válidos');
         }
+
+        // Create the visit in database
+        const { data: visitResult, error: visitError } = await supabase
+          .from('visits')
+          .insert({
+            client_id: client.id,
+            commercial_id: user.id,
+            company_id: selectedCompany,
+            status: 'in_progress' as Database['public']['Enums']['visit_status'],
+            notes: 'Visita creada sin DNI - Pendiente de validación'
+          })
+          .select('id')
+          .single();
+
+        if (visitError) throw visitError;
+
+        setEditingVisitId(visitResult.id);
+
+        // Send admin notification for approval
+        const { error: approvalError } = await supabase
+          .from('client_approval_requests')
+          .insert({
+            client_id: client.id,
+            commercial_id: user.id,
+            status: 'pending'
+          });
+
+        if (approvalError) {
+          console.error('Error creating approval request:', approvalError);
+          // Don't throw here, visit is already created
+        }
+
+        setHasApproval(true);
+        setCurrentStep('visit-form');
+        fetchClientData(client.id);
+        
+        toast({
+          title: "Visita creada",
+          description: "Cliente encontrado. Visita creada y solicitud enviada al administrador para validación.",
+        });
       } else {
         // No client found, prepare for prospect creation
         console.log('No client found by name, creating prospect');
@@ -737,8 +754,8 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
             client_id: client.id,
             commercial_id: user!.id,
             company_id: selectedCompany,
+            status: 'in_progress' as Database['public']['Enums']['visit_status'],
             notes: 'Visita creada en lote',
-            status: 'scheduled' as const,
             latitude: location?.latitude || null,
             longitude: location?.longitude || null,
             location_accuracy: location?.accuracy || null,
@@ -1014,7 +1031,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
             notes: visitData.notes,
             visit_state_code: visitData.visitStateCode,
             company_id: visitData.company_id,
-            status: isComplete ? 'completed' : currentVisitStatus || 'in_progress',
+            status: (isComplete ? 'completed' : currentVisitStatus || 'in_progress') as Database['public']['Enums']['visit_status'],
             updated_at: new Date().toISOString()
           })
           .eq('id', editingVisitId)
@@ -1304,22 +1321,12 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
         ) : (
           <>
             <div className="space-y-2">
-              <Label htmlFor="client-name">Nombre del Cliente *</Label>
+              <Label htmlFor="full-name">Nombre y Apellidos Completo *</Label>
               <Input 
-                id="client-name" 
-                value={clientName} 
-                onChange={e => setClientName(e.target.value)} 
-                placeholder="Introduce el nombre"
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="client-surnames">Apellidos del Cliente *</Label>
-              <Input 
-                id="client-surnames" 
-                value={clientSurnames} 
-                onChange={e => setClientSurnames(e.target.value)} 
-                placeholder="Introduce los apellidos"
+                id="full-name" 
+                value={fullName} 
+                onChange={e => setFullName(e.target.value)} 
+                placeholder="Introduce el nombre y apellidos completo"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     handleNameSubmit();
@@ -1331,7 +1338,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
             <div className="flex gap-2">
               <Button 
                 onClick={handleNameSubmit} 
-                disabled={loading || !selectedCompany || !location || !clientName.trim() || !clientSurnames.trim()}
+                disabled={loading || !selectedCompany || !location || !fullName.trim()}
                 className="flex-1"
               >
                 {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
@@ -1340,8 +1347,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
               <Button 
                 onClick={() => {
                   setNoDNIMode(false);
-                  setClientName('');
-                  setClientSurnames('');
+                  setFullName('');
                 }} 
                 variant="outline"
                 disabled={loading}
