@@ -1393,6 +1393,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
                   ...prev,
                   dni: e.target.value
                 }))} 
+                disabled={clientData.dni !== ''}
                 placeholder="Introduce el DNI"
               />
             </div>
