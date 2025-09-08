@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { UserPlus, Edit, Trash2, Upload, Loader2, Eye, Bell, ToggleLeft, ToggleRight } from 'lucide-react';
+import { UserPlus, Edit, Trash2, Upload, Loader2, Eye, Bell, UserCheck, UserX, User } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { formatCoordinates, parseCoordinates } from '@/lib/coordinates';
@@ -763,7 +763,6 @@ export default function ClientManagement() {
                       <TableHead>Nombre</TableHead>
                       <TableHead>DNI</TableHead>
                       <TableHead>Tipo</TableHead>
-                      <TableHead>Estado</TableHead>
                       <TableHead>Dirección</TableHead>
                       <TableHead>Coordenadas</TableHead>
                       <TableHead>Teléfono</TableHead>
@@ -773,7 +772,7 @@ export default function ClientManagement() {
             <TableBody>
               {loading ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8">
+                    <TableCell colSpan={7} className="text-center py-8">
                       <div className="flex items-center justify-center">
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
                         <span className="text-muted-foreground">Cargando clientes...</span>
@@ -782,7 +781,7 @@ export default function ClientManagement() {
                   </TableRow>
                ) : clients.length === 0 ? (
                  <TableRow>
-                     <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                     <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                        {Object.entries(filters).some(([key, value]) => {
                          if (typeof value === 'boolean') return value;
                          return value.trim() !== '';
@@ -816,26 +815,6 @@ export default function ClientManagement() {
                          }`}>
                            {client.prospect ? 'Prospecto' : 'Cliente'}
                          </span>
-                       </TableCell>
-                       <TableCell>
-                         {isAdmin ? (
-                           <Button
-                             variant="outline"
-                             size="sm"
-                             onClick={() => handleStatusToggle(client.id, client.status === 'active' ? 'inactive' : 'active')}
-                             className={client.status === 'active' ? 'text-green-600' : 'text-red-600'}
-                           >
-                             {client.status === 'active' ? 'Activo' : 'Inactivo'}
-                           </Button>
-                         ) : (
-                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                             client.status === 'active' 
-                               ? 'bg-green-100 text-green-800' 
-                               : 'bg-red-100 text-red-800'
-                           }`}>
-                             {client.status === 'active' ? 'Activo' : 'Inactivo'}
-                           </span>
-                         )}
                        </TableCell>
                        <TableCell>
                          {(() => {
@@ -911,7 +890,7 @@ export default function ClientManagement() {
                              <Eye className="h-4 w-4" />
                            </Button>
                            
-                           {/* Convert to client button for prospects */}
+                           {/* Convert to client icon for prospects */}
                            {client.prospect && isAdmin && (
                              <Button
                                variant="outline"
@@ -924,7 +903,20 @@ export default function ClientManagement() {
                                className="text-blue-600 hover:text-blue-800"
                                title="Convertir a cliente"
                              >
-                               Convertir
+                               <User className="h-4 w-4" />
+                             </Button>
+                           )}
+
+                           {/* Status toggle icons for admins */}
+                           {isAdmin && (
+                             <Button
+                               variant="outline"
+                               size="sm"
+                               onClick={() => handleStatusToggle(client.id, client.status === 'active' ? 'inactive' : 'active')}
+                               className={client.status === 'active' ? 'text-red-600 hover:text-red-800' : 'text-green-600 hover:text-green-800'}
+                               title={client.status === 'active' ? 'Desactivar cliente' : 'Activar cliente'}
+                             >
+                               {client.status === 'active' ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
                              </Button>
                            )}
 

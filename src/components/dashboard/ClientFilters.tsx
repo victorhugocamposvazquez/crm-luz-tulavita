@@ -79,17 +79,6 @@ export default function ClientFilters({ filters, onFilterChange, onClearFilters 
           className="h-8 text-sm col-span-2"
         />
 
-        <div className="flex items-center space-x-2 col-span-2">
-          <input
-            type="checkbox"
-            id="prospect-filter"
-            checked={filters.prospect}
-            onChange={(e) => onFilterChange('prospect', e.target.checked)}
-            className="h-4 w-4"
-          />
-          <Label htmlFor="prospect-filter" className="text-sm">Solo prospectos</Label>
-        </div>
-
         <Select value={filters.status || "all"} onValueChange={(value) => onFilterChange('status', value === 'all' ? '' : value)}>
           <SelectTrigger className="h-8 text-sm col-span-2">
             <SelectValue placeholder="Estado..." />
@@ -100,6 +89,17 @@ export default function ClientFilters({ filters, onFilterChange, onClearFilters 
             <SelectItem value="inactive">Inactivo</SelectItem>
           </SelectContent>
         </Select>
+
+        <div className="flex items-center space-x-2 col-span-2">
+          <input
+            type="checkbox"
+            id="prospect-filter"
+            checked={filters.prospect}
+            onChange={(e) => onFilterChange('prospect', e.target.checked)}
+            className="h-4 w-4"
+          />
+          <Label htmlFor="prospect-filter" className="text-sm">Solo prospectos</Label>
+        </div>
       </div>
     </div>
   );
