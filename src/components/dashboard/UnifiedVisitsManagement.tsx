@@ -27,6 +27,7 @@ interface Client {
   note?: string;
   latitude?: number;
   longitude?: number;
+  prospect?: boolean;
 }
 
 interface Company {
@@ -93,6 +94,11 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
   const [existingClient, setExistingClient] = useState<Client | null>(null);
   const [approvalRequestId, setApprovalRequestId] = useState<string | null>(null);
   const [selectedCompany, setSelectedCompany] = useState('');
+  
+  // No DNI mode state
+  const [noDNIMode, setNoDNIMode] = useState(false);
+  const [clientName, setClientName] = useState('');
+  const [clientSurnames, setClientSurnames] = useState('');
 
   // Form data
   const [clientData, setClientData] = useState({
@@ -104,7 +110,8 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
     telefono1: '',
     telefono2: '',
     email: '',
-    note: ''
+    note: '',
+    prospect: false
   });
   const [visitData, setVisitData] = useState({
     notes: '',
@@ -147,6 +154,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       // Process the continue visit data
       handleContinueVisit(data);
     }
+    
     async function handleContinueVisit(data: any) {
       const {
         visitId,
@@ -514,200 +522,18 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
     setLoading(true);
     
     try {
-       // If only one NIF, handle as before
-        if (nifs.length === 1) {
-          const normalizedDNI = normalizeDNI(nifs[0]);
-          if (!normalizedDNI || !validateDNI(nifs[0])) {
-            toast({
-              title: "Error",
-              description: "DNI inválido. Debe tener al menos 8 caracteres y contener al menos una letra",
-              variant: "destructive"
-            });
-            setLoading(false);
-            return;
-          }
-         
-         const { data: clientData, error } = await supabase
-           .from('clients')
-           .select('*')
-           .eq('dni', normalizedDNI)
-           .maybeSingle();
-
-        if (error) throw error;
-
-        if (clientData) {
-          // Check if client is active
-          if (clientData.status === 'inactive') {
-            toast({
-              title: "Cliente inactivo", 
-              description: "No se puede crear una visita para un cliente inactivo. Contacta con el administrador.",
-              variant: "destructive"
-            });
-            setLoading(false);
-            return;
-          }
-          
-          // Check if user is admin
-          if (userRole?.role === 'admin') {
-            // Admin doesn't need approval, go directly to visit form
-            setExistingClient(clientData);
-            setHasApproval(true);
-            await fetchClientData(clientData.id);
-            setCurrentStep('visit-form');
-          } else {
-            // Commercial user needs approval
-            setExistingClient(clientData);
-            setHasApproval(false);
-            await requestClientApproval(clientData.id);
-          }
-        } else {
-         // Client doesn't exist, create new
-         setClientData(prev => ({
-           ...prev,
-           dni: normalizedDNI
-         }));
-          setCurrentStep('client-form');
-        }
-       } else {
-         // Multiple NIFs - handle bulk creation
-         if (!selectedCompany) {
-           toast({
-             title: "Error", 
-             description: "Selecciona una empresa antes de crear visitas en lote",
-             variant: "destructive"
-           });
-           setLoading(false);
-           return;
-         }
-
-          // Normalize and validate all DNIs before search
-          const validNIFs = nifs.filter(nif => validateDNI(nif));
-          const normalizedNIFs = validNIFs.map(nif => normalizeDNI(nif)).filter(Boolean) as string[];
-          
-          const invalidCount = nifs.length - validNIFs.length;
-          if (invalidCount > 0) {
-            toast({
-              title: "DNIs inválidos detectados",
-              description: `${invalidCount} DNI(s) no cumplen los requisitos (mínimo 8 caracteres con al menos una letra) y fueron omitidos`,
-              variant: "destructive"
-            });
-          }
-         
-         if (normalizedNIFs.length === 0) {
-           toast({
-             title: "Error",
-             description: "No se encontraron DNIs válidos",
-             variant: "destructive"
-           });
-           setLoading(false);
-           return;
-         }
-
-         const { data: existingClients, error: clientError } = await supabase
-           .from('clients')
-           .select('id, dni, nombre_apellidos, status')
-           .in('dni', normalizedNIFs);
-
-        if (clientError) throw clientError;
-
-        // Filter out inactive clients
-        const activeClients = existingClients?.filter(c => c.status !== 'inactive') || [];
-        const inactiveClients = existingClients?.filter(c => c.status === 'inactive') || [];
-        
-        if (inactiveClients.length > 0) {
-          toast({
-            title: "Clientes inactivos detectados",
-            description: `Los siguientes clientes están inactivos y no se crearán visitas: ${inactiveClients.map(c => c.dni).join(', ')}`,
-            variant: "destructive"
-          });
-        }
-
-         const existingNIFs = activeClients?.map(c => c.dni) || [];
-         const missingNIFs = normalizedNIFs.filter(nif => !existingNIFs.includes(nif));
-
-        // Create visits for existing active clients
-        if (activeClients && activeClients.length > 0) {
-          const batchId = crypto.randomUUID();
-          
-          for (const client of activeClients) {
-            // Create approval request for each client (only for commercials)
-            if (userRole?.role !== 'admin') {
-              const { data: approvalData, error: approvalError } = await supabase
-                .from('client_approval_requests')
-                .insert({
-                  client_id: client.id,
-                  commercial_id: user?.id,
-                  status: 'pending'
-                })
-                .select()
-                .single();
-
-              if (approvalError) throw approvalError;
-            }
-
-            // Create visit for each existing client
-            const visitPayload = {
-              client_id: client.id,
-              commercial_id: user?.id,
-              company_id: selectedCompany,
-              status: 'in_progress' as const,
-              approval_status: userRole?.role === 'admin' ? 'approved' as const : 'waiting_admin' as const,
-              notes: '',
-              batch_id: batchId,
-              visit_date: new Date().toISOString(),
-              permission: userRole?.role === 'admin' ? 'approved' : 'pending',
-              latitude: location?.latitude || null,
-              longitude: location?.longitude || null,
-              location_accuracy: location?.accuracy || null
-            };
-
-            const { data: visitData, error: visitError } = await supabase
-              .from('visits')
-              .insert(visitPayload)
-              .select()
-              .single();
-
-            if (visitError) throw visitError;
-
-            // Dispatch event for each created visit
-            window.dispatchEvent(new CustomEvent('visitCreated', {
-              detail: visitData
-            }));
-          }
-
-          toast({
-            title: "Visitas creadas",
-            description: `Se crearon ${existingClients.length} visitas. ${missingNIFs.length > 0 ? `${missingNIFs.length} DNIs no encontrados.` : ''}`
-          });
-
-          if (missingNIFs.length > 0) {
-            toast({
-              title: "DNIs no encontrados",
-              description: `Los siguientes DNIs requieren crear clientes individualmente: ${missingNIFs.join(', ')}`,
-              variant: "default"
-            });
-          }
-
-          // Reset form and redirect to visits list for bulk creation
-          setClientNIF('');
-          setSelectedCompany('');
-          setCurrentStep('nif-input');
-          
-          // Redirect to visits list after bulk creation immediately
-          window.dispatchEvent(new CustomEvent('navigateToVisitsList'));
-        } else {
-          toast({
-            title: "Sin clientes encontrados",
-            description: "Ninguno de los DNIs introducidos existe. Para crear clientes, introduce un solo DNI.",
-            variant: "destructive"
-          });
-        }
+      // Handle multiple DNIs vs single DNI
+      if (nifs.length > 1) {
+        setMultipleNIFs(nifs);
+        await handleMultipleDNIs(nifs);
+      } else {
+        await handleSingleDNI(nifs[0]);
       }
     } catch (error) {
-      console.error('Error checking clients:', error);
+      console.error('Error in handleNIFSubmit:', error);
       toast({
         title: "Error",
-        description: "Error al verificar los clientes",
+        description: "Error procesando los DNI",
         variant: "destructive"
       });
     } finally {
@@ -715,91 +541,309 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
     }
   };
 
-  const requestClientApproval = async (clientId: string) => {
+  const handleNameSubmit = async () => {
+    const fullName = `${clientName.trim()} ${clientSurnames.trim()}`.trim();
+    if (!fullName || !clientName.trim() || !clientSurnames.trim()) {
+      toast({
+        title: "Error",
+        description: "Introduce nombre y apellidos",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setLoading(true);
+    
     try {
-      console.log('=== REQUESTING CLIENT APPROVAL AND CREATING VISIT ===');
-
-      // Create approval request in database
-      const {
-        data: approvalRequest,
-        error
-      } = await supabase.from('client_approval_requests').insert({
-        client_id: clientId,
-        commercial_id: user!.id
-      }).select().single();
-      if (error) throw error;
-      console.log('Approval request created:', approvalRequest);
-
-      // IMMEDIATELY CREATE THE VISIT as pending approval
-      const visitPayload = {
-        client_id: clientId,
-        commercial_id: user!.id,
-        company_id: companies[0]?.id || null,
-        // Use first available company or null
-        notes: '',
-        status: 'in_progress' as 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed',
-        latitude: location?.latitude || null,
-        longitude: location?.longitude || null,
-        location_accuracy: location?.accuracy || null,
-        visit_date: new Date().toISOString(),
-        approval_status: 'waiting_admin' as 'pending' | 'approved' | 'rejected' | 'waiting_admin',
-        permission: 'pending'
-      };
-      console.log('Creating visit immediately with payload:', visitPayload);
-      const {
-        data: visit,
-        error: visitError
-      } = await supabase.from('visits').insert(visitPayload as any).select().single();
-      if (visitError) {
-        console.error('Error creating visit:', visitError);
-        throw visitError;
-      }
-      console.log('Visit created successfully:', visit);
-
-      // Set the editing visit ID so that subsequent saves update this visit instead of creating new ones
-      setEditingVisitId(visit.id);
-      console.log('Dispatching visitCreated event immediately');
-      window.dispatchEvent(new CustomEvent('visitCreated', {
-        detail: visit
-      }));
+      // Search for existing client by name (normalized)
+      const normalizedFullName = fullName.toUpperCase();
+      console.log('Searching for client by name:', normalizedFullName);
       
-      // Reset form and navigate directly to visits list
-      setApprovalRequestId(approvalRequest.id);
-      setClientNIF('');
-      setSelectedCompany('');
-      setCurrentStep('nif-input');
+      const { data: existingClients, error } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('nombre_apellidos', normalizedFullName);
+
+      if (error) throw error;
+      
+      if (existingClients && existingClients.length > 0) {
+        console.log('Found existing client by name:', existingClients[0]);
+        const client = existingClients[0];
+        setExistingClient(client);
+        
+        if (userRole === 'admin') {
+          // Request approval for existing client
+          const { data: approvalRequest, error: approvalError } = await supabase
+            .from('client_approval_requests')
+            .insert({
+              client_id: client.id,
+              commercial_id: user?.id,
+              status: 'pending'
+            })
+            .select('id')
+            .single();
+
+          if (approvalError) throw approvalError;
+
+          setApprovalRequestId(approvalRequest.id);
+          setCurrentStep('pending-approval');
+          
+          toast({
+            title: "Cliente encontrado",
+            description: "Solicitud de acceso enviada al administrador",
+          });
+        } else {
+          setHasApproval(true);
+          setCurrentStep('visit-form');
+          fetchClientData(client.id);
+        }
+      } else {
+        // No client found, prepare for prospect creation
+        console.log('No client found by name, creating prospect');
+        setClientData(prev => ({
+          ...prev,
+          nombre_apellidos: normalizedFullName,
+          dni: '', // Will be empty for prospects
+          prospect: true
+        }));
+        setCurrentStep('client-form');
+      }
+    } catch (error) {
+      console.error('Error searching by name:', error);
+      toast({
+        title: "Error",
+        description: "Error al buscar el cliente",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSingleDNI = async (dniInput: string) => {
+    const normalizedDNI = normalizeDNI(dniInput);
+    if (!normalizedDNI || !validateDNI(dniInput)) {
+      toast({
+        title: "Error",
+        description: "DNI inválido. Debe tener al menos 8 caracteres y contener al menos una letra",
+        variant: "destructive"
+      });
+      return;
+    }
+    
+    const { data: clientData, error } = await supabase
+      .from('clients')
+      .select('*')
+      .eq('dni', normalizedDNI)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    if (clientData) {
+      // Check if client is active
+      if (clientData.status === 'inactive') {
+        toast({
+          title: "Cliente inactivo", 
+          description: "No se puede crear una visita para un cliente inactivo. Contacta con el administrador.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Check if user is admin
+      if (userRole?.role === 'admin') {
+        // Admin doesn't need approval, go directly to visit form
+        setExistingClient(clientData);
+        setHasApproval(true);
+        await fetchClientData(clientData.id);
+        setCurrentStep('visit-form');
+      } else {
+        // Commercial user needs approval
+        setExistingClient(clientData);
+        setHasApproval(false);
+        await requestClientApproval(clientData.id);
+      }
+    } else {
+      // Client doesn't exist, create new
+      setClientData(prev => ({
+        ...prev,
+        dni: normalizedDNI
+      }));
+      setCurrentStep('client-form');
+    }
+  };
+
+  const handleMultipleDNIs = async (nifs: string[]) => {
+    if (!selectedCompany) {
+      toast({
+        title: "Error", 
+        description: "Selecciona una empresa antes de crear visitas en lote",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Normalize and validate all DNIs before search
+    const validNIFs = nifs.filter(nif => validateDNI(nif));
+    const normalizedNIFs = validNIFs.map(nif => normalizeDNI(nif)).filter(Boolean) as string[];
+    
+    const invalidCount = nifs.length - validNIFs.length;
+    if (invalidCount > 0) {
+      toast({
+        title: "DNIs inválidos detectados",
+        description: `${invalidCount} DNI(s) no cumplen los requisitos (mínimo 8 caracteres con al menos una letra) y fueron omitidos`,
+        variant: "destructive"
+      });
+    }
+    
+    if (normalizedNIFs.length === 0) {
+      toast({
+        title: "Error",
+        description: "No se encontraron DNIs válidos",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const { data: existingClients, error: clientError } = await supabase
+      .from('clients')
+      .select('id, dni, nombre_apellidos, status')
+      .in('dni', normalizedNIFs);
+
+    if (clientError) throw clientError;
+
+    // Filter out inactive clients
+    const activeClients = existingClients?.filter(c => c.status !== 'inactive') || [];
+    const inactiveClients = existingClients?.filter(c => c.status === 'inactive') || [];
+    
+    if (inactiveClients.length > 0) {
+      toast({
+        title: "Clientes inactivos detectados",
+        description: `Los siguientes clientes están inactivos y no se crearán visitas: ${inactiveClients.map(c => c.dni).join(', ')}`,
+        variant: "destructive"
+      });
+    }
+
+    const existingNIFs = activeClients?.map(c => c.dni) || [];
+    const missingNIFs = normalizedNIFs.filter(nif => !existingNIFs.includes(nif));
+
+    // Create visits for existing active clients
+    if (activeClients && activeClients.length > 0) {
+      const batchId = crypto.randomUUID();
+      const visitPromises = activeClients.map(client => {
+        return supabase
+          .from('visits')
+          .insert({
+            client_id: client.id,
+            commercial_id: user!.id,
+            company_id: selectedCompany,
+            notes: 'Visita creada en lote',
+            status: 'scheduled' as const,
+            latitude: location?.latitude || null,
+            longitude: location?.longitude || null,
+            location_accuracy: location?.accuracy || null,
+            visit_date: new Date().toISOString(),
+            approval_status: 'approved' as const,
+            permission: 'approved',
+            batch_id: batchId
+          });
+      });
+
+      await Promise.all(visitPromises);
       
       toast({
-        title: "✅ Visita creada exitosamente",
-        description: "La visita se ha guardado correctamente"
+        title: "Visitas creadas",
+        description: `Se crearon ${activeClients.length} visitas para clientes existentes`
       });
+    }
+
+    if (missingNIFs.length > 0) {
+      toast({
+        title: "Sin clientes encontrados",
+        description: `No se encontraron clientes para ${missingNIFs.length} DNI(s): ${missingNIFs.slice(0, 3).join(', ')}${missingNIFs.length > 3 ? '...' : ''}`,
+        variant: "destructive"
+      });
+    }
+
+    // Reset form and redirect to visits list for bulk creation
+    setClientNIF('');
+    setSelectedCompany('');
+    setCurrentStep('nif-input');
+    
+    // Redirect to visits list after bulk creation immediately
+    window.dispatchEvent(new CustomEvent('navigateToVisitsList'));
+  };
+
+  const requestClientApproval = async (clientId: string) => {
+    try {
+      console.log('Requesting client approval for:', clientId);
       
-      // Navigate to visits list and trigger refresh immediately
-      window.dispatchEvent(new CustomEvent('navigateToVisitsList'));
-      // Trigger visits list refresh
-      window.dispatchEvent(new CustomEvent('refreshVisitsList'));
+      // Check if approval request already exists
+      const { data: existingRequest, error: checkError } = await supabase
+        .from('client_approval_requests')
+        .select('id, status')
+        .eq('client_id', clientId)
+        .eq('commercial_id', user!.id)
+        .eq('status', 'pending')
+        .maybeSingle();
+      
+      if (checkError && checkError.code !== 'PGRST116') {
+        throw checkError;
+      }
+      
+      if (existingRequest) {
+        console.log('Using existing approval request:', existingRequest.id);
+        setApprovalRequestId(existingRequest.id);
+        setCurrentStep('pending-approval');
+        return;
+      }
+      
+      // Create new approval request
+      const { data: approvalRequest, error: approvalError } = await supabase
+        .from('client_approval_requests')
+        .insert({
+          client_id: clientId,
+          commercial_id: user!.id,
+          status: 'pending'
+        })
+        .select('id')
+        .single();
+      
+      if (approvalError) throw approvalError;
+      
+      console.log('Created new approval request:', approvalRequest.id);
+      setApprovalRequestId(approvalRequest.id);
+      setCurrentStep('pending-approval');
+      
+      toast({
+        title: "Solicitud enviada",
+        description: "Esperando aprobación del administrador para acceder a los datos del cliente"
+      });
     } catch (error) {
       console.error('Error requesting approval:', error);
       toast({
         title: "Error",
-        description: "Error al crear la visita",
+        description: "Error al solicitar aprobación",
         variant: "destructive"
       });
     }
   };
 
   const handleCreateClient = async () => {
-    if (!clientData.nombre_apellidos || !clientData.direccion || !clientData.localidad || !clientData.codigo_postal) {
+    console.log('Creating client with data:', clientData);
+    
+    // Validate form data
+    if (!clientData.nombre_apellidos || !clientData.direccion || !clientData.localidad) {
       toast({
         title: "Error",
-        description: "Completa los campos obligatorios (Nombre, Dirección, Localidad y Código Postal)",
+        description: "Completa los campos obligatorios: Nombre, Dirección y Localidad",
         variant: "destructive"
       });
       return;
     }
     
-    // Validate DNI if provided
-    if (clientData.dni && !validateDNI(clientData.dni)) {
+    // Validate DNI if provided (for non-prospects)
+    if (!clientData.prospect && clientData.dni && !validateDNI(clientData.dni)) {
       toast({
         title: "Error",
         description: "El DNI debe tener al menos 8 caracteres y contener al menos una letra",
@@ -822,12 +866,15 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
        // Include coordinates in client data
        const rawClientPayload = {
          ...clientData,
+         dni: clientData.prospect ? null : clientData.dni, // Set DNI to null for prospects
          latitude: location?.latitude || null,
          longitude: location?.longitude || null
        };
        
-       // Normalize client data before inserting
-       const clientPayload = normalizeClientData(rawClientPayload);
+       // Normalize client data before inserting (but handle null DNI correctly)
+       const clientPayload = clientData.prospect 
+         ? { ...rawClientPayload, dni: null } 
+         : normalizeClientData(rawClientPayload);
        
        const {
          data: newClient,
@@ -864,8 +911,10 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       console.log('New visit created:', newVisit);
       
       toast({
-        title: "Cliente y visita creados",
-        description: "Cliente registrado exitosamente y visita creada automáticamente"
+        title: clientData.prospect ? "Prospecto y visita creados" : "Cliente y visita creados",
+        description: clientData.prospect 
+          ? "Prospecto registrado exitosamente y visita creada automáticamente" 
+          : "Cliente registrado exitosamente y visita creada automáticamente"
       });
       
       // Dispatch events to navigate back to visits list (same pattern as when completing a visit)
@@ -895,23 +944,11 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
     }
   };
 
-  const addSaleLineProduct = () => {
-    setSaleLines([...saleLines, {
-      type: 'product',
-      products: [{ product_name: '' }],
-      quantity: 1,
-      unit_price: 0,
-      financiada: false,
-      transferencia: false,
-      nulo: false
-    }]);
-  };
-
   const addSaleLinePack = () => {
     setSaleLines([...saleLines, {
       type: 'pack',
-      products: [{ product_name: '' }],
-      quantity: 1, // Always 1 for packs
+      products: [{ product_name: '' }, { product_name: '' }],
+      quantity: 1,
       unit_price: 0,
       financiada: false,
       transferencia: false,
@@ -923,233 +960,235 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
     setSaleLines(saleLines.filter((_, i) => i !== index));
   };
 
-  const updateSaleLine = (index: number, field: keyof SaleLine, value: any) => {
-    const updated = [...saleLines];
-    updated[index] = {
-      ...updated[index],
-      [field]: value
-    };
-    setSaleLines(updated);
-    // Persist partial form state for resilience on remount
-    try {
-      const persisted = sessionStorage.getItem('continueVisitData');
-      if (persisted) {
-        const data = JSON.parse(persisted);
-        sessionStorage.setItem('continueVisitData', JSON.stringify({
-          ...data,
-          draft: {
-            visitData,
-            saleLines: updated,
-            hasApproval,
-            editingVisitId
-          }
-        }));
-      }
-    } catch {}
+  const updateSaleLine = (index: number, field: string, value: any) => {
+    const newSaleLines = [...saleLines];
+    (newSaleLines[index] as any)[field] = value;
+    setSaleLines(newSaleLines);
   };
 
-  const handleSaveVisit = async (isComplete: boolean) => {
-    console.log('=== UNIFIED VISITS - STARTING VISIT SAVE ===');
-    console.log('editingVisitId:', editingVisitId);
-    console.log('isComplete:', isComplete);
-    console.log('existingClient:', existingClient);
-    console.log('visitData:', visitData);
-    console.log('user:', user);
+  const handleSaveVisit = async (isComplete: boolean = false) => {
+    console.log('handleSaveVisit called with isComplete:', isComplete);
+    console.log('Current visitData:', visitData);
+    console.log('Current saleLines:', saleLines);
     
-    if (!existingClient || !visitData.company_id) {
-      console.log('=== VALIDATION FAILED ===');
-      console.log('Missing client or company');
-      console.log('existingClient:', existingClient);
-      console.log('visitData.company_id:', visitData.company_id);
+    // Validate required fields
+    if (!visitData.company_id || !visitData.notes.trim() || !visitData.visitStateCode) {
       toast({
         title: "Error",
-        description: "Debes seleccionar una empresa",
+        description: "Completa todos los campos obligatorios: Empresa, Notas y Estado de la Visita",
         variant: "destructive"
       });
       return;
     }
-    
+
+    if (!existingClient) {
+      toast({
+        title: "Error",
+        description: "No hay cliente seleccionado",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!location) {
+      toast({
+        title: "Error",
+        description: "Ubicación requerida para guardar la visita",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
-    
     try {
+      console.log('Starting visit save process...');
+      
       let visit;
       
       if (editingVisitId) {
+        console.log('Updating existing visit:', editingVisitId);
         // Update existing visit
-        console.log('=== UPDATING EXISTING VISIT ===');
-        const updatePayload = {
-          company_id: visitData.company_id,
-          notes: visitData.notes || null,
-          status: isComplete ? 'completed' as const : 'in_progress' as const,
-          visit_state_code: visitData.visitStateCode || null,
-          // Solo actualizar coordenadas si la visita no está completada o si se está completando ahora
-          ...(currentVisitStatus !== 'completed' && location ? {
-            latitude: location.latitude,
-            longitude: location.longitude, 
-            location_accuracy: location.accuracy
-          } : {})
-        };
-        
-        console.log('Update payload:', updatePayload);
-        
-        const { error: visitError } = await supabase
+        const { data: updatedVisit, error: visitError } = await supabase
           .from('visits')
-          .update(updatePayload as any)
-          .eq('id', editingVisitId);
-          
-        if (visitError) {
-          console.error('Visit update error:', visitError);
-          throw visitError;
-        }
-
-        // Fetch updated visit to get the complete data
-        const { data: fetchedVisit, error: fetchError } = await supabase
-          .from('visits')
-          .select('*')
+          .update({
+            notes: visitData.notes,
+            visit_state_code: visitData.visitStateCode,
+            company_id: visitData.company_id,
+            status: isComplete ? 'completed' : currentVisitStatus || 'in_progress',
+            updated_at: new Date().toISOString()
+          })
           .eq('id', editingVisitId)
+          .select()
           .single();
-          
-        if (fetchError) {
-          console.error('Error fetching updated visit:', fetchError);
-          visit = { id: editingVisitId, ...updatePayload };
-        } else {
-          visit = fetchedVisit;
-        }
         
-        console.log('=== VISIT UPDATED SUCCESSFULLY ===');
-        console.log('Updated visit:', visit);
+        if (visitError) throw visitError;
+        visit = updatedVisit;
+        console.log('Visit updated successfully:', visit);
       } else {
-        // Create new visit (shouldn't happen in edit mode)
-        console.log('=== CREATING NEW VISIT (FALLBACK) ===');
+        console.log('Creating new visit...');
+        // Create new visit
         const visitPayload = {
           client_id: existingClient.id,
           commercial_id: user!.id,
           company_id: visitData.company_id,
-          notes: visitData.notes || null,
-          status: isComplete ? 'completed' as const : 'in_progress' as const,
-          latitude: location?.latitude || null,
-          longitude: location?.longitude || null,
-          location_accuracy: location?.accuracy || null,
+          notes: visitData.notes,
+          visit_state_code: visitData.visitStateCode,
+          status: isComplete ? 'completed' : 'in_progress',
+          latitude: location.latitude,
+          longitude: location.longitude,
+          location_accuracy: location.accuracy || null,
           visit_date: new Date().toISOString(),
-          approval_status: 'pending' as 'pending' | 'approved' | 'rejected' | 'waiting_admin',
-          permission: 'pending',
-          visit_state_code: visitData.visitStateCode || null
+          approval_status: hasApproval ? 'approved' : 'pending',
+          permission: hasApproval ? 'approved' : 'pending'
         };
-        
+
         const { data: newVisit, error: visitError } = await supabase
           .from('visits')
           .insert(visitPayload as any)
           .select()
           .single();
-          
-        if (visitError) {
-          console.error('Visit creation error:', visitError);
-          throw visitError;
-        }
         
+        if (visitError) throw visitError;
         visit = newVisit;
-        setEditingVisitId(newVisit.id); // Set the ID for future saves
+        console.log('New visit created:', visit);
       }
 
-      // Handle sales - always save if there are sale lines, regardless of completion status
+      // Handle sales if there are any
       if (saleLines.length > 0) {
-        const totalAmount = saleLines.reduce((sum, line) => sum + line.quantity * line.unit_price, 0);
-
-        // Check if there's already a sale for this specific visit
-        const {
-          data: existingSales
-        } = await supabase.from('sales').select('id').eq('visit_id', visit.id).maybeSingle();
+        console.log('Processing sale lines...');
+        
+        // Calculate total amount
+        const totalAmount = saleLines.reduce((sum, line) => sum + (line.quantity * line.unit_price), 0);
+        console.log('Total sale amount:', totalAmount);
         
         let saleId;
-        if (existingSales) {
-          // Update the existing sale for this visit
-          saleId = existingSales.id;
-          const {
-            error: saleUpdateError
-          } = await supabase.from('sales').update({
-            amount: totalAmount,
-            latitude: location?.latitude,
-            longitude: location?.longitude,
-            location_accuracy: location?.accuracy,
-            sale_date: new Date().toISOString()
-          }).eq('id', saleId);
-          if (saleUpdateError) throw saleUpdateError;
-
-          // Delete existing sale lines for this sale
-          const {
-            error: deleteError
-          } = await supabase.from('sale_lines').delete().eq('sale_id', saleId);
-          if (deleteError) throw deleteError;
-        } else {
-          // Create new sale linked to this specific visit
-          const salePayload = {
-            client_id: existingClient.id,
-            commercial_id: user!.id,
-            company_id: visitData.company_id,
-            visit_id: visit.id, // Link the sale to this specific visit
-            amount: totalAmount,
-            latitude: location?.latitude,
-            longitude: location?.longitude,
-            location_accuracy: location?.accuracy,
-            sale_date: new Date().toISOString()
-          };
-          const {
-            data: sale,
-            error: saleError
-          } = await supabase.from('sales').insert(salePayload).select().single();
-          if (saleError) throw saleError;
-          saleId = sale.id;
-        }
-
-        // Insert new sale lines without product names (they go to sale_lines_products)
-        const saleLinesPayload = saleLines.map(line => ({
-          quantity: line.quantity,
-          unit_price: line.unit_price,
-          financiada: line.financiada,
-          transferencia: line.transferencia,
-          nulo: line.nulo,
-          sale_id: saleId
-        }));
         
-        const { data: insertedSaleLines, error: linesError } = await supabase
-          .from('sale_lines')
-          .insert(saleLinesPayload)
-          .select('id');
-        
-        if (linesError) throw linesError;
-
-        // Insert products for each sale line
-        if (insertedSaleLines) {
-          const productInserts = [];
-          for (let i = 0; i < insertedSaleLines.length; i++) {
-            const saleLineId = insertedSaleLines[i].id;
-            const products = saleLines[i].products;
-            
-            for (const product of products) {
-              productInserts.push({
-                sale_line_id: saleLineId,
-                product_name: product.product_name
-              });
-            }
+        if (editingVisitId) {
+          // Check if sale already exists for this visit
+          const { data: existingSale, error: saleCheckError } = await supabase
+            .from('sales')
+            .select('id')
+            .eq('visit_id', editingVisitId)
+            .maybeSingle();
+          
+          if (saleCheckError && saleCheckError.code !== 'PGRST116') {
+            throw saleCheckError;
           }
           
-          if (productInserts.length > 0) {
-            const { error: productsError } = await supabase
-              .from('sale_lines_products')
-              .insert(productInserts);
+          if (existingSale) {
+            console.log('Updating existing sale:', existingSale.id);
+            // Update existing sale
+            const { data: updatedSale, error: saleError } = await supabase
+              .from('sales')
+              .update({
+                amount: totalAmount,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', existingSale.id)
+              .select()
+              .single();
             
-            if (productsError) throw productsError;
+            if (saleError) throw saleError;
+            saleId = updatedSale.id;
+            
+            // Delete existing sale lines
+            await supabase
+              .from('sale_lines_products')
+              .delete()
+              .in('sale_line_id', 
+                await supabase
+                  .from('sale_lines')
+                  .select('id')
+                  .eq('sale_id', saleId)
+                  .then(({ data }) => (data || []).map(sl => sl.id))
+              );
+            
+            await supabase
+              .from('sale_lines')
+              .delete()
+              .eq('sale_id', saleId);
+          } else {
+            // Create new sale for existing visit
+            console.log('Creating new sale for existing visit...');
+            const { data: newSale, error: saleError } = await supabase
+              .from('sales')
+              .insert({
+                client_id: existingClient.id,
+                commercial_id: user!.id,
+                company_id: visitData.company_id,
+                amount: totalAmount,
+                visit_id: visit.id,
+                latitude: location.latitude,
+                longitude: location.longitude,
+                location_accuracy: location.accuracy || null
+              })
+              .select()
+              .single();
+            
+            if (saleError) throw saleError;
+            saleId = newSale.id;
+          }
+        } else {
+          // Create new sale for new visit
+          console.log('Creating new sale...');
+          const { data: newSale, error: saleError } = await supabase
+            .from('sales')
+            .insert({
+              client_id: existingClient.id,
+              commercial_id: user!.id,
+              company_id: visitData.company_id,
+              amount: totalAmount,
+              visit_id: visit.id,
+              latitude: location.latitude,
+              longitude: location.longitude,
+              location_accuracy: location.accuracy || null
+            })
+            .select()
+            .single();
+          
+          if (saleError) throw saleError;
+          saleId = newSale.id;
+        }
+
+        // Create sale lines
+        console.log('Creating sale lines...');
+        for (const [index, line] of saleLines.entries()) {
+          const lineTotal = line.quantity * line.unit_price;
+          
+          const { data: saleLine, error: lineError } = await supabase
+            .from('sale_lines')
+            .insert({
+              sale_id: saleId,
+              quantity: line.quantity,
+              unit_price: line.unit_price,
+              line_total: lineTotal,
+              financiada: line.financiada,
+              transferencia: line.transferencia,
+              nulo: line.nulo
+            })
+            .select()
+            .single();
+          
+          if (lineError) throw lineError;
+          console.log('Sale line created:', saleLine);
+          
+          // Create products for this line
+          for (const product of line.products) {
+            if (product.product_name.trim()) {
+              const { error: productError } = await supabase
+                .from('sale_lines_products')
+                .insert({
+                  sale_line_id: saleLine.id,
+                  product_name: product.product_name.trim()
+                });
+              
+              if (productError) throw productError;
+              console.log('Product created for line:', product.product_name);
+            }
           }
         }
       }
 
-      // Add client comment if provided (simplified for now)
-      if (clientComment.trim()) {
-        console.log('Client comment:', clientComment.trim());
-        // This would be saved to client_comments table once types are updated
-      }
-      console.log('=== EMITTING CUSTOM EVENT ===');
-      
       toast({
         title: isComplete ? "Visita finalizada" : "Visita guardada",
         description: isComplete ? "La visita se ha completado y las ventas son definitivas" : "La visita se ha guardado. Las ventas son temporales hasta finalizar"
@@ -1227,29 +1266,92 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
           </Select>
         </div>
         
-        <div className="space-y-2">
-          <Label htmlFor="nif">NIF/DNI del Cliente</Label>
-          <Input 
-            id="nif" 
-            value={clientNIF} 
-            onChange={e => setClientNIF(e.target.value)} 
-            placeholder="Introduce uno o varios DNI separados por comas (ej: 12345678A, 87654321B)"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                handleNIFSubmit();
-              }
-            }}
-          />
-          <p className="text-sm text-muted-foreground mt-1">
-            • Para un solo DNI: si no existe, podrás crear el cliente<br/>
-            • Para múltiples DNIs: solo se crearán visitas para clientes existentes
-          </p>
-        </div>
+        {!noDNIMode ? (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="nif">NIF/DNI del Cliente</Label>
+              <Input 
+                id="nif" 
+                value={clientNIF} 
+                onChange={e => setClientNIF(e.target.value)} 
+                placeholder="Introduce uno o varios DNI separados por comas (ej: 12345678A, 87654321B)"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleNIFSubmit();
+                  }
+                }}
+              />
+              <p className="text-sm text-muted-foreground mt-1">
+                • Para un solo DNI: si no existe, podrás crear el cliente<br/>
+                • Para múltiples DNIs: solo se crearán visitas para clientes existentes
+              </p>
+            </div>
+            
+            <div className="flex gap-2">
+              <Button onClick={handleNIFSubmit} disabled={loading || !selectedCompany || !location} className="flex-1">
+                {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Verificar Cliente(s)
+              </Button>
+              <Button 
+                onClick={() => setNoDNIMode(true)} 
+                variant="outline"
+                disabled={loading || !selectedCompany || !location}
+              >
+                No tengo DNI
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="space-y-2">
+              <Label htmlFor="client-name">Nombre del Cliente *</Label>
+              <Input 
+                id="client-name" 
+                value={clientName} 
+                onChange={e => setClientName(e.target.value)} 
+                placeholder="Introduce el nombre"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="client-surnames">Apellidos del Cliente *</Label>
+              <Input 
+                id="client-surnames" 
+                value={clientSurnames} 
+                onChange={e => setClientSurnames(e.target.value)} 
+                placeholder="Introduce los apellidos"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    handleNameSubmit();
+                  }
+                }}
+              />
+            </div>
+            
+            <div className="flex gap-2">
+              <Button 
+                onClick={handleNameSubmit} 
+                disabled={loading || !selectedCompany || !location || !clientName.trim() || !clientSurnames.trim()}
+                className="flex-1"
+              >
+                {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Buscar Cliente
+              </Button>
+              <Button 
+                onClick={() => {
+                  setNoDNIMode(false);
+                  setClientName('');
+                  setClientSurnames('');
+                }} 
+                variant="outline"
+                disabled={loading}
+              >
+                Volver
+              </Button>
+            </div>
+          </>
+        )}
         
-        <Button onClick={handleNIFSubmit} disabled={loading || !selectedCompany || !location}>
-          {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-          Verificar Cliente(s)
-        </Button>
         {!location && (
           <p className="text-sm text-amber-600 mt-2">
             ⚠️ Necesitas activar la geolocalización para crear visitas
@@ -1258,10 +1360,9 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       </CardContent>
     </Card>;
 
-
   const renderClientForm = () => <Card>
       <CardHeader>
-        <CardTitle>Nuevo cliente</CardTitle>
+        <CardTitle>{clientData.prospect ? 'Nuevo prospecto' : 'Nuevo cliente'}</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
@@ -1273,11 +1374,17 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
           }))} required />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="dni">DNI/NIF</Label>
-            <Input id="dni" value={clientData.dni} onChange={e => setClientData(prev => ({
-            ...prev,
-            dni: e.target.value
-          }))} disabled />
+            <Label htmlFor="dni">DNI/NIF {clientData.prospect && '(Opcional para prospectos)'}</Label>
+            <Input 
+              id="dni" 
+              value={clientData.dni} 
+              onChange={e => setClientData(prev => ({
+                ...prev,
+                dni: e.target.value
+              }))} 
+              disabled={clientData.prospect}
+              placeholder={clientData.prospect ? 'No requerido para prospectos' : 'Introduce el DNI'}
+            />
           </div>
         </div>
 
@@ -1298,24 +1405,24 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
           }))} required />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="codigo_postal">Código Postal *</Label>
+            <Label htmlFor="codigo_postal">Código Postal</Label>
             <Input id="codigo_postal" value={clientData.codigo_postal} onChange={e => setClientData(prev => ({
             ...prev,
             codigo_postal: e.target.value
-          }))} required />
+          }))} />
           </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="telefono1">Teléfono 1</Label>
+            <Label htmlFor="telefono1">Teléfono Principal</Label>
             <Input id="telefono1" value={clientData.telefono1} onChange={e => setClientData(prev => ({
             ...prev,
             telefono1: e.target.value
           }))} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="telefono2">Teléfono 2</Label>
+            <Label htmlFor="telefono2">Teléfono Secundario</Label>
             <Input id="telefono2" value={clientData.telefono2} onChange={e => setClientData(prev => ({
             ...prev,
             telefono2: e.target.value
@@ -1333,105 +1440,139 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
 
         <div className="space-y-2">
           <Label htmlFor="note">Nota</Label>
-          <Textarea 
-            id="note" 
-            value={clientData.note || ''} 
-            onChange={e => setClientData(prev => ({
-              ...prev,
-              note: e.target.value
-            }))}
-            placeholder="Añade una nota sobre este cliente..."
-            className="min-h-[60px]"
-          />
+          <Textarea id="note" value={clientData.note} onChange={e => setClientData(prev => ({
+          ...prev,
+          note: e.target.value
+        }))} rows={3} />
         </div>
 
         {location && (
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Latitud</Label>
-              <Input 
-                type="text"
-                value={formatCoordinates(location.latitude, location.longitude).split(' ')[0]}
-                readOnly
-                className="bg-muted"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Longitud</Label>
-              <Input 
-                type="text"
-                value={formatCoordinates(location.latitude, location.longitude).split(' ')[1]}
-                readOnly
-                className="bg-muted"
-              />
-            </div>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <MapPin className="w-4 h-4" />
+            Ubicación registrada: {formatCoordinates(location.latitude, location.longitude)}
           </div>
         )}
 
-        <Button onClick={handleCreateClient} disabled={loading}>
-          {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-          Crear cliente y continuar
+        <div className="flex gap-4">
+          <Button variant="outline" onClick={() => setCurrentStep('nif-input')} disabled={loading}>
+            Volver
+          </Button>
+          <Button onClick={handleCreateClient} disabled={loading || !location} className="flex-1">
+            {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            {clientData.prospect ? 'Crear Prospecto y Visita' : 'Crear Cliente y Visita'}
+          </Button>
+        </div>
+
+        {!location && (
+          <p className="text-sm text-amber-600">
+            ⚠️ Necesitas activar la geolocalización para crear el cliente
+          </p>
+        )}
+      </CardContent>
+    </Card>;
+
+  const renderPendingApproval = () => <Card>
+      <CardHeader>
+        <CardTitle>Esperando Aprobación</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {existingClient && <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <h4 className="font-semibold text-blue-900 mb-2">Cliente identificado</h4>
+            <div className="space-y-1">
+              <p className="text-blue-800">{existingClient.nombre_apellidos}</p>
+              {existingClient.dni && <p className="text-blue-700">DNI: {existingClient.dni}</p>}
+              {(() => {
+                const fullAddress = [
+                  existingClient.direccion,
+                  existingClient.localidad,
+                  existingClient.codigo_postal
+                ]
+                  .filter(Boolean)
+                  .join(', ');
+                const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`;
+                return (
+                  <p className="text-blue-700">
+                    <a 
+                      href={mapsUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="hover:underline underline"
+                    >
+                      {fullAddress}
+                    </a>
+                  </p>
+                );
+              })()}
+            </div>
+          </div>}
+
+        <div className="text-center py-8">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
+          <p className="text-lg font-medium">Solicitud de acceso enviada</p>
+          <p className="text-muted-foreground">
+            Un administrador debe aprobar tu acceso a la información de este cliente.
+            La página se actualizará automáticamente cuando recibas la aprobación.
+          </p>
+        </div>
+
+        <Button variant="outline" onClick={() => setCurrentStep('nif-input')} className="w-full">
+          Volver a búsqueda
         </Button>
       </CardContent>
     </Card>;
 
-  const renderVisitForm = () => {
-    // Check if visit is completed or rejected (read-only)
-    const isReadOnly = currentVisitStatus === 'completed' || currentVisitStatus === 'no_answer' || currentVisitStatus === 'not_interested' || currentVisitStatus === 'postponed';
-    
-    return (
-      <div className="space-y-6">
-        {isReadOnly && (
-          <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-blue-800 font-medium">📋 Vista de Solo Lectura</p>
-            <p className="text-blue-700 text-sm">Esta visita está finalizada y no puede editarse.</p>
-          </div>
-        )}
-
-        {/* Client Info */}
+  const renderVisitForm = () => <div className="space-y-6">
+        {/* Client Info Display */}
         {existingClient && hasApproval && <div className="space-y-4">
             <Card className="p-4 bg-green-50 border-green-200">
-              <h3 className="font-semibold text-green-800 mb-2">Cliente seleccionado</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-green-700 font-medium">{existingClient.nombre_apellidos}</p>
-                  {(() => {
-                    const fullAddress = [existingClient.direccion, existingClient.localidad, existingClient.codigo_postal]
-                      .filter(Boolean)
-                      .join(', ');
-                    const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`;
-                    return (
-                      <p className="text-green-600">
-                        <a 
-                          href={mapsUrl} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="hover:underline underline"
-                        >
-                          {fullAddress}
-                        </a>
-                      </p>
-                    );
-                  })()}
-                  {existingClient.latitude && existingClient.longitude && (
+              <div className="flex justify-between items-start mb-3">
+                <h4 className="font-semibold text-green-800">Información del Cliente</h4>
+                <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-sm">
+                  Aprobado
+                </span>
+              </div>
+              <div className="space-y-1">
+                <p className="text-green-800 font-medium">{existingClient.nombre_apellidos}</p>
+                {(() => {
+                  const fullAddress = [
+                    existingClient.direccion,
+                    existingClient.localidad,
+                    existingClient.codigo_postal
+                  ]
+                    .filter(Boolean)
+                    .join(', ');
+                  const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`;
+                  return (
                     <p className="text-green-600">
-                      Coordenadas: 
                       <a 
-                        href={`https://www.google.com/maps/search/?api=1&query=${existingClient.latitude},${existingClient.longitude}`}
+                        href={mapsUrl} 
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="hover:underline underline ml-1"
+                        className="hover:underline underline"
                       >
-                        {formatCoordinates(existingClient.latitude, existingClient.longitude)}
+                        {fullAddress}
                       </a>
                     </p>
-                  )}
-                  {existingClient.dni && <p className="text-green-600">DNI: {existingClient.dni}</p>}
-                  {existingClient.telefono1 && <p className="text-green-600">Tel: {existingClient.telefono1}</p>}
-                  {existingClient.telefono2 && <p className="text-green-600">Tel 2: {existingClient.telefono2}</p>}
-                  {existingClient.note && <p className="text-green-600">Nota: {existingClient.note}</p>}
-                  {existingClient.email && <p className="text-green-600">Email: {existingClient.email}</p>}
-                </div>
+                  );
+                })()}
+                {existingClient.latitude && existingClient.longitude && (
+                  <p className="text-green-600">
+                    Coordenadas: 
+                    <a 
+                      href={`https://www.google.com/maps/search/?api=1&query=${existingClient.latitude},${existingClient.longitude}`}
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="hover:underline underline ml-1"
+                    >
+                      {formatCoordinates(existingClient.latitude, existingClient.longitude)}
+                    </a>
+                  </p>
+                )}
+                {existingClient.dni && <p className="text-green-600">DNI: {existingClient.dni}</p>}
+                {existingClient.telefono1 && <p className="text-green-600">Tel: {existingClient.telefono1}</p>}
+                {existingClient.telefono2 && <p className="text-green-600">Tel 2: {existingClient.telefono2}</p>}
+                {existingClient.note && <p className="text-green-600">Nota: {existingClient.note}</p>}
+                {existingClient.email && <p className="text-green-600">Email: {existingClient.email}</p>}
               </div>
             </Card>
 
@@ -1763,35 +1904,21 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
             className="flex-1"
           >
             {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            Finalizar
+            Finalizar Visita
           </Button>
         </div>}
-        
-        {isReadOnly && <div className="text-center py-4">
-            <Button variant="outline" onClick={() => window.dispatchEvent(new CustomEvent('navigateToVisitsList'))}>
-              Volver a la Lista de Visitas
-            </Button>
-          </div>}
-      </div>
-    );
-  };
+      </div>;
 
-  console.log('=== COMPONENT RENDER ===');
-  console.log('currentStep:', currentStep);
-  console.log('existingClient:', existingClient);
-  console.log('approvalRequestId:', approvalRequestId);
-  console.log('hasApproval:', hasApproval);
-  console.log('userRole:', userRole);
   return <div className="container mx-auto p-6 max-w-4xl">
       <div className="mb-6">
         <h1 className="text-3xl font-bold">Gestión de visitas</h1>
         <p className="text-muted-foreground">
           Registra las visitas a clientes y las ventas realizadas
         </p>
-        
       </div>
 
       {currentStep === 'nif-input' && renderNIFInput()}
+      {currentStep === 'pending-approval' && renderPendingApproval()}
       {currentStep === 'client-form' && renderClientForm()}
       {currentStep === 'visit-form' && renderVisitForm()}
     </div>;

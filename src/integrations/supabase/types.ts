@@ -120,6 +120,7 @@ export type Database = {
           longitude: number | null
           nombre_apellidos: string
           note: string | null
+          prospect: boolean
           status: string
           telefono1: string | null
           telefono2: string | null
@@ -137,6 +138,7 @@ export type Database = {
           longitude?: number | null
           nombre_apellidos: string
           note?: string | null
+          prospect?: boolean
           status?: string
           telefono1?: string | null
           telefono2?: string | null
@@ -154,6 +156,7 @@ export type Database = {
           longitude?: number | null
           nombre_apellidos?: string
           note?: string | null
+          prospect?: boolean
           status?: string
           telefono1?: string | null
           telefono2?: string | null
