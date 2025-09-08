@@ -209,7 +209,14 @@ export default function ClientManagement() {
     // Normalize client data
     console.log('Raw DNI before normalization:', rawClientData.dni);
     console.log('Raw nombre before normalization:', rawClientData.nombre_apellidos);
+    
     const clientData = normalizeClientData(rawClientData);
+    
+    // Add prospect field if editing and DNI is empty
+    if (editingClient && (!clientData.dni || clientData.dni.trim() === '')) {
+      (clientData as any).prospect = true;
+    }
+    
     console.log('Normalized DNI:', clientData.dni);
     console.log('Normalized nombre:', clientData.nombre_apellidos);
     console.log('Full normalized client data:', clientData);
