@@ -11,15 +11,18 @@ interface ClientFiltersProps {
     localidad: string;
     codigo_postal: string;
     telefono: string;
-    email: string;
     status: string;
+    prospect: boolean;
   };
-  onFilterChange: (key: string, value: string) => void;
+  onFilterChange: (key: string, value: string | boolean) => void;
   onClearFilters: () => void;
 }
 
 export default function ClientFilters({ filters, onFilterChange, onClearFilters }: ClientFiltersProps) {
-  const hasActiveFilters = Object.values(filters).some(value => value.trim() !== '');
+  const hasActiveFilters = Object.entries(filters).some(([key, value]) => {
+    if (typeof value === 'boolean') return value;
+    return value.trim() !== '';
+  });
 
   return (
     <div className="bg-muted/30 px-4 py-3 rounded-lg">
@@ -75,13 +78,17 @@ export default function ClientFilters({ filters, onFilterChange, onClearFilters 
           onChange={(e) => onFilterChange('telefono', e.target.value)}
           className="h-8 text-sm col-span-2"
         />
-        
-        <Input
-          placeholder="Email..."
-          value={filters.email}
-          onChange={(e) => onFilterChange('email', e.target.value)}
-          className="h-8 text-sm col-span-2"
-        />
+
+        <div className="flex items-center space-x-2 col-span-2">
+          <input
+            type="checkbox"
+            id="prospect-filter"
+            checked={filters.prospect}
+            onChange={(e) => onFilterChange('prospect', e.target.checked)}
+            className="h-4 w-4"
+          />
+          <Label htmlFor="prospect-filter" className="text-sm">Solo prospectos</Label>
+        </div>
 
         <Select value={filters.status || "all"} onValueChange={(value) => onFilterChange('status', value === 'all' ? '' : value)}>
           <SelectTrigger className="h-8 text-sm col-span-2">

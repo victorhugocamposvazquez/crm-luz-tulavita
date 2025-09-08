@@ -36,6 +36,7 @@ interface Client {
   created_at: string;
   status: 'active' | 'inactive';
   note?: string;
+  prospect: boolean;
 }
 
 export default function ClientManagement() {
@@ -63,9 +64,14 @@ export default function ClientManagement() {
     localidad: '',
     codigo_postal: '',
     telefono: '',
-    email: '',
-    status: ''
+    status: '',
+    prospect: false
   });
+
+  // Conversion dialog state
+  const [convertDialogOpen, setConvertDialogOpen] = useState(false);
+  const [convertingClient, setConvertingClient] = useState<Client | null>(null);
+  const [convertDNI, setConvertDNI] = useState('');
 
   const isAdmin = userRole?.role === 'admin';
   const totalPages = Math.ceil(totalItems / pageSize);
@@ -123,11 +129,11 @@ export default function ClientManagement() {
       if (filters.telefono.trim()) {
         query = query.or(`telefono1.ilike.%${filters.telefono.trim()}%,telefono2.ilike.%${filters.telefono.trim()}%`);
       }
-      if (filters.email.trim()) {
-        query = query.ilike('email', `%${filters.email.trim()}%`);
-      }
       if (filters.status.trim()) {
         query = query.eq('status', filters.status.trim());
+      }
+      if (filters.prospect) {
+        query = query.eq('prospect', true);
       }
 
       // Apply pagination
@@ -400,7 +406,7 @@ export default function ClientManagement() {
     }
   };
 
-  const handleFilterChange = (key: string, value: string) => {
+  const handleFilterChange = (key: string, value: string | boolean) => {
     setFilters(prev => ({ ...prev, [key]: value }));
     setCurrentPage(1); // Reset to first page when filtering
   };
@@ -412,8 +418,8 @@ export default function ClientManagement() {
       localidad: '',
       codigo_postal: '',
       telefono: '',
-      email: '',
-      status: ''
+      status: '',
+      prospect: false
     });
     setCurrentPage(1);
   };
@@ -469,6 +475,12 @@ export default function ClientManagement() {
   const handleStatusToggle = async (clientId: string, status: 'active' | 'inactive') => {
     if (!isAdmin) return;
 
+    const confirmMessage = status === 'active' 
+      ? '¿Estás seguro de que quieres activar este cliente?' 
+      : '¿Estás seguro de que quieres desactivar este cliente?';
+
+    if (!confirm(confirmMessage)) return;
+
     try {
       const { error } = await supabase
         .from('clients')
@@ -488,6 +500,65 @@ export default function ClientManagement() {
       toast({
         title: "Error",
         description: error.message || "No se pudo actualizar el status del cliente",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleConvertToClient = async () => {
+    if (!convertingClient || !convertDNI.trim()) {
+      toast({
+        title: "Error",
+        description: "Debe introducir un DNI válido",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!validateDNI(convertDNI)) {
+      toast({
+        title: "Error",
+        description: "El DNI debe tener al menos 8 caracteres y contener al menos una letra",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .update({ 
+          prospect: false, 
+          dni: normalizeDNI(convertDNI) 
+        })
+        .eq('id', convertingClient.id);
+
+      if (error) {
+        if (error.message?.includes('duplicate key') || error.code === '23505') {
+          toast({
+            title: "Error",
+            description: "Ya existe otro cliente con ese mismo DNI",
+            variant: "destructive",
+          });
+          return;
+        }
+        throw error;
+      }
+
+      toast({
+        title: "Cliente convertido",
+        description: "El prospecto ha sido convertido a cliente exitosamente",
+      });
+
+      setConvertDialogOpen(false);
+      setConvertingClient(null);
+      setConvertDNI('');
+      fetchClients();
+    } catch (error: any) {
+      console.error('Error converting prospect to client:', error);
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo convertir el prospecto a cliente",
         variant: "destructive",
       });
     }
@@ -691,156 +762,210 @@ export default function ClientManagement() {
               <TableRow>
                       <TableHead>Nombre</TableHead>
                       <TableHead>DNI</TableHead>
-                      <TableHead>Activo</TableHead>
+                      <TableHead>Tipo</TableHead>
+                      <TableHead>Estado</TableHead>
                       <TableHead>Dirección</TableHead>
                       <TableHead>Coordenadas</TableHead>
                       <TableHead>Teléfono</TableHead>
-                      <TableHead>Email</TableHead>
                       <TableHead>Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
-                 <TableRow>
-                   <TableCell colSpan={8} className="text-center py-8">
-                     <div className="flex items-center justify-center">
-                       <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                       <span className="text-muted-foreground">Cargando clientes...</span>
-                     </div>
-                   </TableCell>
-                 </TableRow>
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8">
+                      <div className="flex items-center justify-center">
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        <span className="text-muted-foreground">Cargando clientes...</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
                ) : clients.length === 0 ? (
                  <TableRow>
-                   <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                     {Object.values(filters).some(f => f.trim()) ? 
-                       "No se encontraron clientes con los filtros aplicados" : 
-                       "No hay clientes registrados"
-                     }
-                   </TableCell>
+                     <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                       {Object.entries(filters).some(([key, value]) => {
+                         if (typeof value === 'boolean') return value;
+                         return value.trim() !== '';
+                       }) ? 
+                         "No se encontraron clientes con los filtros aplicados" : 
+                         "No hay clientes registrados"
+                       }
+                     </TableCell>
                  </TableRow>
               ) : (
-                 clients.map((client) => (
-                   <TableRow key={client.id} className={client.status === 'inactive' ? 'opacity-60' : ''}>
-                      <TableCell className="font-medium">{client.nombre_apellidos}</TableCell>
-                      <TableCell>{client.dni || '-'}</TableCell>
+                 clients.map((client) => {
+                   const getRowClasses = () => {
+                     let classes = "";
+                     if (client.prospect) {
+                       classes += "bg-blue-50 hover:bg-blue-100 ";
+                     } else if (client.status === 'inactive') {
+                       classes += "bg-red-50 hover:bg-red-100 ";
+                     }
+                     return classes;
+                   };
+
+                   return (
+                    <TableRow key={client.id} className={getRowClasses()}>
+                       <TableCell className="font-medium">{client.nombre_apellidos}</TableCell>
+                       <TableCell>{client.dni || '-'}</TableCell>
                        <TableCell>
-                         <Switch
-                           checked={client.status === 'active'}
-                           onCheckedChange={(checked) => handleStatusToggle(client.id, checked ? 'active' : 'inactive')}
-                           disabled={!isAdmin}
-                         />
+                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                           client.prospect 
+                             ? 'bg-blue-100 text-blue-800' 
+                             : 'bg-green-100 text-green-800'
+                         }`}>
+                           {client.prospect ? 'Prospecto' : 'Cliente'}
+                         </span>
                        </TableCell>
-                      <TableCell>
-                        {(() => {
-                          // Construir dirección completa
-                          const parts = [client.direccion];
-                          if (client.localidad) parts.push(client.localidad);
-                          if (client.codigo_postal) parts.push(client.codigo_postal);
-                          const fullAddress = parts.filter(part => part?.trim()).join(', ');
-                          
-                          // Usar siempre la dirección completa para Google Maps
-                          return (
+                       <TableCell>
+                         {isAdmin ? (
+                           <Button
+                             variant="outline"
+                             size="sm"
+                             onClick={() => handleStatusToggle(client.id, client.status === 'active' ? 'inactive' : 'active')}
+                             className={client.status === 'active' ? 'text-green-600' : 'text-red-600'}
+                           >
+                             {client.status === 'active' ? 'Activo' : 'Inactivo'}
+                           </Button>
+                         ) : (
+                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                             client.status === 'active' 
+                               ? 'bg-green-100 text-green-800' 
+                               : 'bg-red-100 text-red-800'
+                           }`}>
+                             {client.status === 'active' ? 'Activo' : 'Inactivo'}
+                           </span>
+                         )}
+                       </TableCell>
+                       <TableCell>
+                         {(() => {
+                           // Construir dirección completa
+                           const parts = [client.direccion];
+                           if (client.localidad) parts.push(client.localidad);
+                           if (client.codigo_postal) parts.push(client.codigo_postal);
+                           const fullAddress = parts.filter(part => part?.trim()).join(', ');
+                           
+                           // Usar siempre la dirección completa para Google Maps
+                           return (
+                             <a
+                               href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`}
+                               target="_blank"
+                               rel="noopener noreferrer"
+                               className="text-primary hover:underline cursor-pointer"
+                               onClick={(e) => e.stopPropagation()}
+                             >
+                               {fullAddress}
+                             </a>
+                           );
+                         })()}
+                       </TableCell>
+                      <TableCell className="max-w-[150px]">
+                        {client.latitude && client.longitude ? (
+                          editingCoordinates?.id === client.id ? (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="text"
+                                value={editingCoordinates.coordinates}
+                                onChange={(e) => setEditingCoordinates({ ...editingCoordinates, coordinates: e.target.value })}
+                                className="text-xs p-1 border rounded w-full"
+                                placeholder="43°16'59.7&quot;N 1°40'39.8&quot;W"
+                              />
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleCoordinatesEdit(client.id, editingCoordinates.coordinates)}
+                              >
+                                ✓
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => setEditingCoordinates(null)}
+                              >
+                                ✕
+                              </Button>
+                            </div>
+                          ) : (
                             <a
-                              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`}
+                              href={`https://www.google.com/maps?q=${client.latitude},${client.longitude}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-primary hover:underline cursor-pointer"
+                              className="text-xs text-primary hover:underline cursor-pointer"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              {fullAddress}
+                              {formatCoordinates(client.latitude, client.longitude)}
                             </a>
-                          );
-                        })()}
-                      </TableCell>
-                     <TableCell className="max-w-[150px]">
-                       {client.latitude && client.longitude ? (
-                         editingCoordinates?.id === client.id ? (
-                           <div className="flex items-center gap-2">
-                             <input
-                               type="text"
-                               value={editingCoordinates.coordinates}
-                               onChange={(e) => setEditingCoordinates({ ...editingCoordinates, coordinates: e.target.value })}
-                               className="text-xs p-1 border rounded w-full"
-                               placeholder="43°16'59.7&quot;N 1°40'39.8&quot;W"
-                             />
-                             <Button
-                               size="sm"
-                               variant="outline"
-                               onClick={() => handleCoordinatesEdit(client.id, editingCoordinates.coordinates)}
-                             >
-                               ✓
-                             </Button>
-                             <Button
-                               size="sm"
-                               variant="outline"
-                               onClick={() => setEditingCoordinates(null)}
-                             >
-                               ✕
-                             </Button>
-                           </div>
+                          )
                          ) : (
-                           <a
-                             href={`https://www.google.com/maps?q=${client.latitude},${client.longitude}`}
-                             target="_blank"
-                             rel="noopener noreferrer"
-                             className="text-xs text-primary hover:underline cursor-pointer"
-                             onClick={(e) => e.stopPropagation()}
-                           >
-                             {formatCoordinates(client.latitude, client.longitude)}
-                           </a>
-                         )
-                        ) : (
-                          <span className="text-xs text-muted-foreground">Sin coordenadas</span>
-                        )}
-                     </TableCell>
-                     <TableCell>{client.telefono1 || '-'}</TableCell>
-                     <TableCell>{client.email || '-'}</TableCell>
-                      <TableCell>
-                        <div className="flex space-x-2">
-                          <Button 
-                            variant="outline" 
-                            size="sm"
-                            onClick={() => setSelectedClientId(client.id)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          {/* Only show edit/delete for admins */}
-                          {isAdmin && (
-                            <>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setEditingClient(client);
-                                  setDialogOpen(true);
-                                }}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedClient({ id: client.id, name: client.nombre_apellidos });
-                                  setReminderDialogOpen(true);
-                                }}
-                                title="Crear recordatorio de renovación"
-                              >
-                                <Bell className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleDelete(client.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </>
-                          )}
-                        </div>
+                           <span className="text-xs text-muted-foreground">Sin coordenadas</span>
+                         )}
                       </TableCell>
-                  </TableRow>
-                ))
+                      <TableCell>{client.telefono1 || '-'}</TableCell>
+                       <TableCell>
+                         <div className="flex space-x-2">
+                           <Button 
+                             variant="outline" 
+                             size="sm"
+                             onClick={() => setSelectedClientId(client.id)}
+                           >
+                             <Eye className="h-4 w-4" />
+                           </Button>
+                           
+                           {/* Convert to client button for prospects */}
+                           {client.prospect && isAdmin && (
+                             <Button
+                               variant="outline"
+                               size="sm"
+                               onClick={() => {
+                                 setConvertingClient(client);
+                                 setConvertDNI(client.dni || '');
+                                 setConvertDialogOpen(true);
+                               }}
+                               className="text-blue-600 hover:text-blue-800"
+                               title="Convertir a cliente"
+                             >
+                               Convertir
+                             </Button>
+                           )}
+
+                           {/* Only show edit/delete for admins */}
+                           {isAdmin && (
+                             <>
+                               <Button
+                                 variant="outline"
+                                 size="sm"
+                                 onClick={() => {
+                                   setEditingClient(client);
+                                   setDialogOpen(true);
+                                 }}
+                               >
+                                 <Edit className="h-4 w-4" />
+                               </Button>
+                               <Button
+                                 variant="outline"
+                                 size="sm"
+                                 onClick={() => {
+                                   setSelectedClient({ id: client.id, name: client.nombre_apellidos });
+                                   setReminderDialogOpen(true);
+                                 }}
+                                 title="Crear recordatorio de renovación"
+                               >
+                                 <Bell className="h-4 w-4" />
+                               </Button>
+                               <Button
+                                 variant="outline"
+                                 size="sm"
+                                 onClick={() => handleDelete(client.id)}
+                               >
+                                 <Trash2 className="h-4 w-4" />
+                               </Button>
+                             </>
+                           )}
+                         </div>
+                       </TableCell>
+                   </TableRow>
+                   );
+                 })
               )}
             </TableBody>
           </Table>
@@ -869,6 +994,41 @@ export default function ClientManagement() {
           onReminderCreated={fetchClients}
         />
       )}
+
+      {/* Convert to Client Dialog */}
+      <Dialog open={convertDialogOpen} onOpenChange={setConvertDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Convertir a Cliente</DialogTitle>
+            <DialogDescription>
+              Convertir "{convertingClient?.nombre_apellidos}" de prospecto a cliente
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="convert-dni">DNI/NIF *</Label>
+              <Input
+                id="convert-dni"
+                value={convertDNI}
+                onChange={(e) => setConvertDNI(e.target.value)}
+                placeholder="Introduce el DNI del cliente"
+                required
+              />
+              <p className="text-sm text-muted-foreground">
+                El DNI es obligatorio para convertir a cliente y no puede estar duplicado.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setConvertDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleConvertToClient}>
+              Convertir a Cliente
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
