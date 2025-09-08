@@ -412,7 +412,11 @@ export default function CommercialVisitsManager() {
         <h1 className="sr-only">Gestión de Visitas</h1>
         {currentView === 'list' && (
           <div className="flex gap-2">
-            <Button onClick={() => setCurrentView('create-single')}>
+            <Button onClick={() => {
+              // Clear any existing visit continuation data
+              sessionStorage.removeItem('continueVisitData');
+              setCurrentView('create-single');
+            }}>
               <Plus className="h-4 w-4 mr-2" />
               Nueva visita
             </Button>
