@@ -647,7 +647,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       // Create the visit in database
       console.log('=== CREATING VISIT BY DNI ===');
       console.log('Client found by DNI:', clientData);
-      console.log('Creating visit with approved status');
+      console.log('Creating visit with waiting_admin status');
       
       const { data: visitResult, error: visitError } = await supabase
         .from('visits')
@@ -656,8 +656,8 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
           commercial_id: user.id,
           company_id: selectedCompany,
           status: 'in_progress' as Database['public']['Enums']['visit_status'],
-          approval_status: 'approved',
-          permission: 'approved',
+          approval_status: 'waiting_admin',
+          permission: 'pending',
           notes: '',
           latitude: location?.latitude || null,
           longitude: location?.longitude || null,
@@ -670,6 +670,22 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       if (visitError) throw visitError;
       console.log('Visit created successfully:', visitResult);
 
+      // Send admin notification for validation
+      console.log('=== CREATING ADMIN NOTIFICATION ===');
+      const { error: approvalError } = await supabase
+        .from('client_approval_requests')
+        .insert({
+          client_id: clientData.id,
+          commercial_id: user.id,
+          status: 'pending'
+        });
+
+      if (approvalError) {
+        console.error('Error creating approval request:', approvalError);
+      } else {
+        console.log('Admin notification created successfully');
+      }
+
       // Reset form and navigate to visits list
       setClientNIF('');
       setSelectedCompany('');
@@ -680,7 +696,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
 
       toast({
         title: "Visita creada",
-        description: "Visita creada exitosamente para el cliente existente.",
+        description: "Visita creada y pendiente de aprobación por el administrador.",
       });
     } else {
       // Client doesn't exist, create new
