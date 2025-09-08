@@ -93,6 +93,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
   const [clientNIF, setClientNIF] = useState('');
   const [multipleNIFs, setMultipleNIFs] = useState<string[]>([]);
   const [existingClient, setExistingClient] = useState<Client | null>(null);
+  const [cameFromDNISearch, setCameFromDNISearch] = useState(false);
   
   const [selectedCompany, setSelectedCompany] = useState('');
   
@@ -132,6 +133,45 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
   const [editingVisitId, setEditingVisitId] = useState<string | null>(null);
   const [currentVisitStatus, setCurrentVisitStatus] = useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = useState(false);
+
+  const resetToInitialState = () => {
+    console.log('=== RESETTING TO INITIAL STATE ===');
+    setCurrentStep('nif-input');
+    setClientNIF('');
+    setMultipleNIFs([]);
+    setExistingClient(null);
+    setSelectedCompany('');
+    setNoDNIMode(false);
+    setFullName('');
+    setCameFromDNISearch(false);
+    setClientData({
+      nombre_apellidos: '',
+      dni: '',
+      direccion: '',
+      localidad: '',
+      codigo_postal: '',
+      telefono1: '',
+      telefono2: '',
+      email: '',
+      note: '',
+      prospect: false
+    });
+    setVisitData({
+      notes: '',
+      status: 'in_progress' as 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed',
+      company_id: '',
+      permission: 'pending',
+      visitStateCode: ''
+    });
+    setSaleLines([]);
+    setClientComment('');
+    setClientPurchases([]);
+    setClientVisits([]);
+    setHasApproval(false);
+    setEditingVisitId(null);
+    setCurrentVisitStatus(null);
+    setIsReadOnly(false);
+  };
 
   useEffect(() => {
     fetchCompanies();
@@ -225,44 +265,6 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
         console.error('Error in continue visit:', error);
         resetToInitialState();
       }
-    }
-
-    function resetToInitialState() {
-      console.log('=== RESETTING TO INITIAL STATE ===');
-      setCurrentStep('nif-input');
-      setClientNIF('');
-      setMultipleNIFs([]);
-      setExistingClient(null);
-      setSelectedCompany('');
-      setNoDNIMode(false);
-      setFullName('');
-      setClientData({
-        nombre_apellidos: '',
-        dni: '',
-        direccion: '',
-        localidad: '',
-        codigo_postal: '',
-        telefono1: '',
-        telefono2: '',
-        email: '',
-        note: '',
-        prospect: false
-      });
-      setVisitData({
-        notes: '',
-        status: 'in_progress' as 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed',
-        company_id: '',
-        permission: 'pending',
-        visitStateCode: ''
-      });
-      setSaleLines([]);
-      setClientComment('');
-      setClientPurchases([]);
-      setClientVisits([]);
-      setHasApproval(false);
-      setEditingVisitId(null);
-      setCurrentVisitStatus(null);
-      setIsReadOnly(false);
     }
     ;
     window.addEventListener('continueVisit', handleContinueVisit as EventListener);
@@ -627,6 +629,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       } else {
         // No client found, prepare for client creation
         console.log('No client found by name, creating new client');
+        setCameFromDNISearch(false);
         setClientData(prev => ({
           ...prev,
           nombre_apellidos: normalizedFullName,
@@ -743,6 +746,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       });
     } else {
       // Client doesn't exist, create new
+      setCameFromDNISearch(true);
       setClientData(prev => ({
         ...prev,
         dni: normalizedDNI
@@ -1393,7 +1397,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
                   ...prev,
                   dni: e.target.value
                 }))} 
-                disabled={clientData.dni !== ''}
+                disabled={cameFromDNISearch}
                 placeholder="Introduce el DNI"
               />
             </div>
@@ -1466,7 +1470,9 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
         )}
 
         <div className="flex gap-4">
-          <Button variant="outline" onClick={() => setCurrentStep('nif-input')} disabled={loading}>
+          <Button variant="outline" onClick={() => {
+            resetToInitialState();
+          }} disabled={loading}>
             Volver
           </Button>
           <Button onClick={handleCreateClient} disabled={loading || !location} className="flex-1">
