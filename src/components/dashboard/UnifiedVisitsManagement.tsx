@@ -525,7 +525,11 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
           throw new Error('Usuario o empresa no válidos');
         }
 
-        // Create the visit in database
+         // Create the visit in database
+        console.log('=== CREATING VISIT BY NAME WITHOUT DNI ===');
+        console.log('Client found:', client);
+        console.log('Creating visit with waiting_admin status');
+        
         const { data: visitResult, error: visitError } = await supabase
           .from('visits')
           .insert({
@@ -545,8 +549,10 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
           .single();
 
         if (visitError) throw visitError;
+        console.log('Visit created successfully:', visitResult);
 
         // Send admin notification for validation when found by name without DNI
+        console.log('=== CREATING ADMIN NOTIFICATION ===');
         const { error: approvalError } = await supabase
           .from('client_approval_requests')
           .insert({
@@ -557,6 +563,8 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
 
         if (approvalError) {
           console.error('Error creating approval request:', approvalError);
+        } else {
+          console.log('Admin notification created successfully');
         }
 
         // Reset form and navigate to visits list
@@ -637,6 +645,10 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       }
 
       // Create the visit in database
+      console.log('=== CREATING VISIT BY DNI ===');
+      console.log('Client found by DNI:', clientData);
+      console.log('Creating visit with approved status');
+      
       const { data: visitResult, error: visitError } = await supabase
         .from('visits')
         .insert({
@@ -656,6 +668,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
         .single();
 
       if (visitError) throw visitError;
+      console.log('Visit created successfully:', visitResult);
 
       // Reset form and navigate to visits list
       setClientNIF('');
