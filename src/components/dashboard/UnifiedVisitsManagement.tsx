@@ -533,8 +533,8 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
             commercial_id: user.id,
             company_id: selectedCompany,
             status: 'in_progress' as Database['public']['Enums']['visit_status'],
-            approval_status: 'approved',
-            permission: 'approved',
+            approval_status: 'waiting_admin',
+            permission: 'pending',
             notes: '',
             latitude: location?.latitude || null,
             longitude: location?.longitude || null,
@@ -545,6 +545,19 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
           .single();
 
         if (visitError) throw visitError;
+
+        // Send admin notification for validation when found by name without DNI
+        const { error: approvalError } = await supabase
+          .from('client_approval_requests')
+          .insert({
+            client_id: client.id,
+            commercial_id: user.id,
+            status: 'pending'
+          });
+
+        if (approvalError) {
+          console.error('Error creating approval request:', approvalError);
+        }
 
         // Reset form and navigate to visits list
         setClientNIF('');
@@ -558,7 +571,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
         
         toast({
           title: "Visita creada",
-          description: "Cliente encontrado. Visita creada exitosamente.",
+          description: "Cliente encontrado. Visita pendiente de aprobación por el administrador.",
         });
       } else {
         // No client found, prepare for prospect creation
