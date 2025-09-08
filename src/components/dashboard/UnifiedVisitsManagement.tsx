@@ -70,7 +70,7 @@ interface ClientVisit {
   permission: string;
 }
 
-type WorkflowStep = 'nif-input' | 'pending-approval' | 'client-form' | 'visit-form';
+type WorkflowStep = 'nif-input' | 'client-form' | 'visit-form';
 
 interface UnifiedVisitsManagementProps {
   onSuccess?: () => void;
@@ -93,7 +93,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
   const [clientNIF, setClientNIF] = useState('');
   const [multipleNIFs, setMultipleNIFs] = useState<string[]>([]);
   const [existingClient, setExistingClient] = useState<Client | null>(null);
-  const [approvalRequestId, setApprovalRequestId] = useState<string | null>(null);
+  
   const [selectedCompany, setSelectedCompany] = useState('');
   
   // No DNI mode state
@@ -252,56 +252,6 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
     console.log('Companies loaded:', companies);
   }, [companies]);
 
-  // Real-time subscription for approval status
-  useEffect(() => {
-    if (!approvalRequestId) return;
-    const channel = supabase.channel('approval-updates').on('postgres_changes', {
-      event: 'UPDATE',
-      schema: 'public',
-      table: 'client_approval_requests',
-      filter: `id=eq.${approvalRequestId}`
-    }, async payload => {
-      console.log('Approval request updated:', payload);
-      const updatedRequest = payload.new as any;
-      if (updatedRequest.status === 'approved') {
-        setHasApproval(true);
-        toast({
-          title: "Aprobación concedida",
-          description: "Puedes ver la información del cliente"
-        });
-
-        // Update the actual visit status when approved
-        if (existingClient) {
-          // Update visit to in_progress when approved
-          try {
-            const {
-              error: updateError
-            } = await supabase.from('visits').update({
-              status: 'in_progress'
-            }).eq('client_id', existingClient.id).eq('approval_status', 'waiting_admin');
-            if (updateError) {
-              console.error('Error updating visit status:', updateError);
-            }
-            fetchClientData(existingClient.id);
-          } catch (error) {
-            console.error('Error in approval update:', error);
-          }
-        }
-        setCurrentStep('visit-form');
-      } else if (updatedRequest.status === 'rejected') {
-        setHasApproval(false);
-        toast({
-          title: "Acceso denegado",
-          description: "Continúa con la visita sin información previa",
-          variant: "destructive"
-        });
-        setCurrentStep('visit-form');
-      }
-    }).subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [approvalRequestId, existingClient]);
 
   const fetchCompanies = async () => {
     try {
@@ -570,7 +520,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
         const client = existingClients[0];
         setExistingClient(client);
         
-        // Always create the visit first, then send admin notification for approval
+        // Always create the visit in database immediately
         if (!user?.id || !selectedCompany) {
           throw new Error('Usuario o empresa no válidos');
         }
@@ -583,7 +533,11 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
             commercial_id: user.id,
             company_id: selectedCompany,
             status: 'in_progress' as Database['public']['Enums']['visit_status'],
-            notes: 'Visita creada sin DNI - Pendiente de validación'
+            notes: '',
+            latitude: location?.latitude || null,
+            longitude: location?.longitude || null,
+            location_accuracy: location?.accuracy || null,
+            visit_date: new Date().toISOString()
           })
           .select('id')
           .single();
@@ -591,28 +545,13 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
         if (visitError) throw visitError;
 
         setEditingVisitId(visitResult.id);
-
-        // Send admin notification for approval
-        const { error: approvalError } = await supabase
-          .from('client_approval_requests')
-          .insert({
-            client_id: client.id,
-            commercial_id: user.id,
-            status: 'pending'
-          });
-
-        if (approvalError) {
-          console.error('Error creating approval request:', approvalError);
-          // Don't throw here, visit is already created
-        }
-
         setHasApproval(true);
         setCurrentStep('visit-form');
         fetchClientData(client.id);
         
         toast({
           title: "Visita creada",
-          description: "Cliente encontrado. Visita creada y solicitud enviada al administrador para validación.",
+          description: "Cliente encontrado. Visita creada exitosamente.",
         });
       } else {
         // No client found, prepare for prospect creation
@@ -667,19 +606,45 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
         return;
       }
       
-      // Check if user is admin
-      if (userRole?.role === 'admin') {
-        // Admin doesn't need approval, go directly to visit form
-        setExistingClient(clientData);
-        setHasApproval(true);
-        await fetchClientData(clientData.id);
-        setCurrentStep('visit-form');
-      } else {
-        // Commercial user needs approval
-        setExistingClient(clientData);
-        setHasApproval(false);
-        await requestClientApproval(clientData.id);
+      // Always create visit immediately for existing client
+      if (!user?.id || !selectedCompany) {
+        toast({
+          title: "Error",
+          description: "Selecciona una empresa antes de crear la visita",
+          variant: "destructive"
+        });
+        return;
       }
+
+      // Create the visit in database
+      const { data: visitResult, error: visitError } = await supabase
+        .from('visits')
+        .insert({
+          client_id: clientData.id,
+          commercial_id: user.id,
+          company_id: selectedCompany,
+          status: 'in_progress' as Database['public']['Enums']['visit_status'],
+          notes: '',
+          latitude: location?.latitude || null,
+          longitude: location?.longitude || null,
+          location_accuracy: location?.accuracy || null,
+          visit_date: new Date().toISOString()
+        })
+        .select('id')
+        .single();
+
+      if (visitError) throw visitError;
+
+      setExistingClient(clientData);
+      setEditingVisitId(visitResult.id);
+      setHasApproval(true);
+      await fetchClientData(clientData.id);
+      setCurrentStep('visit-form');
+
+      toast({
+        title: "Visita creada",
+        description: "Visita creada exitosamente para el cliente existente.",
+      });
     } else {
       // Client doesn't exist, create new
       setClientData(prev => ({
@@ -791,60 +756,6 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
     window.dispatchEvent(new CustomEvent('navigateToVisitsList'));
   };
 
-  const requestClientApproval = async (clientId: string) => {
-    try {
-      console.log('Requesting client approval for:', clientId);
-      
-      // Check if approval request already exists
-      const { data: existingRequest, error: checkError } = await supabase
-        .from('client_approval_requests')
-        .select('id, status')
-        .eq('client_id', clientId)
-        .eq('commercial_id', user!.id)
-        .eq('status', 'pending')
-        .maybeSingle();
-      
-      if (checkError && checkError.code !== 'PGRST116') {
-        throw checkError;
-      }
-      
-      if (existingRequest) {
-        console.log('Using existing approval request:', existingRequest.id);
-        setApprovalRequestId(existingRequest.id);
-        setCurrentStep('pending-approval');
-        return;
-      }
-      
-      // Create new approval request
-      const { data: approvalRequest, error: approvalError } = await supabase
-        .from('client_approval_requests')
-        .insert({
-          client_id: clientId,
-          commercial_id: user!.id,
-          status: 'pending'
-        })
-        .select('id')
-        .single();
-      
-      if (approvalError) throw approvalError;
-      
-      console.log('Created new approval request:', approvalRequest.id);
-      setApprovalRequestId(approvalRequest.id);
-      setCurrentStep('pending-approval');
-      
-      toast({
-        title: "Solicitud enviada",
-        description: "Esperando aprobación del administrador para acceder a los datos del cliente"
-      });
-    } catch (error) {
-      console.error('Error requesting approval:', error);
-      toast({
-        title: "Error",
-        description: "Error al solicitar aprobación",
-        variant: "destructive"
-      });
-    }
-  };
 
   const handleCreateClient = async () => {
     console.log('Creating client with data:', clientData);
@@ -1226,7 +1137,6 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
         setCurrentStep('nif-input');
         setClientNIF('');
         setExistingClient(null);
-        setApprovalRequestId(null);
         setEditingVisitId(null);
         setCurrentVisitStatus(null);
         setVisitData({
@@ -1477,55 +1387,6 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       </CardContent>
     </Card>;
 
-  const renderPendingApproval = () => <Card>
-      <CardHeader>
-        <CardTitle>Esperando Aprobación</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {existingClient && <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h4 className="font-semibold text-blue-900 mb-2">Cliente identificado</h4>
-            <div className="space-y-1">
-              <p className="text-blue-800">{existingClient.nombre_apellidos}</p>
-              {existingClient.dni && <p className="text-blue-700">DNI: {existingClient.dni}</p>}
-              {(() => {
-                const fullAddress = [
-                  existingClient.direccion,
-                  existingClient.localidad,
-                  existingClient.codigo_postal
-                ]
-                  .filter(Boolean)
-                  .join(', ');
-                const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`;
-                return (
-                  <p className="text-blue-700">
-                    <a 
-                      href={mapsUrl} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="hover:underline underline"
-                    >
-                      {fullAddress}
-                    </a>
-                  </p>
-                );
-              })()}
-            </div>
-          </div>}
-
-        <div className="text-center py-8">
-          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4" />
-          <p className="text-lg font-medium">Solicitud de acceso enviada</p>
-          <p className="text-muted-foreground">
-            Un administrador debe aprobar tu acceso a la información de este cliente.
-            La página se actualizará automáticamente cuando recibas la aprobación.
-          </p>
-        </div>
-
-        <Button variant="outline" onClick={() => setCurrentStep('nif-input')} className="w-full">
-          Volver a búsqueda
-        </Button>
-      </CardContent>
-    </Card>;
 
   const renderVisitForm = () => <div className="space-y-6">
         {/* Client Info Display */}
@@ -1924,7 +1785,6 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       </div>
 
       {currentStep === 'nif-input' && renderNIFInput()}
-      {currentStep === 'pending-approval' && renderPendingApproval()}
       {currentStep === 'client-form' && renderClientForm()}
       {currentStep === 'visit-form' && renderVisitForm()}
     </div>;
