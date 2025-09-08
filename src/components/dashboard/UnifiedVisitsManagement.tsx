@@ -625,12 +625,12 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
           description: "Cliente encontrado. Visita pendiente de aprobación por el administrador.",
         });
       } else {
-        // No client found, prepare for prospect creation
-        console.log('No client found by name, creating prospect');
+        // No client found, prepare for client creation
+        console.log('No client found by name, creating new client');
         setClientData(prev => ({
           ...prev,
           nombre_apellidos: normalizedFullName,
-          dni: '', // Will be empty for prospects
+          dni: '', // Will be empty for clients without DNI
           prospect: true
         }));
         setCurrentStep('client-form');
@@ -935,10 +935,8 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       console.log('New visit created:', newVisit);
       
       toast({
-        title: clientData.prospect ? "Prospecto y visita creados" : "Cliente y visita creados",
-        description: clientData.prospect 
-          ? "Prospecto registrado exitosamente y visita creada automáticamente" 
-          : "Cliente registrado exitosamente y visita creada automáticamente"
+        title: "Cliente y visita creados",
+        description: "Cliente registrado exitosamente y visita creada automáticamente"
       });
       
       // Dispatch events to navigate back to visits list (same pattern as when completing a visit)
@@ -1374,7 +1372,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
 
   const renderClientForm = () => <Card>
       <CardHeader>
-        <CardTitle>{clientData.prospect ? 'Nuevo prospecto' : 'Nuevo cliente'}</CardTitle>
+        <CardTitle>Nuevo cliente</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
@@ -1386,7 +1384,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
           }))} required />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="dni">DNI/NIF {clientData.prospect && '(Opcional para prospectos)'}</Label>
+            <Label htmlFor="dni">DNI/NIF (Opcional)</Label>
             <Input 
               id="dni" 
               value={clientData.dni} 
@@ -1395,7 +1393,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
                 dni: e.target.value
               }))} 
               disabled={clientData.prospect}
-              placeholder={clientData.prospect ? 'No requerido para prospectos' : 'Introduce el DNI'}
+              placeholder="Introduce el DNI (opcional)"
             />
           </div>
         </div>
@@ -1471,7 +1469,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
           </Button>
           <Button onClick={handleCreateClient} disabled={loading || !location} className="flex-1">
             {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-            {clientData.prospect ? 'Crear Prospecto y Visita' : 'Crear Cliente y Visita'}
+            Crear Cliente y Visita
           </Button>
         </div>
 
