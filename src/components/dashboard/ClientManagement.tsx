@@ -574,13 +574,11 @@ export default function ClientManagement() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                      <div className="space-y-2">
-                       <Label htmlFor="dni">DNI {editingClient && "(Solo lectura)"}</Label>
+                       <Label htmlFor="dni">DNI</Label>
                        <Input 
                          id="dni" 
                          name="dni" 
                          defaultValue={editingClient?.dni || ''}
-                         readOnly={!!editingClient}
-                         className={editingClient ? 'bg-muted cursor-not-allowed' : ''}
                        />
                      </div>
                     <div className="space-y-2">
