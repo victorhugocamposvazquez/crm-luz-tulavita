@@ -544,14 +544,32 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
 
         if (visitError) throw visitError;
 
-        setEditingVisitId(visitResult.id);
-        setHasApproval(true);
-        setCurrentStep('visit-form');
-        fetchClientData(client.id);
+        // Send admin notification for validation when found by name without DNI
+        const { error: approvalError } = await supabase
+          .from('client_approval_requests')
+          .insert({
+            client_id: client.id,
+            commercial_id: user.id,
+            status: 'pending'
+          });
+
+        if (approvalError) {
+          console.error('Error creating approval request:', approvalError);
+        }
+
+        // Reset form and navigate to visits list
+        setClientNIF('');
+        setFullName('');
+        setSelectedCompany('');
+        setNoDNIMode(false);
+        setCurrentStep('nif-input');
+        
+        window.dispatchEvent(new CustomEvent('visitCreated', { detail: visitResult }));
+        window.dispatchEvent(new CustomEvent('navigateToVisitsList'));
         
         toast({
           title: "Visita creada",
-          description: "Cliente encontrado. Visita creada exitosamente.",
+          description: "Cliente encontrado. Visita creada y notificación enviada al administrador.",
         });
       } else {
         // No client found, prepare for prospect creation
@@ -635,11 +653,13 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
 
       if (visitError) throw visitError;
 
-      setExistingClient(clientData);
-      setEditingVisitId(visitResult.id);
-      setHasApproval(true);
-      await fetchClientData(clientData.id);
-      setCurrentStep('visit-form');
+      // Reset form and navigate to visits list
+      setClientNIF('');
+      setSelectedCompany('');
+      setCurrentStep('nif-input');
+      
+      window.dispatchEvent(new CustomEvent('visitCreated', { detail: visitResult }));
+      window.dispatchEvent(new CustomEvent('navigateToVisitsList'));
 
       toast({
         title: "Visita creada",
