@@ -622,7 +622,17 @@ export default function VisitSalesManagement() {
 
   const updateSaleLine = (index: number, field: keyof SaleLine, value: any) => {
     const newLines = [...saleLines];
-    newLines[index] = { ...newLines[index], [field]: value };
+    // Only update allowed fields, excluding database-generated fields
+    const allowedUpdate = {
+      products: newLines[index].products,
+      quantity: newLines[index].quantity,
+      unit_price: newLines[index].unit_price,
+      financiada: newLines[index].financiada,
+      transferencia: newLines[index].transferencia,
+      nulo: newLines[index].nulo,
+      [field]: value
+    };
+    newLines[index] = allowedUpdate;
     setSaleLines(newLines);
   };
 
