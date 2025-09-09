@@ -12,7 +12,7 @@ import { format, subDays, startOfMonth, endOfMonth, eachMonthOfInterval, subMont
 import { es } from 'date-fns/locale';
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { calculateCommission } from '@/lib/commission';
+import { calculateCommission, calculateTotalExcludingNulls, calculateSaleCommission } from '@/lib/commission';
 import { formatCoordinates } from '@/lib/coordinates';
 import { toast } from '@/hooks/use-toast';
 
@@ -106,7 +106,7 @@ export default function CommercialStatistics() {
       // Calculate commission using new system
       const processedSales = salesData?.map(sale => ({
         ...sale,
-        commission_amount: sale.commission_amount || calculateCommission(sale.amount)
+        commission_amount: calculateSaleCommission(sale)
       })) || [];
 
       setSales(processedSales);
@@ -149,7 +149,7 @@ export default function CommercialStatistics() {
           ...visit,
           sales: visitSales?.map(sale => ({
             ...sale,
-            commission_amount: sale.commission_amount || calculateCommission(sale.amount)
+            commission_amount: calculateSaleCommission(sale)
           })) || []
         };
       }));
@@ -179,7 +179,7 @@ export default function CommercialStatistics() {
         }) || [];
 
         const totalAmount = monthSales.reduce((sum, sale) => sum + sale.amount, 0);
-        const totalCommission = monthSales.reduce((sum, sale) => sum + calculateCommission(sale.amount), 0);
+        const totalCommission = monthSales.reduce((sum, sale) => sum + calculateSaleCommission(sale), 0);
 
         return {
           month: format(month, 'MMM yyyy', { locale: es }),

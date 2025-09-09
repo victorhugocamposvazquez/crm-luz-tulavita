@@ -47,7 +47,7 @@ interface SaleLine {
   unit_price: number;
   financiada: boolean;
   transferencia: boolean;
-  nulo: boolean;
+  nulo?: boolean; // Optional for commercial forms, required for admin
 }
 
 interface ClientPurchase {
@@ -977,8 +977,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       quantity: 1,
       unit_price: 0,
       financiada: false,
-      transferencia: false,
-      nulo: false
+      transferencia: false
     }]);
   };
 
@@ -1833,10 +1832,6 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
                       <label className="flex items-center gap-2">
                         <input type="checkbox" checked={line.transferencia} onChange={e => updateSaleLine(index, 'transferencia', e.target.checked)} disabled={isReadOnly} />
                         <span>Transferencia</span>
-                      </label>
-                      <label className="flex items-center gap-2">
-                        <input type="checkbox" checked={line.nulo} onChange={e => updateSaleLine(index, 'nulo', e.target.checked)} disabled={isReadOnly} />
-                        <span>Nulo</span>
                       </label>
                     </div>
 

@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Search, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import VisitsTable from '@/components/visits/VisitsTable';
-import { calculateCommission } from '@/lib/commission';
+import { calculateCommission, calculateTotalExcludingNulls, calculateSaleCommission } from '@/lib/commission';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import ClientPagination from '@/components/dashboard/ClientPagination';
@@ -178,7 +178,7 @@ export default function AdminVisitsView() {
 
         // Calculate commission using the new system
         const commissionPercentage = sale.commission_percentage || 0;
-        const calculatedCommission = sale.commission_amount || calculateCommission(sale.amount);
+        const calculatedCommission = calculateSaleCommission({ amount: sale.amount, commission_amount: sale.commission_amount });
 
         return {
           ...sale,

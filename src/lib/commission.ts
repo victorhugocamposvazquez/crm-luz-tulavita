@@ -1,6 +1,7 @@
 /**
  * Calculates commission based on exact sale amount matches
  * Returns 0 if the amount doesn't match any of the predefined values
+ * Note: This calculation should exclude sale lines marked as "nulo" (null)
  */
 export const calculateCommission = (saleAmount: number): number => {
   const commissionTable: Record<number, number> = {
@@ -13,6 +14,47 @@ export const calculateCommission = (saleAmount: number): number => {
   };
 
   return commissionTable[saleAmount] || 0;
+};
+
+/**
+ * Calculates the total amount from sale lines excluding those marked as "nulo"
+ */
+export const calculateTotalExcludingNulls = (saleLines: Array<{ quantity: number; unit_price: number; nulo: boolean }>): number => {
+  return saleLines
+    .filter(line => !line.nulo)
+    .reduce((sum, line) => sum + (line.quantity * line.unit_price), 0);
+};
+
+/**
+ * Calculates the effective amount for commission calculation excluding null lines
+ * If sale_lines are not available, falls back to the sale amount
+ */
+export const calculateEffectiveAmount = (
+  sale: { 
+    amount: number; 
+    sale_lines?: Array<{ quantity: number; unit_price: number; nulo: boolean }> 
+  }
+): number => {
+  if (sale.sale_lines && sale.sale_lines.length > 0) {
+    return calculateTotalExcludingNulls(sale.sale_lines);
+  }
+  return sale.amount;
+};
+
+/**
+ * Calculates commission for a sale considering only non-null lines
+ */
+export const calculateSaleCommission = (sale: { 
+  amount: number; 
+  commission_amount?: number;
+  sale_lines?: Array<{ quantity: number; unit_price: number; nulo: boolean }> 
+}): number => {
+  if (sale.commission_amount) {
+    return sale.commission_amount;
+  }
+  
+  const effectiveAmount = calculateEffectiveAmount(sale);
+  return calculateCommission(effectiveAmount);
 };
 
 /**

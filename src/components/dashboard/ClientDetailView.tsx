@@ -16,7 +16,7 @@ import { es } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { formatCoordinates } from '@/lib/coordinates';
 import VisitsTable from '@/components/visits/VisitsTable';
-import { calculateCommission } from '@/lib/commission';
+import { calculateCommission, calculateTotalExcludingNulls, calculateSaleCommission } from '@/lib/commission';
 import RemindersTable from '@/components/reminders/RemindersTable';
 import ReminderDialog from '@/components/reminders/ReminderDialog';
 
@@ -255,7 +255,7 @@ const fetchVisits = async () => {
       
       // Calculate commission using the new system
       const commissionPercentage = sale.commission_percentage || 0;
-      const calculatedCommission = sale.commission_amount || calculateCommission(sale.amount);
+      const calculatedCommission = calculateSaleCommission({ amount: sale.amount, commission_amount: sale.commission_amount });
       
       return { 
         ...sale, 

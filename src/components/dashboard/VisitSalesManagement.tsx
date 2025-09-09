@@ -20,7 +20,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 import { formatCoordinates } from '@/lib/coordinates';
-import { calculateCommission } from '@/lib/commission';
+import { calculateCommission, calculateTotalExcludingNulls, calculateSaleCommission } from '@/lib/commission';
 
 interface Client {
   id: string;
@@ -637,7 +637,7 @@ export default function VisitSalesManagement() {
   };
 
   const calculateTotal = () => {
-    return saleLines.reduce((sum, line) => sum + (line.quantity * line.unit_price), 0);
+    return calculateTotalExcludingNulls(saleLines);
   };
 
   const calculateCommissionAmount = () => {
