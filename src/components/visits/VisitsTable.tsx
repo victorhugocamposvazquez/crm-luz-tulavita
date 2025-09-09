@@ -1,7 +1,7 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Eye, Settings } from 'lucide-react';
+import { Eye, Settings, Bell } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Link } from 'react-router-dom';
@@ -48,6 +48,7 @@ interface VisitsTableProps {
   sales: Sale[];
   onViewVisit: (visit: Visit) => void | Promise<void>;
   onAdminManageVisit?: (visit: Visit) => void;
+  onCreateReminder?: (visit: Visit) => void;
   loading: boolean;
   showClientColumns?: boolean;
   emptyMessage?: string;
@@ -87,6 +88,7 @@ export default function VisitsTable({
   sales, 
   onViewVisit,
   onAdminManageVisit,
+  onCreateReminder,
   loading, 
   showClientColumns = false,
   emptyMessage = "No hay visitas registradas" 
@@ -228,15 +230,30 @@ export default function VisitsTable({
                 </TableCell>
                 <TableCell>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => onViewVisit(visit)}>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => onViewVisit(visit)}
+                      title="Ver detalles"
+                    >
                       <Eye className="h-4 w-4" />
                     </Button>
+                    {onCreateReminder && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onCreateReminder(visit)}
+                        title="Crear recordatorio"
+                      >
+                        <Bell className="h-4 w-4" />
+                      </Button>
+                    )}
                     {isAdmin && onAdminManageVisit && (
                       <Button 
                         size="sm" 
                         variant="outline" 
                         onClick={() => onAdminManageVisit(visit)}
-                        className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                        title="Administrar visita"
                       >
                         <Settings className="h-4 w-4" />
                       </Button>
