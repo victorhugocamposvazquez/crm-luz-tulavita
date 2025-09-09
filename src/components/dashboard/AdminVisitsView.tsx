@@ -15,6 +15,8 @@ import { calculateCommission } from '@/lib/commission';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import ClientPagination from '@/components/dashboard/ClientPagination';
+import VisitDetailsDialog from '@/components/visits/VisitDetailsDialog';
+import AdminVisitManagementDialog from '@/components/admin/AdminVisitManagementDialog';
 
 interface Visit {
   id: string;
@@ -36,9 +38,10 @@ interface Visit {
     email: string;
   };
   client?: {
+    id: string;
     nombre_apellidos: string;
-    dni: string;
-    direccion: string;
+    dni?: string;
+    direccion?: string;  
   };
   company?: {
     name: string;
@@ -94,6 +97,8 @@ export default function AdminVisitsView() {
   const [loading, setLoading] = useState(true);
   const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
   const [visitSales, setVisitSales] = useState<Sale[]>([]);
+  const [adminManagementVisit, setAdminManagementVisit] = useState<Visit | null>(null);
+  const [adminDialogOpen, setAdminDialogOpen] = useState(false);
   const [filters, setFilters] = useState({
     commercial: '',
     dni: '',
@@ -294,6 +299,21 @@ export default function AdminVisitsView() {
     setVisitSales(relatedSales);
   };
 
+  const handleAdminManageVisit = (visit: Visit) => {
+    setAdminManagementVisit(visit);
+    setAdminDialogOpen(true);
+  };
+
+  const handleAdminDialogClose = () => {
+    setAdminDialogOpen(false);
+    setAdminManagementVisit(null);
+  };
+
+  const handleVisitUpdated = () => {
+    fetchVisits();
+    fetchSales();
+  };
+
   const handleFilterChange = (key: string, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
@@ -444,6 +464,7 @@ export default function AdminVisitsView() {
             visits={paginatedVisits as any}
             sales={sales}
             onViewVisit={handleViewVisit as any}
+            onAdminManageVisit={handleAdminManageVisit as any}
             loading={loading}
             showClientColumns={true}
             emptyMessage="No se encontraron visitas con los filtros aplicados"
@@ -465,129 +486,20 @@ export default function AdminVisitsView() {
       </Card>
 
       {/* Visit Detail Dialog */}
-      {selectedVisit && (
-        <Dialog open={!!selectedVisit} onOpenChange={() => setSelectedVisit(null)}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Detalles de la Visita</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Cliente</Label>
-                  <p className="font-medium">{selectedVisit.client?.nombre_apellidos}</p>
-                </div>
-                <div>
-                  <Label>DNI</Label>
-                  <p>{selectedVisit.client?.dni}</p>
-                </div>
-                <div>
-                  <Label>Comercial</Label>
-                  <p>{selectedVisit.commercial ? `${selectedVisit.commercial.first_name} ${selectedVisit.commercial.last_name}` : 'N/A'}</p>
-                </div>
-                <div>
-                  <Label>Empresa</Label>
-                  <p>{selectedVisit.company?.name || 'N/A'}</p>
-                </div>
-                <div>
-                  <Label>Fecha</Label>
-                  <p>{format(new Date(selectedVisit.visit_date), "dd/MM/yyyy HH:mm", { locale: es })}</p>
-                </div>
-                <div>
-                  <Label>Estado</Label>
-                  <div>
-                    <Badge className={statusColors[selectedVisit.status as keyof typeof statusColors] || 'bg-gray-100 text-gray-800'}>
-                      {statusLabels[selectedVisit.status as keyof typeof statusLabels] || selectedVisit.status}
-                    </Badge>
-                  </div>
-                </div>
-                {selectedVisit.visit_states && (
-                  <div>
-                    <Label>Resultado de la visita</Label>
-                    <div>
-                      <Badge variant="outline">
-                        {selectedVisit.visit_states.name.charAt(0).toUpperCase() + selectedVisit.visit_states.name.slice(1).toLowerCase()}
-                      </Badge>
-                    </div>
-                  </div>
-                )}
-              </div>
+      <VisitDetailsDialog
+        visit={selectedVisit}
+        sales={visitSales}
+        onClose={() => setSelectedVisit(null)}
+        onAdminManageVisit={handleAdminManageVisit}
+        showClientInfo={true}
+      />
 
-              {selectedVisit.notes && (
-                <div>
-                  <Label>Notas</Label>
-                  <p className="text-sm bg-muted p-2 rounded">{selectedVisit.notes}</p>
-                </div>
-              )}
-
-              {visitSales.length > 0 && (
-                <div>
-                  <Label>Ventas</Label>
-                  <div className="mt-2 space-y-4">
-                    {visitSales.map((sale, index) => (
-                      <div key={sale.id} className="border rounded p-3">
-                        <div className="flex justify-between items-start mb-2">
-                          <div>
-                            <p className="font-medium">Venta #{index + 1}</p>
-                            <p className="text-sm text-muted-foreground">{format(new Date(sale.sale_date), "dd/MM/yyyy HH:mm", { locale: es })}</p>
-                          </div>
-                          <p className="font-bold text-green-600">€{sale.amount.toFixed(2)}</p>
-                        </div>
-                        
-                        {sale.sale_lines && sale.sale_lines.length > 0 && (
-                          <div className="mt-2">
-                            <p className="text-sm font-medium mb-1">Productos:</p>
-                            <div className="space-y-1">
-                              {sale.sale_lines.map((line: any, lineIndex: number) => (
-                                <div key={lineIndex} className="text-xs bg-muted/50 p-2 rounded">
-                                  <div className="flex justify-between">
-                                    <div>
-                                      {line.products && line.products.length > 1 ? (
-                                        // Pack: mostrar productos en líneas separadas
-                                        <div className="space-y-1">
-                                          <div className="font-medium">
-                                            {line.quantity}x Pack - €{line.unit_price.toFixed(2)}
-                                          </div>
-                                          {line.products.map((product: any, productIndex: number) => (
-                                            <div key={productIndex} className="ml-2 text-muted-foreground">
-                                              • {product.product_name || 'Sin nombre'}
-                                            </div>
-                                          ))}
-                                        </div>
-                                      ) : (
-                                        // Producto individual
-                                        <span>
-                                          {line.quantity}x {line.products?.[0]?.product_name || 'Sin producto'} - €{line.unit_price.toFixed(2)}
-                                        </span>
-                                      )}
-                                    </div>
-                                    <span>€{(line.quantity * line.unit_price).toFixed(2)}</span>
-                                  </div>
-                                  <div className="flex gap-2 mt-1 text-xs">
-                                   <span className={`px-2 py-1 rounded ${line.financiada ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                                     {line.financiada ? '✓' : '✗'} Financiada
-                                   </span>
-                                   <span className={`px-2 py-1 rounded ${line.transferencia ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                                     {line.transferencia ? '✓' : '✗'} Transferencia
-                                   </span>
-                                   <span className={`px-2 py-1 rounded ${line.nulo ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600'}`}>
-                                     {line.nulo ? '✓' : '✗'} Nulo
-                                   </span>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+      <AdminVisitManagementDialog
+        visit={adminManagementVisit}
+        isOpen={adminDialogOpen}
+        onClose={handleAdminDialogClose}
+        onVisitUpdated={handleVisitUpdated}
+      />
     </div>
   );
 }

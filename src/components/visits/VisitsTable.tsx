@@ -1,11 +1,12 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Eye } from 'lucide-react';
+import { Eye, Settings } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Link } from 'react-router-dom';
 import { calculateCommission } from '@/lib/commission';
+import { useAuth } from '@/hooks/useAuth';
 
 interface Visit {
   id: string;
@@ -46,6 +47,7 @@ interface VisitsTableProps {
   visits: Visit[];
   sales: Sale[];
   onViewVisit: (visit: Visit) => void | Promise<void>;
+  onAdminManageVisit?: (visit: Visit) => void;
   loading: boolean;
   showClientColumns?: boolean;
   emptyMessage?: string;
@@ -83,11 +85,14 @@ const getStatusDisplay = (status: string, approvalStatus?: string) => {
 export default function VisitsTable({ 
   visits, 
   sales, 
-  onViewVisit, 
+  onViewVisit,
+  onAdminManageVisit,
   loading, 
   showClientColumns = false,
   emptyMessage = "No hay visitas registradas" 
 }: VisitsTableProps) {
+  const { userRole } = useAuth();
+  const isAdmin = userRole?.role === 'admin';
   if (loading) {
     return <div className="text-center py-4">Cargando visitas...</div>;
   }
@@ -222,9 +227,21 @@ export default function VisitsTable({
                   {totalCommission > 0 ? `€${totalCommission.toFixed(2)}` : '-'}
                 </TableCell>
                 <TableCell>
-                  <Button size="sm" variant="outline" onClick={() => onViewVisit(visit)}>
-                    <Eye className="h-4 w-4" />
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => onViewVisit(visit)}>
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    {isAdmin && onAdminManageVisit && (
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => onAdminManageVisit(visit)}
+                        className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                      >
+                        <Settings className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             );
