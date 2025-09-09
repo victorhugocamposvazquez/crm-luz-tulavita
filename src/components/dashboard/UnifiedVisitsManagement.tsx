@@ -1187,7 +1187,6 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
               sale_id: saleId,
               quantity: line.quantity,
               unit_price: line.unit_price,
-              line_total: lineTotal,
               financiada: line.financiada,
               transferencia: line.transferencia,
               nulo: line.nulo
