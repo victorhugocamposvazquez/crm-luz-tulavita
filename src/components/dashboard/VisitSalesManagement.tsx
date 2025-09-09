@@ -599,7 +599,16 @@ export default function VisitSalesManagement() {
   const openSaleDialog = (sale?: Sale) => {
     if (sale) {
       setEditingSale(sale);
-      setSaleLines(sale.sale_lines || [{ products: [], quantity: 1, unit_price: 0, financiada: false, transferencia: false, nulo: false }]);
+      // Clean sale lines data, removing database generated fields
+      const cleanSaleLines = (sale.sale_lines || []).map(line => ({
+        products: line.products || [],
+        quantity: line.quantity,
+        unit_price: line.unit_price,
+        financiada: line.financiada,
+        transferencia: line.transferencia,
+        nulo: line.nulo
+      }));
+      setSaleLines(cleanSaleLines.length > 0 ? cleanSaleLines : [{ products: [], quantity: 1, unit_price: 0, financiada: false, transferencia: false, nulo: false }]);
     } else {
       setEditingSale(null);
       setSaleLines([{ products: [], quantity: 1, unit_price: 0, financiada: false, transferencia: false, nulo: false }]);
