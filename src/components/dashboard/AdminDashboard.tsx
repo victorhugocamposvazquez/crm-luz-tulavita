@@ -59,8 +59,9 @@ interface Visit {
     name: string;
   };
   commercial?: {
-    first_name: string;
-    last_name: string;
+    first_name: string | null;
+    last_name: string | null;
+    email: string;
   } | null;
   notes: string;
   sales?: any[];
@@ -256,7 +257,7 @@ export default function AdminDashboard() {
             name,
             description
           ),
-          client:clients(nombre_apellidos, dni),
+          client:clients(id, nombre_apellidos, dni),
           company:companies(name)
         `)
         .gte('visit_date', thirtyDaysAgo.toISOString())
@@ -276,7 +277,7 @@ export default function AdminDashboard() {
         if (visit.commercial_id) {
           const { data: commercialData } = await supabase
             .from('profiles')
-            .select('first_name, last_name')
+            .select('first_name, last_name, email')
             .eq('id', visit.commercial_id)
             .single();
           commercial = commercialData;

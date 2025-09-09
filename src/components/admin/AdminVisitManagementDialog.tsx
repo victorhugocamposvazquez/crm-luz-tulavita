@@ -27,10 +27,10 @@ interface Visit {
     dni?: string;
   };
   commercial?: {
-    first_name?: string;
-    last_name?: string;
+    first_name: string | null;
+    last_name: string | null;
     email: string;
-  };
+  } | null;
   visit_states?: {
     name: string;
     description?: string;
