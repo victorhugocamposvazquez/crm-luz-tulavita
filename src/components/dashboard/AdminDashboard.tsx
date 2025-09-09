@@ -19,7 +19,6 @@ import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
 import ReminderDialog from '@/components/reminders/ReminderDialog';
 import ClientPagination from '@/components/dashboard/ClientPagination';
 import AdminVisitManagementDialog from '@/components/admin/AdminVisitManagementDialog';
-import VisitDetailsDialog from '@/components/visits/VisitDetailsDialog';
 
 interface Sale {
   id: string;
@@ -43,20 +42,18 @@ interface Sale {
 interface Visit {
   id: string;
   visit_date: string;
-  status: 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed';
-  approval_status?: 'pending' | 'approved' | 'rejected' | 'waiting_admin';
+  status: string;
+  approval_status: string;
   client_id: string;
   commercial_id: string;
   visit_state_code?: string;
   latitude?: number;
   longitude?: number;
   location_accuracy?: number;
-  permission?: string;
   client: {
     id: string;
     nombre_apellidos: string;
     dni: string;
-    direccion?: string;
   };
   company: {
     name: string;
@@ -66,7 +63,7 @@ interface Visit {
     last_name: string | null;
     email: string;
   } | null;
-  notes?: string;
+  notes: string;
   sales?: any[];
   visit_states?: {
     name: string;
@@ -1057,13 +1054,146 @@ export default function AdminDashboard() {
       </div>
 
       {/* Visit Detail Dialog */}
-      <VisitDetailsDialog
-        visit={selectedVisit}
-        sales={visitSales}
-        onClose={() => setSelectedVisit(null)}
-        onAdminManageVisit={handleAdminManageVisit}
-        showClientInfo={true}
-      />
+      {selectedVisit && (
+        <Dialog open={!!selectedVisit} onOpenChange={() => setSelectedVisit(null)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Detalles de la Visita</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Cliente</Label>
+                  <p className="font-medium">{selectedVisit.client.nombre_apellidos}</p>
+                </div>
+                <div>
+                  <Label>DNI</Label>
+                  <p>{selectedVisit.client.dni}</p>
+                </div>
+                <div>
+                  <Label>Comercial</Label>
+                  <p>{selectedVisit.commercial ? `${selectedVisit.commercial.first_name} ${selectedVisit.commercial.last_name}` : 'N/A'}</p>
+                </div>
+                <div>
+                  <Label>Empresa</Label>
+                  <p>{selectedVisit.company.name}</p>
+                </div>
+                <div>
+                  <Label>Fecha</Label>
+                  <p>{formatDate(selectedVisit.visit_date)}</p>
+                </div>
+                <div>
+                  <Label>Estado</Label>
+                  <div>{getStatusBadge(selectedVisit.status)}</div>
+                </div>
+                {selectedVisit.visit_states && (
+                  <div>
+                    <Label>Resultado de la visita</Label>
+                    <div>
+                      <Badge variant="outline">
+                        {selectedVisit.visit_states.name.charAt(0).toUpperCase() + selectedVisit.visit_states.name.slice(1).toLowerCase()}
+                      </Badge>
+                    </div>
+                  </div>
+                )}
+                {(selectedVisit.latitude && selectedVisit.longitude) && (
+                  <div>
+                    <Label>Ubicación</Label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <a 
+                        href={`https://maps.google.com/?q=${selectedVisit.latitude},${selectedVisit.longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer hover:underline flex items-center gap-1"
+                      >
+                        {formatCoordinates(selectedVisit.latitude, selectedVisit.longitude)}
+                        <MapPin className="h-3 w-3" />
+                      </a>
+                      {selectedVisit.location_accuracy && (
+                        <span className="text-xs text-muted-foreground">
+                          (±{selectedVisit.location_accuracy.toFixed(0)}m)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {selectedVisit.notes && (
+                <div>
+                  <Label>Notas</Label>
+                  <p className="text-sm bg-muted p-2 rounded">{selectedVisit.notes}</p>
+                </div>
+              )}
+
+              {visitSales.length > 0 && (
+                <div>
+                  <Label>Ventas</Label>
+                  <div className="mt-2 space-y-4">
+                    {visitSales.map((sale, index) => (
+                      <div key={sale.id} className="border rounded p-3">
+                        <div className="flex justify-between items-start mb-2">
+                          <div>
+                            <p className="font-medium">Venta #{index + 1}</p>
+                            <p className="text-sm text-muted-foreground">{formatDate(sale.sale_date)}</p>
+                          </div>
+                          <p className="font-bold text-green-600">{formatCurrency(sale.amount)}</p>
+                        </div>
+                        
+                        {sale.sale_lines && sale.sale_lines.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-sm font-medium mb-1">Productos:</p>
+                            <div className="space-y-1">
+                              {sale.sale_lines.map((line: any) => (
+                                <div key={line.id} className="text-xs bg-muted/50 p-2 rounded">
+                                  <div className="flex justify-between">
+                                    <div>
+                                      {line.sale_lines_products && line.sale_lines_products.length > 1 ? (
+                                        // Pack: mostrar productos en líneas separadas
+                                        <div className="space-y-1">
+                                          <div className="font-medium">
+                                            {line.quantity}x Pack - {formatCurrency(line.unit_price)}
+                                          </div>
+                                          {line.sale_lines_products.map((product: any, productIndex: number) => (
+                                            <div key={productIndex} className="ml-2 text-muted-foreground">
+                                              • {product.product_name || 'Sin nombre'}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      ) : (
+                                        // Producto individual
+                                        <span>
+                                          {line.quantity}x {line.sale_lines_products?.[0]?.product_name || 'Sin producto'} - {formatCurrency(line.unit_price)}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span>{formatCurrency(line.line_total || (line.quantity * line.unit_price))}</span>
+                                  </div>
+                                  <div className="flex gap-2 mt-1 text-xs">
+                                   <span className={`px-2 py-1 rounded ${line.financiada ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                     {line.financiada ? '✓' : '✗'} Financiada
+                                   </span>
+                                   <span className={`px-2 py-1 rounded ${line.transferencia ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                                     {line.transferencia ? '✓' : '✗'} Transferencia
+                                   </span>
+                                   <span className={`px-2 py-1 rounded ${line.nulo ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600'}`}>
+                                     {line.nulo ? '✓' : '✗'} Nulo
+                                   </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {/* Reminder Dialog */}
       {selectedClientForReminder && (
