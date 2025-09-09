@@ -119,7 +119,7 @@ export default function AdminVisitManagementDialog({
       // Initialize basic info
       setNotes(visit.notes || '');
       setStatus(visit.status);
-      setVisitStateCode(visit.visit_state_code || '');
+      setVisitStateCode(visit.visit_state_code || 'none');
       setSelectedClientId(visit.client_id);
       
       fetchClients();
@@ -241,7 +241,7 @@ export default function AdminVisitManagementDialog({
         status: status as 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed',
       };
       
-      if (visitStateCode) {
+      if (visitStateCode && visitStateCode !== 'none') {
         updateData.visit_state_code = visitStateCode;
       }
       
@@ -481,7 +481,7 @@ export default function AdminVisitManagementDialog({
                     <SelectValue placeholder="Seleccionar resultado" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Sin resultado específico</SelectItem>
+                    <SelectItem value="none">Sin resultado específico</SelectItem>
                     {visitStates.map(state => (
                       <SelectItem key={state.code} value={state.code}>
                         {state.name}
