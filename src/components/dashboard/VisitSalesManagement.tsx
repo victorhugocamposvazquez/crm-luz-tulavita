@@ -447,9 +447,28 @@ export default function VisitSalesManagement() {
           nulo: line.nulo
         }));
 
-        await supabase
+        const linesResult = await supabase
           .from('sale_lines')
-          .insert(linesData);
+          .insert(linesData)
+          .select();
+
+        if (linesResult.error) throw linesResult.error;
+
+        // Insertar productos para cada línea
+        const productsData = linesResult.data.flatMap((insertedLine, index) => 
+          validLines[index].products.map(product => ({
+            sale_line_id: insertedLine.id,
+            product_name: product.product_name
+          }))
+        );
+
+        if (productsData.length > 0) {
+          const productsResult = await supabase
+            .from('sale_lines_products')
+            .insert(productsData);
+          
+          if (productsResult.error) throw productsResult.error;
+        }
 
       } else {
         const insertData = { ...saleData };
@@ -479,9 +498,28 @@ export default function VisitSalesManagement() {
           nulo: line.nulo
         }));
 
-        await supabase
+        const linesResult = await supabase
           .from('sale_lines')
-          .insert(linesData);
+          .insert(linesData)
+          .select();
+
+        if (linesResult.error) throw linesResult.error;
+
+        // Insertar productos para cada línea
+        const productsData = linesResult.data.flatMap((insertedLine, index) => 
+          validLines[index].products.map(product => ({
+            sale_line_id: insertedLine.id,
+            product_name: product.product_name
+          }))
+        );
+
+        if (productsData.length > 0) {
+          const productsResult = await supabase
+            .from('sale_lines_products')
+            .insert(productsData);
+          
+          if (productsResult.error) throw productsResult.error;
+        }
       }
 
       toast({
