@@ -1177,26 +1177,23 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
         }
 
         // Create sale lines
-        console.log('Creating sale lines...');
         for (const [index, line] of saleLines.entries()) {
-          const lineTotal = line.quantity * line.unit_price;
+          const insertData = {
+            sale_id: saleId,
+            quantity: line.quantity,
+            unit_price: line.unit_price,
+            financiada: line.financiada,
+            transferencia: line.transferencia,
+            nulo: line.nulo
+          };
           
           const { data: saleLine, error: lineError } = await supabase
             .from('sale_lines')
-            .insert({
-              sale_id: saleId,
-              quantity: line.quantity,
-              unit_price: line.unit_price,
-              line_total: lineTotal,
-              financiada: line.financiada,
-              transferencia: line.transferencia,
-              nulo: line.nulo
-            })
+            .insert(insertData)
             .select()
             .single();
           
           if (lineError) throw lineError;
-          console.log('Sale line created:', saleLine);
           
           // Create products for this line
           for (const product of line.products) {

@@ -440,12 +440,35 @@ export default function VisitSalesManagement() {
         // Insertar nuevas líneas
         const linesData = validLines.map(line => ({
           sale_id: editingSale.id,
-          ...line
+          quantity: line.quantity,
+          unit_price: line.unit_price,
+          financiada: line.financiada,
+          transferencia: line.transferencia,
+          nulo: line.nulo
         }));
 
-        await supabase
+        const linesResult = await supabase
           .from('sale_lines')
-          .insert(linesData);
+          .insert(linesData)
+          .select();
+
+        if (linesResult.error) throw linesResult.error;
+
+        // Insertar productos para cada línea
+        const productsData = linesResult.data.flatMap((insertedLine, index) => 
+          validLines[index].products.map(product => ({
+            sale_line_id: insertedLine.id,
+            product_name: product.product_name
+          }))
+        );
+
+        if (productsData.length > 0) {
+          const productsResult = await supabase
+            .from('sale_lines_products')
+            .insert(productsData);
+          
+          if (productsResult.error) throw productsResult.error;
+        }
 
       } else {
         const insertData = { ...saleData };
@@ -468,12 +491,35 @@ export default function VisitSalesManagement() {
         // Insertar líneas de productos
         const linesData = validLines.map(line => ({
           sale_id: result.data.id,
-          ...line
+          quantity: line.quantity,
+          unit_price: line.unit_price,
+          financiada: line.financiada,
+          transferencia: line.transferencia,
+          nulo: line.nulo
         }));
 
-        await supabase
+        const linesResult = await supabase
           .from('sale_lines')
-          .insert(linesData);
+          .insert(linesData)
+          .select();
+
+        if (linesResult.error) throw linesResult.error;
+
+        // Insertar productos para cada línea
+        const productsData = linesResult.data.flatMap((insertedLine, index) => 
+          validLines[index].products.map(product => ({
+            sale_line_id: insertedLine.id,
+            product_name: product.product_name
+          }))
+        );
+
+        if (productsData.length > 0) {
+          const productsResult = await supabase
+            .from('sale_lines_products')
+            .insert(productsData);
+          
+          if (productsResult.error) throw productsResult.error;
+        }
       }
 
       toast({
@@ -576,7 +622,17 @@ export default function VisitSalesManagement() {
 
   const updateSaleLine = (index: number, field: keyof SaleLine, value: any) => {
     const newLines = [...saleLines];
-    newLines[index] = { ...newLines[index], [field]: value };
+    // Only update allowed fields, excluding database-generated fields
+    const allowedUpdate = {
+      products: newLines[index].products,
+      quantity: newLines[index].quantity,
+      unit_price: newLines[index].unit_price,
+      financiada: newLines[index].financiada,
+      transferencia: newLines[index].transferencia,
+      nulo: newLines[index].nulo,
+      [field]: value
+    };
+    newLines[index] = allowedUpdate;
     setSaleLines(newLines);
   };
 
@@ -591,7 +647,16 @@ export default function VisitSalesManagement() {
   const openSaleDialog = (sale?: Sale) => {
     if (sale) {
       setEditingSale(sale);
-      setSaleLines(sale.sale_lines || [{ products: [], quantity: 1, unit_price: 0, financiada: false, transferencia: false, nulo: false }]);
+      // Clean sale lines data, removing database generated fields
+      const cleanSaleLines = (sale.sale_lines || []).map(line => ({
+        products: line.products || [],
+        quantity: line.quantity,
+        unit_price: line.unit_price,
+        financiada: line.financiada,
+        transferencia: line.transferencia,
+        nulo: line.nulo
+      }));
+      setSaleLines(cleanSaleLines.length > 0 ? cleanSaleLines : [{ products: [], quantity: 1, unit_price: 0, financiada: false, transferencia: false, nulo: false }]);
     } else {
       setEditingSale(null);
       setSaleLines([{ products: [], quantity: 1, unit_price: 0, financiada: false, transferencia: false, nulo: false }]);
