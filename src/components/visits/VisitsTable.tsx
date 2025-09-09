@@ -195,7 +195,7 @@ export default function VisitsTable({
                          {visit.client?.nombre_apellidos || 'Sin nombre'}
                        </Link>
                      </TableCell>
-                    <TableCell>{visit.client?.dni || 'Sin DNI'}</TableCell>
+                    <TableCell>{visit.client?.dni || '-'}</TableCell>
                   </>
                 )}
                 <TableCell className="font-medium">

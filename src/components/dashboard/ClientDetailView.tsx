@@ -700,13 +700,20 @@ const fetchVisits = async () => {
           </CardHeader>
           <CardContent>
             <VisitsTable
-              visits={visits as any}
-              sales={sales}
-              onViewVisit={handleViewVisit as any}
-              loading={loading}
-              showClientColumns={false}
-              emptyMessage="No hay visitas registradas para este cliente"
-            />
+            visits={visits as any}
+            sales={sales}
+            onViewVisit={handleViewVisit as any}
+            onCreateReminder={(visit: any) => {
+              setSelectedClient({
+                id: clientId,
+                name: client?.nombre_apellidos || ''
+              });
+              setReminderDialogOpen(true);
+            }}
+            loading={loading}
+            showClientColumns={false}
+            emptyMessage="No hay visitas registradas para este cliente"
+          />
           </CardContent>
         </Card>
       </div>

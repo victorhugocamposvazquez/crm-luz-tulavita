@@ -17,6 +17,7 @@ import { es } from 'date-fns/locale';
 import ClientPagination from '@/components/dashboard/ClientPagination';
 import VisitDetailsDialog from '@/components/visits/VisitDetailsDialog';
 import AdminVisitManagementDialog from '@/components/admin/AdminVisitManagementDialog';
+import ReminderDialog from '@/components/reminders/ReminderDialog';
 
 interface Visit {
   id: string;
@@ -113,6 +114,10 @@ export default function AdminVisitsView() {
     pageSize: 20,
     totalItems: 0
   });
+
+  // Reminder dialog state
+  const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
+  const [selectedClientForReminder, setSelectedClientForReminder] = useState<{ id: string; name: string } | null>(null);
 
   // Redirect if not admin
   useEffect(() => {
@@ -314,6 +319,14 @@ export default function AdminVisitsView() {
     fetchSales();
   };
 
+  const handleCreateReminder = (visit: Visit) => {
+    setSelectedClientForReminder({
+      id: visit.client_id,
+      name: visit.client.nombre_apellidos
+    });
+    setReminderDialogOpen(true);
+  };
+
   const handleFilterChange = (key: string, value: string) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
@@ -465,6 +478,7 @@ export default function AdminVisitsView() {
             sales={sales}
             onViewVisit={handleViewVisit as any}
             onAdminManageVisit={handleAdminManageVisit as any}
+            onCreateReminder={handleCreateReminder as any}
             loading={loading}
             showClientColumns={true}
             emptyMessage="No se encontraron visitas con los filtros aplicados"
@@ -499,6 +513,18 @@ export default function AdminVisitsView() {
         isOpen={adminDialogOpen}
         onClose={handleAdminDialogClose}
         onVisitUpdated={handleVisitUpdated}
+      />
+
+      {/* Reminder Dialog */}
+      <ReminderDialog
+        open={reminderDialogOpen}
+        onOpenChange={setReminderDialogOpen}
+        clientId={selectedClientForReminder?.id || ''}
+        clientName={selectedClientForReminder?.name || ''}
+        onReminderCreated={() => {
+          // Refresh data if needed
+          fetchVisits();
+        }}
       />
     </div>
   );
