@@ -438,21 +438,32 @@ export default function VisitSalesManagement() {
           .eq('sale_id', editingSale.id);
 
         // Insertar nuevas líneas
-        const linesData = validLines.map(line => ({
-          sale_id: editingSale.id,
-          quantity: line.quantity,
-          unit_price: line.unit_price,
-          financiada: line.financiada,
-          transferencia: line.transferencia,
-          nulo: line.nulo
-        }));
+        console.log('DEBUG: validLines before insert:', JSON.stringify(validLines, null, 2));
+        
+        const linesData = validLines.map(line => {
+          const cleanLine = {
+            sale_id: editingSale.id,
+            quantity: line.quantity,
+            unit_price: line.unit_price,
+            financiada: line.financiada,
+            transferencia: line.transferencia,
+            nulo: line.nulo
+          };
+          console.log('DEBUG: cleanLine for insert:', JSON.stringify(cleanLine, null, 2));
+          return cleanLine;
+        });
+
+        console.log('DEBUG: Final linesData for insert:', JSON.stringify(linesData, null, 2));
 
         const linesResult = await supabase
           .from('sale_lines')
           .insert(linesData)
           .select();
 
-        if (linesResult.error) throw linesResult.error;
+        if (linesResult.error) {
+          console.error('DEBUG: Error inserting sale_lines:', linesResult.error);
+          throw linesResult.error;
+        }
 
         // Insertar productos para cada línea
         const productsData = linesResult.data.flatMap((insertedLine, index) => 
@@ -489,21 +500,32 @@ export default function VisitSalesManagement() {
         if (result.error) throw result.error;
 
         // Insertar líneas de productos
-        const linesData = validLines.map(line => ({
-          sale_id: result.data.id,
-          quantity: line.quantity,
-          unit_price: line.unit_price,
-          financiada: line.financiada,
-          transferencia: line.transferencia,
-          nulo: line.nulo
-        }));
+        console.log('DEBUG: validLines before insert (new sale):', JSON.stringify(validLines, null, 2));
+        
+        const linesData = validLines.map(line => {
+          const cleanLine = {
+            sale_id: result.data.id,
+            quantity: line.quantity,
+            unit_price: line.unit_price,
+            financiada: line.financiada,
+            transferencia: line.transferencia,
+            nulo: line.nulo
+          };
+          console.log('DEBUG: cleanLine for insert (new sale):', JSON.stringify(cleanLine, null, 2));
+          return cleanLine;
+        });
+
+        console.log('DEBUG: Final linesData for insert (new sale):', JSON.stringify(linesData, null, 2));
 
         const linesResult = await supabase
           .from('sale_lines')
           .insert(linesData)
           .select();
 
-        if (linesResult.error) throw linesResult.error;
+        if (linesResult.error) {
+          console.error('DEBUG: Error inserting sale_lines (new sale):', linesResult.error);
+          throw linesResult.error;
+        }
 
         // Insertar productos para cada línea
         const productsData = linesResult.data.flatMap((insertedLine, index) => 
