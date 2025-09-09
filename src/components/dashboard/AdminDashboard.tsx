@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Users, Euro, MapPin, TrendingUp, Eye, Bell } from 'lucide-react';
+import { Users, Euro, MapPin, TrendingUp, Eye, Bell, Settings } from 'lucide-react';
 import { formatCoordinates } from '@/lib/coordinates';
 import { calculateCommission } from '@/lib/commission';
 import { format, subDays, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths, startOfDay, endOfDay } from 'date-fns';
@@ -18,6 +18,7 @@ import { es } from 'date-fns/locale';
 import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
 import ReminderDialog from '@/components/reminders/ReminderDialog';
 import ClientPagination from '@/components/dashboard/ClientPagination';
+import AdminVisitManagementDialog from '@/components/admin/AdminVisitManagementDialog';
 
 interface Sale {
   id: string;
@@ -44,11 +45,13 @@ interface Visit {
   status: string;
   approval_status: string;
   client_id: string;
+  commercial_id: string;
   visit_state_code?: string;
   latitude?: number;
   longitude?: number;
   location_accuracy?: number;
   client: {
+    id: string;
     nombre_apellidos: string;
     dni: string;
   };
@@ -83,6 +86,8 @@ export default function AdminDashboard() {
   const [monthlySalesData, setMonthlySalesData] = useState<any[]>([]);
   const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
   const [visitSales, setVisitSales] = useState<any[]>([]);
+  const [adminManagementVisit, setAdminManagementVisit] = useState<Visit | null>(null);
+  const [adminDialogOpen, setAdminDialogOpen] = useState(false);
   const [selectedCommercial, setSelectedCommercial] = useState<string>('all');
   const [commercials, setCommercials] = useState<any[]>([]);
   const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
@@ -352,6 +357,20 @@ export default function AdminDashboard() {
       name: visit.client.nombre_apellidos
     });
     setReminderDialogOpen(true);
+  };
+
+  const handleAdminManageVisit = (visit: Visit) => {
+    setAdminManagementVisit(visit);
+    setAdminDialogOpen(true);
+  };
+
+  const handleAdminDialogClose = () => {
+    setAdminDialogOpen(false);
+    setAdminManagementVisit(null);
+  };
+
+  const handleVisitUpdated = () => {
+    fetchDashboardData();
   };
 
   const handleReminderCreated = () => {
@@ -994,6 +1013,14 @@ export default function AdminDashboard() {
                           >
                             <Bell className="h-4 w-4" />
                           </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleAdminManageVisit(visit)}
+                            title="Administrar visita"
+                          >
+                            <Settings className="h-4 w-4" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -1177,6 +1204,13 @@ export default function AdminDashboard() {
           onReminderCreated={handleReminderCreated}
         />
       )}
+
+      <AdminVisitManagementDialog
+        visit={adminManagementVisit}
+        isOpen={adminDialogOpen}
+        onClose={handleAdminDialogClose}
+        onVisitUpdated={handleVisitUpdated}
+      />
     </div>
   );
 }

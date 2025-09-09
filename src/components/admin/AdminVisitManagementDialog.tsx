@@ -73,6 +73,13 @@ interface Client {
   direccion: string;
 }
 
+interface Commercial {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+}
+
 interface AdminVisitManagementDialogProps {
   visit: Visit | null;
   isOpen: boolean;
@@ -106,6 +113,10 @@ export default function AdminVisitManagementDialog({
   const [selectedClientId, setSelectedClientId] = useState('');
   const [clients, setClients] = useState<Client[]>([]);
   
+  // Commercial change state
+  const [selectedCommercialId, setSelectedCommercialId] = useState('');
+  const [commercials, setCommercials] = useState<Commercial[]>([]);
+  
   // Sales management state
   const [sales, setSales] = useState<Sale[]>([]);
   const [editingSale, setEditingSale] = useState<Sale | null>(null);
@@ -121,12 +132,42 @@ export default function AdminVisitManagementDialog({
       setStatus(visit.status);
       setVisitStateCode(visit.visit_state_code || 'none');
       setSelectedClientId(visit.client_id);
+      setSelectedCommercialId(visit.commercial_id);
       
       fetchClients();
+      fetchCommercials();
       fetchSales();
       fetchVisitStates();
     }
   }, [visit, isOpen]);
+
+  const fetchCommercials = async () => {
+    try {
+      // First get user_roles with role 'commercial'
+      const { data: userRoles, error: roleError } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'commercial');
+      
+      if (roleError) throw roleError;
+      
+      if (userRoles && userRoles.length > 0) {
+        const userIds = userRoles.map(ur => ur.user_id);
+        
+        // Then get profiles for these users
+        const { data: profiles, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email')
+          .in('id', userIds)
+          .order('first_name');
+        
+        if (profileError) throw profileError;
+        setCommercials(profiles || []);
+      }
+    } catch (error) {
+      console.error('Error fetching commercials:', error);
+    }
+  };
 
   const fetchClients = async () => {
     try {
@@ -236,6 +277,7 @@ export default function AdminVisitManagementDialog({
         status: 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed'; 
         visit_state_code?: string; 
         client_id?: string; 
+        commercial_id?: string; 
       } = {
         notes,
         status: status as 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed',
@@ -247,6 +289,10 @@ export default function AdminVisitManagementDialog({
       
       if (selectedClientId !== visit.client_id) {
         updateData.client_id = selectedClientId;
+      }
+      
+      if (selectedCommercialId !== visit.commercial_id) {
+        updateData.commercial_id = selectedCommercialId;
       }
       
       const { error } = await supabase
@@ -264,6 +310,16 @@ export default function AdminVisitManagementDialog({
           .eq('visit_id', visit.id);
         
         if (salesUpdateError) throw salesUpdateError;
+      }
+      
+      // If commercial changed, update all sales to new commercial
+      if (selectedCommercialId !== visit.commercial_id) {
+        const { error: salesCommercialUpdateError } = await supabase
+          .from('sales')
+          .update({ commercial_id: selectedCommercialId })
+          .eq('visit_id', visit.id);
+        
+        if (salesCommercialUpdateError) throw salesCommercialUpdateError;
       }
       
       toast({
@@ -438,7 +494,7 @@ export default function AdminVisitManagementDialog({
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="basic">Información Básica</TabsTrigger>
-            <TabsTrigger value="sales">Packs ({sales.length})</TabsTrigger>
+            <TabsTrigger value="sales">Ventas ({sales.length})</TabsTrigger>
             <TabsTrigger value="danger">Zona Peligrosa</TabsTrigger>
           </TabsList>
 
@@ -454,6 +510,22 @@ export default function AdminVisitManagementDialog({
                     {clients.map(client => (
                       <SelectItem key={client.id} value={client.id}>
                         {client.nombre_apellidos} {client.dni ? `(${client.dni})` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="commercial">Comercial</Label>
+                <Select value={selectedCommercialId} onValueChange={setSelectedCommercialId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar comercial" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {commercials.map(commercial => (
+                      <SelectItem key={commercial.id} value={commercial.id}>
+                        {commercial.first_name} {commercial.last_name} ({commercial.email})
                       </SelectItem>
                     ))}
                   </SelectContent>
