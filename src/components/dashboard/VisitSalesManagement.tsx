@@ -440,7 +440,11 @@ export default function VisitSalesManagement() {
         // Insertar nuevas líneas
         const linesData = validLines.map(line => ({
           sale_id: editingSale.id,
-          ...line
+          quantity: line.quantity,
+          unit_price: line.unit_price,
+          financiada: line.financiada,
+          transferencia: line.transferencia,
+          nulo: line.nulo
         }));
 
         await supabase
@@ -468,7 +472,11 @@ export default function VisitSalesManagement() {
         // Insertar líneas de productos
         const linesData = validLines.map(line => ({
           sale_id: result.data.id,
-          ...line
+          quantity: line.quantity,
+          unit_price: line.unit_price,
+          financiada: line.financiada,
+          transferencia: line.transferencia,
+          nulo: line.nulo
         }));
 
         await supabase
