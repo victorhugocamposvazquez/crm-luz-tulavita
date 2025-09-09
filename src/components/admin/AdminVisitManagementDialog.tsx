@@ -438,7 +438,7 @@ export default function AdminVisitManagementDialog({
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="basic">Información Básica</TabsTrigger>
-            <TabsTrigger value="sales">Ventas ({sales.length})</TabsTrigger>
+            <TabsTrigger value="sales">Packs ({sales.length})</TabsTrigger>
             <TabsTrigger value="danger">Zona Peligrosa</TabsTrigger>
           </TabsList>
 
@@ -484,7 +484,7 @@ export default function AdminVisitManagementDialog({
                     <SelectItem value="none">Sin resultado específico</SelectItem>
                     {visitStates.map(state => (
                       <SelectItem key={state.code} value={state.code}>
-                        {state.name}
+                        {state.name.charAt(0).toUpperCase() + state.name.slice(1)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -502,10 +502,6 @@ export default function AdminVisitManagementDialog({
               />
             </div>
 
-            <Button onClick={handleSaveBasicInfo} disabled={loading}>
-              <Save className="h-4 w-4 mr-2" />
-              Guardar Información Básica
-            </Button>
           </TabsContent>
 
           <TabsContent value="sales" className="space-y-4">
@@ -514,14 +510,14 @@ export default function AdminVisitManagementDialog({
                 <CardHeader>
                   <CardTitle>Editando Venta</CardTitle>
                   <CardDescription>
-                    Modifica las líneas de productos de esta venta
+                    Modifica los packs de productos de esta venta
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {saleLines.map((line, lineIndex) => (
                     <Card key={lineIndex} className="p-4">
                       <div className="flex justify-between items-start mb-4">
-                        <h4 className="font-medium">Línea {lineIndex + 1}</h4>
+                        <h4 className="font-medium">Pack {lineIndex + 1}</h4>
                         <Button
                           size="sm"
                           variant="destructive"
@@ -613,7 +609,7 @@ export default function AdminVisitManagementDialog({
                   <div className="flex gap-2">
                     <Button onClick={addSaleLine} variant="outline">
                       <Plus className="h-4 w-4 mr-2" />
-                      Añadir Línea
+                      Añadir Pack
                     </Button>
                     <Button onClick={handleSaveSale} disabled={loading}>
                       <Save className="h-4 w-4 mr-2" />
@@ -645,7 +641,7 @@ export default function AdminVisitManagementDialog({
                           <div>
                             <p className="font-medium">Venta: €{sale.amount.toFixed(2)}</p>
                             <p className="text-sm text-muted-foreground">
-                              {sale.sale_lines?.length || 0} líneas de producto
+                              {sale.sale_lines?.length || 0} packs de productos
                             </p>
                           </div>
                           <Button onClick={() => handleEditSale(sale)} size="sm">
@@ -689,6 +685,10 @@ export default function AdminVisitManagementDialog({
         </Tabs>
 
         <DialogFooter>
+          <Button onClick={handleSaveBasicInfo} disabled={loading}>
+            <Save className="h-4 w-4 mr-2" />
+            Guardar
+          </Button>
           <Button variant="outline" onClick={onClose}>
             Cerrar
           </Button>
