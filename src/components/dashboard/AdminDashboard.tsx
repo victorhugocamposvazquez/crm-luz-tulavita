@@ -26,6 +26,7 @@ interface Sale {
   amount: number;
   commission_percentage: number;
   commission_amount: number;
+  sale_lines?: Array<{ quantity: number; unit_price: number; nulo: boolean }>;
   client: {
     nombre_apellidos: string;
     dni: string;
@@ -204,6 +205,7 @@ export default function AdminDashboard() {
           commission_percentage,
           commission_amount,
           commercial_id,
+          sale_lines(quantity, unit_price, nulo),
           client:clients(nombre_apellidos, dni),
           company:companies(name)
         `)
@@ -286,7 +288,14 @@ export default function AdminDashboard() {
         // Fetch visit sales
         const { data: visitSales } = await supabase
           .from('sales')
-          .select('id, sale_date, amount, commission_percentage, commission_amount')
+          .select(`
+            id, 
+            sale_date, 
+            amount, 
+            commission_percentage, 
+            commission_amount,
+            sale_lines(quantity, unit_price, nulo)
+          `)
           .eq('visit_id', visit.id);
 
         return {
@@ -304,7 +313,11 @@ export default function AdminDashboard() {
       // Fetch monthly sales data for charts
       let monthlySalesQuery = supabase
         .from('sales')
-        .select('sale_date, amount')
+        .select(`
+          sale_date, 
+          amount,
+          sale_lines(quantity, unit_price, nulo)
+        `)
         .gte('sale_date', sixMonthsAgo.toISOString())
         .order('sale_date');
 
