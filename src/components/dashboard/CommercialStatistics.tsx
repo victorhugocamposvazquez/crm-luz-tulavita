@@ -22,6 +22,7 @@ interface SaleInVisit {
   amount: number;
   commission_percentage: number;
   commission_amount: number;
+  sale_lines?: Array<{ quantity: number; unit_price: number; nulo: boolean }>;
 }
 
 interface Sale {
@@ -37,6 +38,7 @@ interface Sale {
   company: {
     name: string;
   };
+  sale_lines?: Array<{ quantity: number; unit_price: number; nulo: boolean }>;
 }
 
 interface Visit {
@@ -95,7 +97,8 @@ export default function CommercialStatistics() {
           commission_percentage,
           commission_amount,
           client:clients(nombre_apellidos, dni),
-          company:companies(name)
+          company:companies(name),
+          sale_lines(quantity, unit_price, nulo)
         `)
         .eq('commercial_id', user.id)
         .gte('sale_date', thirtyDaysAgo.toISOString())
@@ -142,7 +145,14 @@ export default function CommercialStatistics() {
       const visitsWithSales = await Promise.all((visitsData || []).map(async (visit) => {
         const { data: visitSales } = await supabase
           .from('sales')
-          .select('id, sale_date, amount, commission_percentage, commission_amount')
+          .select(`
+            id, 
+            sale_date, 
+            amount, 
+            commission_percentage, 
+            commission_amount,
+            sale_lines(quantity, unit_price, nulo)
+          `)
           .eq('visit_id', visit.id);
 
         return {
@@ -159,7 +169,11 @@ export default function CommercialStatistics() {
       // Fetch monthly sales data for charts
       const { data: monthlySales, error: monthlyError } = await supabase
         .from('sales')
-        .select('sale_date, amount')
+        .select(`
+          sale_date, 
+          amount,
+          sale_lines(quantity, unit_price, nulo)
+        `)
         .eq('commercial_id', user.id)
         .gte('sale_date', sixMonthsAgo.toISOString())
         .order('sale_date');
