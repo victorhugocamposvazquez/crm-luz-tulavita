@@ -12,7 +12,7 @@ import { format, subDays, startOfMonth, endOfMonth, eachMonthOfInterval, subMont
 import { es } from 'date-fns/locale';
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { calculateCommission, calculateTotalExcludingNulls, calculateSaleCommission } from '@/lib/commission';
+import { calculateCommission, calculateTotalExcludingNulls, calculateSaleCommission, calculateEffectiveAmount } from '@/lib/commission';
 import { formatCoordinates } from '@/lib/coordinates';
 import { toast } from '@/hooks/use-toast';
 
@@ -192,7 +192,7 @@ export default function CommercialStatistics() {
           return saleDate >= startOfMonth(month) && saleDate <= endOfMonth(month);
         }) || [];
 
-        const totalAmount = monthSales.reduce((sum, sale) => sum + sale.amount, 0);
+        const totalAmount = monthSales.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0);
         const totalCommission = monthSales.reduce((sum, sale) => sum + calculateSaleCommission(sale), 0);
 
         return {
@@ -296,7 +296,7 @@ export default function CommercialStatistics() {
     return <div className="min-h-screen flex items-center justify-center">Cargando estadísticas...</div>;
   }
 
-  const totalSales = sales.reduce((sum, sale) => sum + sale.amount, 0);
+  const totalSales = sales.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0);
   const totalCommissions = sales.reduce((sum, sale) => sum + sale.commission_amount, 0);
   const approvedVisits = visits.filter(visit => visit.approval_status === 'approved').length;
   const pendingVisits = visits.filter(visit => visit.approval_status === 'pending').length;
@@ -457,7 +457,7 @@ export default function CommercialStatistics() {
             </TableHeader>
             <TableBody>
               {completedVisits.map((visit) => {
-                const totalSalesAmount = visit.sales?.reduce((sum, sale) => sum + sale.amount, 0) || 0;
+                const totalSalesAmount = visit.sales?.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0) || 0;
                 const totalCommission = visit.sales?.reduce((sum, sale) => sum + sale.commission_amount, 0) || 0;
                 
                 return (

@@ -12,7 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Users, Euro, MapPin, TrendingUp, Eye, Bell, Settings } from 'lucide-react';
 import { formatCoordinates } from '@/lib/coordinates';
-import { calculateCommission, calculateTotalExcludingNulls, calculateSaleCommission } from '@/lib/commission';
+import { calculateCommission, calculateTotalExcludingNulls, calculateSaleCommission, calculateEffectiveAmount } from '@/lib/commission';
 import { format, subDays, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths, startOfDay, endOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
@@ -128,13 +128,16 @@ export default function AdminDashboard() {
       // Fetch today's sales
       const { data: todaySalesData, error: todaySalesError } = await supabase
         .from('sales')
-        .select('amount')
+        .select(`
+          amount,
+          sale_lines(quantity, unit_price, nulo)
+        `)
         .gte('sale_date', startToday.toISOString())
         .lte('sale_date', endToday.toISOString());
 
       if (todaySalesError) throw todaySalesError;
 
-      const todaySalesAmount = todaySalesData?.reduce((sum, sale) => sum + sale.amount, 0) || 0;
+      const todaySalesAmount = todaySalesData?.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0) || 0;
 
       // Fetch today's visits count
       const { count: todayVisitsCount, error: todayVisitsError } = await supabase
@@ -148,22 +151,28 @@ export default function AdminDashboard() {
       // Fetch current month sales
       const { data: monthSalesData, error: monthSalesError } = await supabase
         .from('sales')
-        .select('amount')
+        .select(`
+          amount,
+          sale_lines(quantity, unit_price, nulo)
+        `)
         .gte('sale_date', startOfCurrentMonth.toISOString());
 
       if (monthSalesError) throw monthSalesError;
 
-      const monthSalesAmount = monthSalesData?.reduce((sum, sale) => sum + sale.amount, 0) || 0;
+      const monthSalesAmount = monthSalesData?.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0) || 0;
 
       // Fetch total sales (without filters) for the stats card
       const { data: totalSalesData, error: totalSalesError } = await supabase
         .from('sales')
-        .select('amount')
+        .select(`
+          amount,
+          sale_lines(quantity, unit_price, nulo)  
+        `)
         .gte('sale_date', thirtyDaysAgo.toISOString());
 
       if (totalSalesError) throw totalSalesError;
 
-      const totalSalesAmount = totalSalesData?.reduce((sum, sale) => sum + sale.amount, 0) || 0;
+      const totalSalesAmount = totalSalesData?.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0) || 0;
 
       setStats({
         totalClients: clientsCount || 0,
@@ -340,7 +349,7 @@ export default function AdminDashboard() {
           return saleDate >= startOfMonth(month) && saleDate <= endOfMonth(month);
         }) || [];
 
-        const totalAmount = monthSales.reduce((sum, sale) => sum + sale.amount, 0);
+        const totalAmount = monthSales.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0);
         const totalCommission = monthSales.reduce((sum, sale) => sum + calculateSaleCommission(sale), 0);
 
         return {
@@ -498,7 +507,7 @@ export default function AdminDashboard() {
     return <div className="min-h-screen flex items-center justify-center">Cargando dashboard...</div>;
   }
 
-  const totalSales = sales.reduce((sum, sale) => sum + sale.amount, 0);
+  const totalSales = sales.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0);
   const totalCommissions = sales.reduce((sum, sale) => sum + sale.commission_amount, 0);
   const approvedVisits = visits.filter(visit => visit.approval_status === 'approved').length;
   const completedVisits = visits.filter(visit => visit.status === 'completed');
@@ -962,7 +971,7 @@ export default function AdminDashboard() {
               </TableHeader>
               <TableBody>
                 {paginatedCompletedVisits.map((visit) => {
-                  const totalSalesAmount = visit.sales?.reduce((sum, sale) => sum + sale.amount, 0) || 0;
+                  const totalSalesAmount = visit.sales?.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0) || 0;
                   const totalCommission = visit.sales?.reduce((sum, sale) => sum + sale.commission_amount, 0) || 0;
                   
                   return (

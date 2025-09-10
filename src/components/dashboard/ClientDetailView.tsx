@@ -16,7 +16,7 @@ import { es } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { formatCoordinates } from '@/lib/coordinates';
 import VisitsTable from '@/components/visits/VisitsTable';
-import { calculateCommission, calculateTotalExcludingNulls, calculateSaleCommission } from '@/lib/commission';
+import { calculateCommission, calculateTotalExcludingNulls, calculateSaleCommission, calculateEffectiveAmount } from '@/lib/commission';
 import RemindersTable from '@/components/reminders/RemindersTable';
 import ReminderDialog from '@/components/reminders/ReminderDialog';
 
@@ -68,7 +68,7 @@ interface Sale {
   commercial?: {
     first_name: string | null;
     last_name: string | null;
-    email: string;
+    email: string;  
   } | null;
   sale_lines?: Array<{
     products: { product_name: string }[];
@@ -255,7 +255,15 @@ const fetchVisits = async () => {
       
       // Calculate commission using the new system
       const commissionPercentage = sale.commission_percentage || 0;
-      const calculatedCommission = calculateSaleCommission({ amount: sale.amount, commission_amount: sale.commission_amount });
+      const calculatedCommission = calculateSaleCommission({ 
+        amount: sale.amount, 
+        commission_amount: sale.commission_amount,
+        sale_lines: (lines || []).map(line => ({
+          quantity: line.quantity,
+          unit_price: line.unit_price,
+          nulo: line.nulo
+        }))
+      });
       
       return { 
         ...sale, 
@@ -329,7 +337,7 @@ const fetchVisits = async () => {
   };
 
   // Estadísticas calculadas
-  const totalSales = sales.reduce((sum, sale) => sum + sale.amount, 0);
+  const totalSales = sales.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0);
   const totalCommissions = sales.reduce((sum, sale) => sum + sale.commission_amount, 0);
   const averageSale = sales.length > 0 ? totalSales / sales.length : 0;
   const totalProducts = sales.reduce((sum, sale) => sum + (sale.sale_lines?.length || 0), 0);
@@ -354,14 +362,15 @@ const fetchVisits = async () => {
   const monthlySalesData = sales.reduce((acc, sale) => {
     const month = format(new Date(sale.sale_date), 'yyyy-MM');
     const existing = acc.find(item => item.month === month);
+    const effectiveAmount = calculateEffectiveAmount(sale);
     if (existing) {
-      existing.amount += sale.amount;
+      existing.amount += effectiveAmount;
       existing.count += 1;
     } else {
       acc.push({
         month,
         monthLabel: format(new Date(sale.sale_date), 'MMM yyyy', { locale: es }),
-        amount: sale.amount,
+        amount: effectiveAmount,
         count: 1
       });
     }
