@@ -5,7 +5,7 @@ import { Eye, Settings, Bell } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Link } from 'react-router-dom';
-import { calculateCommission } from '@/lib/commission';
+import { calculateCommission, calculateSaleCommission } from '@/lib/commission';
 import { useAuth } from '@/hooks/useAuth';
 
 interface Visit {
@@ -179,7 +179,7 @@ export default function VisitsTable({
             const totalSales = visitSales.reduce((sum, sale) => sum + sale.amount, 0);
             // Calculate commission using stored amount or calculate with new system
             const totalCommission = visitSales.reduce((sum, sale) => {
-              const commission = sale.commission_amount || calculateCommission(sale.amount);
+              const commission = calculateSaleCommission(sale);
               return sum + commission;
             }, 0);
             

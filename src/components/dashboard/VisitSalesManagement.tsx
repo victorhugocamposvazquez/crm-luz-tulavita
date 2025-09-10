@@ -390,7 +390,7 @@ export default function VisitSalesManagement() {
 
     const formData = new FormData(e.currentTarget);
     const total = validLines.reduce((sum, line) => sum + (line.quantity * line.unit_price), 0);
-    const commissionAmount = calculateCommission(total);
+    const commissionAmount = calculateSaleCommission({ amount: total, sale_lines: validLines });
 
     const saleData = {
       client_id: formData.get('client_id') as string,
@@ -641,7 +641,7 @@ export default function VisitSalesManagement() {
   };
 
   const calculateCommissionAmount = () => {
-    return calculateCommission(calculateTotal());
+    return calculateSaleCommission({ amount: calculateTotal(), sale_lines: saleLines });
   };
 
   const openSaleDialog = (sale?: Sale) => {
