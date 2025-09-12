@@ -43,18 +43,23 @@ export const calculateEffectiveAmount = (
 
 /**
  * Calculates commission for a sale considering only non-null lines
+ * If hasSecondCommercial is true, divides the commission by 2
  */
-export const calculateSaleCommission = (sale: { 
-  amount: number; 
-  commission_amount?: number;
-  sale_lines?: Array<{ quantity: number; unit_price: number; nulo: boolean }> 
-}): number => {
+export const calculateSaleCommission = (
+  sale: { 
+    amount: number; 
+    commission_amount?: number;
+    sale_lines?: Array<{ quantity: number; unit_price: number; nulo: boolean }> 
+  },
+  hasSecondCommercial: boolean = false
+): number => {
   if (sale.commission_amount) {
-    return sale.commission_amount;
+    return hasSecondCommercial ? sale.commission_amount / 2 : sale.commission_amount;
   }
   
   const effectiveAmount = calculateEffectiveAmount(sale);
-  return calculateCommission(effectiveAmount);
+  const baseCommission = calculateCommission(effectiveAmount);
+  return hasSecondCommercial ? baseCommission / 2 : baseCommission;
 };
 
 /**

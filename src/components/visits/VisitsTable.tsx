@@ -156,6 +156,7 @@ export default function VisitsTable({
             </>
           )}
           <TableHead>Comercial</TableHead>
+          <TableHead>Segundo Comercial</TableHead>
           <TableHead>Empresa</TableHead>
           <TableHead>Fecha</TableHead>
           <TableHead>Estado</TableHead>
@@ -169,7 +170,7 @@ export default function VisitsTable({
       <TableBody>
         {visits.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={showClientColumns ? 11 : 9} className="text-center py-8 text-muted-foreground">
+            <TableCell colSpan={showClientColumns ? 12 : 10} className="text-center py-8 text-muted-foreground">
               {emptyMessage}
             </TableCell>
           </TableRow>
@@ -178,9 +179,9 @@ export default function VisitsTable({
             // Find sales for this visit and calculate commission properly
             const visitSales = sales.filter(sale => sale.visit_id === visit.id);
             const totalSales = visitSales.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0);
-            // Calculate commission using stored amount or calculate with new system
             const totalCommission = visitSales.reduce((sum, sale) => {
-              const commission = calculateSaleCommission(sale);
+              const hasSecondCommercial = !!visit.second_commercial;
+              const commission = calculateSaleCommission(sale, hasSecondCommercial);
               return sum + commission;
             }, 0);
             
@@ -201,6 +202,12 @@ export default function VisitsTable({
                 )}
                 <TableCell className="font-medium">
                   {getCommercialName(visit.commercial)}
+                </TableCell>
+                <TableCell>
+                  {visit.second_commercial ? 
+                    getCommercialName(visit.second_commercial) : 
+                    '-'
+                  }
                 </TableCell>
                 <TableCell>{visit.company?.name || 'N/A'}</TableCell>
                 <TableCell>

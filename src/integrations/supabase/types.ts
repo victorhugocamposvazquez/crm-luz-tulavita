@@ -485,6 +485,7 @@ export type Database = {
           longitude: number | null
           notes: string | null
           permission: string | null
+          second_commercial_id: string | null
           status: Database["public"]["Enums"]["visit_status"]
           updated_at: string
           visit_date: string
@@ -507,6 +508,7 @@ export type Database = {
           longitude?: number | null
           notes?: string | null
           permission?: string | null
+          second_commercial_id?: string | null
           status: Database["public"]["Enums"]["visit_status"]
           updated_at?: string
           visit_date?: string
@@ -529,6 +531,7 @@ export type Database = {
           longitude?: number | null
           notes?: string | null
           permission?: string | null
+          second_commercial_id?: string | null
           status?: Database["public"]["Enums"]["visit_status"]
           updated_at?: string
           visit_date?: string

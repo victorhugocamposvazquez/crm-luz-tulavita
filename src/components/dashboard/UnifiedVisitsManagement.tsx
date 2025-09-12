@@ -118,6 +118,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
     notes: '',
     status: 'in_progress' as 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed',
     company_id: '',
+    second_commercial_id: '',
     permission: 'pending',
     visitStateCode: ''
   });
@@ -128,6 +129,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
 
   const [loading, setLoading] = useState(false);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [commercials, setCommercials] = useState<{id: string, first_name: string | null, last_name: string | null, email: string}[]>([]);
   const [visitStates, setVisitStates] = useState<{code: string, name: string}[]>([]);
   const [hasApproval, setHasApproval] = useState(false);
   const [editingVisitId, setEditingVisitId] = useState<string | null>(null);
@@ -160,6 +162,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       notes: '',
       status: 'in_progress' as 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed',
       company_id: '',
+      second_commercial_id: '',
       permission: 'pending',
       visitStateCode: ''
     });
@@ -175,6 +178,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
 
   useEffect(() => {
     fetchCompanies();
+    fetchCommercials();
     fetchVisitStates();
     // Auto-request location when component loads
     if (location === null) {
@@ -236,6 +240,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
             notes: visitData.notes || '',
             status: visitData.status as any,
             company_id: visitData.company_id || '',
+            second_commercial_id: visitData.second_commercial_id || '',
             permission: visitData.permission || 'pending',
             visitStateCode: visitData.visit_state_code || ''
           });
@@ -339,6 +344,30 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       toast({
         title: "Error",
         description: "Error al cargar estados de visita",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const fetchCommercials = async () => {
+    try {
+      console.log('Fetching commercials...');
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .neq('id', user?.id); // Exclude current user
+      
+      if (error) {
+        console.error('Commercials fetch error:', error);
+        throw error;
+      }
+      console.log('Commercials fetched:', data);
+      setCommercials(data || []);
+    } catch (error) {
+      console.error('Error fetching commercials:', error);
+      toast({
+        title: "Error",
+        description: "Error al cargar comerciales",
         variant: "destructive"
       });
     }
@@ -580,6 +609,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
           .insert({
             client_id: client.id,
             commercial_id: user.id,
+            second_commercial_id: visitData.second_commercial_id || null,
             company_id: selectedCompany,
             status: 'in_progress' as Database['public']['Enums']['visit_status'],
             approval_status: 'waiting_admin',
@@ -700,6 +730,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
         .insert({
           client_id: clientData.id,
           commercial_id: user.id,
+          second_commercial_id: visitData.second_commercial_id || null,
           company_id: selectedCompany,
           status: 'in_progress' as Database['public']['Enums']['visit_status'],
           approval_status: 'waiting_admin',
@@ -818,6 +849,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
           .insert({
             client_id: client.id,
             commercial_id: user!.id,
+            second_commercial_id: null, // No second commercial for batch visits
             company_id: selectedCompany,
             status: 'in_progress' as Database['public']['Enums']['visit_status'],
             notes: 'Visita creada en lote',
@@ -914,6 +946,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       const visitPayload = {
         client_id: newClient.id,
         commercial_id: user!.id,
+        second_commercial_id: null, // No second commercial for new client creation
         company_id: selectedCompany,
         notes: '',
         status: 'in_progress' as const,
@@ -1055,6 +1088,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
         const visitPayload = {
           client_id: existingClient.id,
           commercial_id: user!.id,
+          second_commercial_id: visitData.second_commercial_id || null,
           company_id: visitData.company_id,
           notes: visitData.notes,
           visit_state_code: visitData.visitStateCode,
@@ -1237,6 +1271,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
           notes: '',
           status: 'in_progress',
           company_id: '',
+          second_commercial_id: '',
           permission: 'pending',
           visitStateCode: ''
         });
@@ -1623,6 +1658,27 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
                       </SelectItem>
                     ))
                   ) : null}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="secondCommercial">Segundo Comercial (Opcional)</Label>
+              <Select 
+                value={visitData.second_commercial_id} 
+                onValueChange={(value) => setVisitData(prev => ({ ...prev, second_commercial_id: value }))}
+                disabled={isReadOnly}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecciona un compañero" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Sin segundo comercial</SelectItem>
+                  {commercials.map(commercial => (
+                    <SelectItem key={commercial.id} value={commercial.id}>
+                      {[commercial.first_name, commercial.last_name].filter(Boolean).join(' ') || commercial.email}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
