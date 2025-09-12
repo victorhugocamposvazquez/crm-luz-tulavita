@@ -93,7 +93,7 @@ export default function CommercialStatistics() {
       const thirtyDaysAgo = subDays(new Date(), 30);
       const sixMonthsAgo = subMonths(new Date(), 6);
 
-      // Fetch sales from last 30 days
+      // Fetch sales from last 30 days - incluir ventas donde es comercial principal
       const { data: salesData, error: salesError } = await supabase
         .from('sales')
         .select(`
@@ -110,18 +110,44 @@ export default function CommercialStatistics() {
         .gte('sale_date', thirtyDaysAgo.toISOString())
         .order('sale_date', { ascending: false });
 
+      // Fetch sales from visits where user is second commercial
+      const { data: secondCommercialSalesData, error: secondCommercialSalesError } = await supabase
+        .from('sales')
+        .select(`
+          id,
+          sale_date,
+          amount,
+          commission_percentage,
+          commission_amount,
+          client:clients(nombre_apellidos, dni),
+          company:companies(name),
+          sale_lines(quantity, unit_price, nulo),
+          visit:visits!inner(second_commercial_id)
+        `)
+        .gte('sale_date', thirtyDaysAgo.toISOString())
+        .eq('visit.second_commercial_id', user.id)
+        .order('sale_date', { ascending: false });
+
+      if (secondCommercialSalesError) console.error('Error fetching second commercial sales:', secondCommercialSalesError);
+
       if (salesError) throw salesError;
 
+      // Combinar ventas principales y de segundo comercial
+      const allSalesData = [
+        ...(salesData || []),
+        ...(secondCommercialSalesData || [])
+      ];
+
       // Calculate commission using new system - dividir por segundo comercial en estadísticas
-      const processedSales = salesData?.map(sale => ({
+      const processedSales = allSalesData.map(sale => ({
         ...sale,
         commission_amount: calculateSaleCommission(sale, false) // Individual sales don't have visit context
-      })) || [];
+      }));
 
       setSales(processedSales);
 
-      // Fetch visits from last 30 days with associated sales
-      const { data: visitsData, error: visitsError } = await supabase
+      // Fetch visits from last 30 days where user is primary or second commercial
+      const { data: primaryVisitsData, error: primaryVisitsError } = await supabase
         .from('visits')
         .select(`
           id,
@@ -146,11 +172,48 @@ export default function CommercialStatistics() {
         .gte('visit_date', thirtyDaysAgo.toISOString())
         .order('visit_date', { ascending: false });
 
-      if (visitsError) throw visitsError;
-      console.log('[CSTATS] visitsData length:', visitsData?.length || 0, 'second_commercial_ids:', (visitsData || []).map(v => v.second_commercial_id).filter(Boolean));
+      const { data: secondaryVisitsData, error: secondaryVisitsError } = await supabase
+        .from('visits')
+        .select(`
+          id,
+          visit_date,
+          status,
+          approval_status,
+          notes,
+          client_id,
+          second_commercial_id,
+          latitude,
+          longitude,
+          location_accuracy,
+          visit_state_code,
+          visit_states (
+            name,
+            description
+          ),
+          client:clients(nombre_apellidos, dni),
+          company:companies(name)
+        `)
+        .eq('second_commercial_id', user.id)
+        .gte('visit_date', thirtyDaysAgo.toISOString())
+        .order('visit_date', { ascending: false });
+
+      if (primaryVisitsError) throw primaryVisitsError;
+      if (secondaryVisitsError) throw secondaryVisitsError;
+
+      // Combinar visitas donde es comercial principal y segundo comercial
+      const allVisitsData = [
+        ...(primaryVisitsData || []),
+        ...(secondaryVisitsData || [])
+      ];
+
+      // Eliminar duplicados por ID si los hubiera
+      const uniqueVisitsData = allVisitsData.filter((visit, index, self) => 
+        index === self.findIndex((v) => v.id === visit.id)
+      );
+      console.log('[CSTATS] uniqueVisitsData length:', uniqueVisitsData?.length || 0, 'second_commercial_ids:', (uniqueVisitsData || []).map(v => v.second_commercial_id).filter(Boolean));
 
       // For each visit, fetch associated sales and second commercial data
-      const visitsWithSales = await Promise.all((visitsData || []).map(async (visit) => {
+      const visitsWithSales = await Promise.all((uniqueVisitsData || []).map(async (visit) => {
         // Fetch second commercial data
         let second_commercial = null;
         if (visit.second_commercial_id) {
@@ -192,8 +255,8 @@ export default function CommercialStatistics() {
       console.log('[CSTATS] Enriched visits sample:', visitsWithSales.slice(0,3).map(v => ({ id: v.id, second: v.second_commercial })));
       setVisits(visitsWithSales);
 
-      // Fetch monthly sales data for charts
-      const { data: monthlySales, error: monthlyError } = await supabase
+      // Fetch monthly sales data for charts - incluir ventas donde es comercial principal
+      const { data: primaryMonthlySales, error: primaryMonthlyError } = await supabase
         .from('sales')
         .select(`
           sale_date, 
@@ -204,7 +267,27 @@ export default function CommercialStatistics() {
         .gte('sale_date', sixMonthsAgo.toISOString())
         .order('sale_date');
 
-      if (monthlyError) throw monthlyError;
+      // Fetch monthly sales data where user is second commercial
+      const { data: secondaryMonthlySales, error: secondaryMonthlyError } = await supabase
+        .from('sales')
+        .select(`
+          sale_date, 
+          amount,
+          sale_lines(quantity, unit_price, nulo),
+          visit:visits!inner(second_commercial_id)
+        `)
+        .gte('sale_date', sixMonthsAgo.toISOString())
+        .eq('visit.second_commercial_id', user.id)
+        .order('sale_date');
+
+      if (primaryMonthlyError) throw primaryMonthlyError;
+      if (secondaryMonthlyError) console.error('Error fetching secondary monthly sales:', secondaryMonthlyError);
+
+      // Combinar ventas mensuales
+      const allMonthlySales = [
+        ...(primaryMonthlySales || []),
+        ...(secondaryMonthlySales || [])
+      ];
 
       // Process monthly data
       const months = eachMonthOfInterval({
@@ -213,7 +296,7 @@ export default function CommercialStatistics() {
       });
 
       const monthlyData = months.map(month => {
-        const monthSales = monthlySales?.filter(sale => {
+        const monthSales = allMonthlySales?.filter(sale => {
           const saleDate = new Date(sale.sale_date);
           return saleDate >= startOfMonth(month) && saleDate <= endOfMonth(month);
         }) || [];
