@@ -8,7 +8,8 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy:functions:b": "supabase login --token sbp_8d6f00125e50df0dd7d814a2c425949a41a4e67a && supabase functions deploy admin-actions --project-ref nrlawnrmxlipizjwebbz && supabase functions deploy get-mapbox-token --project-ref nrlawnrmxlipizjwebbz"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
