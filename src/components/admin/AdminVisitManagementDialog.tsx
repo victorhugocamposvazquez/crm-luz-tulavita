@@ -305,7 +305,7 @@ export default function AdminVisitManagementDialog({
       }
       
       if (selectedSecondCommercialId !== (visit.second_commercial_id || '')) {
-        updateData.second_commercial_id = selectedSecondCommercialId === "none" ? null : selectedSecondCommercialId;
+        updateData.second_commercial_id = selectedSecondCommercialId === "" ? null : selectedSecondCommercialId;
       }
       
       const { error } = await supabase
