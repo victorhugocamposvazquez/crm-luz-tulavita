@@ -1664,23 +1664,23 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
 
             <div className="space-y-2">
               <Label htmlFor="secondCommercial">Segundo Comercial (Opcional)</Label>
-              <Select 
-                value={visitData.second_commercial_id} 
-                onValueChange={(value) => setVisitData(prev => ({ ...prev, second_commercial_id: value }))}
-                disabled={isReadOnly}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecciona un compañero" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">Sin segundo comercial</SelectItem>
-                  {commercials.map(commercial => (
-                    <SelectItem key={commercial.id} value={commercial.id}>
-                      {[commercial.first_name, commercial.last_name].filter(Boolean).join(' ') || commercial.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <Select 
+                  value={visitData.second_commercial_id || "none"} 
+                  onValueChange={(value) => setVisitData(prev => ({ ...prev, second_commercial_id: value === "none" ? "" : value }))}
+                  disabled={isReadOnly}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona un compañero" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin segundo comercial</SelectItem>
+                    {commercials.map(commercial => (
+                      <SelectItem key={commercial.id} value={commercial.id}>
+                        {[commercial.first_name, commercial.last_name].filter(Boolean).join(' ') || commercial.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
             </div>
 
             <div className="space-y-2">

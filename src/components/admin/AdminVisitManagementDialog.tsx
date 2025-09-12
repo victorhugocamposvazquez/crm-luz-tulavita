@@ -305,7 +305,7 @@ export default function AdminVisitManagementDialog({
       }
       
       if (selectedSecondCommercialId !== (visit.second_commercial_id || '')) {
-        updateData.second_commercial_id = selectedSecondCommercialId || null;
+        updateData.second_commercial_id = selectedSecondCommercialId === "none" ? null : selectedSecondCommercialId;
       }
       
       const { error } = await supabase
@@ -561,12 +561,12 @@ export default function AdminVisitManagementDialog({
 
               <div>
                 <Label htmlFor="secondCommercial">Segundo Comercial</Label>
-                <Select value={selectedSecondCommercialId} onValueChange={setSelectedSecondCommercialId}>
+                <Select value={selectedSecondCommercialId || "none"} onValueChange={(value) => setSelectedSecondCommercialId(value === "none" ? "" : value)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Sin segundo comercial" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Sin segundo comercial</SelectItem>
+                    <SelectItem value="none">Sin segundo comercial</SelectItem>
                     {commercials.map(commercial => (
                       <SelectItem key={commercial.id} value={commercial.id}>
                         {commercial.first_name} {commercial.last_name} ({commercial.email})
