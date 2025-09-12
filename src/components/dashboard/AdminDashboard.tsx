@@ -261,6 +261,7 @@ export default function AdminDashboard() {
           notes,
           client_id,
           commercial_id,
+          second_commercial_id,
           visit_state_code,
           latitude,
           longitude,
@@ -295,6 +296,17 @@ export default function AdminDashboard() {
           commercial = commercialData;
         }
 
+        // Fetch second commercial data
+        let second_commercial = null;
+        if (visit.second_commercial_id) {
+          const { data: secondCommercialData } = await supabase
+            .from('profiles')
+            .select('first_name, last_name, email')
+            .eq('id', visit.second_commercial_id)
+            .single();
+          second_commercial = secondCommercialData;
+        }
+
         // Fetch visit sales
         const { data: visitSales } = await supabase
           .from('sales')
@@ -311,6 +323,7 @@ export default function AdminDashboard() {
         return {
           ...visit,
           commercial,
+          second_commercial,
           sales: visitSales?.map(sale => ({
             ...sale,
             commission_amount: calculateSaleCommission(sale, !!(visit as any).second_commercial_id)
@@ -962,6 +975,7 @@ export default function AdminDashboard() {
                   <TableHead>Fecha Visita</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Comercial</TableHead>
+                  <TableHead>Segundo Comercial</TableHead>
                   <TableHead>Empresa</TableHead>
                   <TableHead>Resultado de la visita</TableHead>
                   <TableHead>Notas</TableHead>
@@ -986,6 +1000,12 @@ export default function AdminDashboard() {
                       </TableCell>
                       <TableCell>
                         {visit.commercial ? `${visit.commercial.first_name} ${visit.commercial.last_name}` : 'N/A'}
+                      </TableCell>
+                      <TableCell>
+                        {(visit as any).second_commercial ? 
+                          `${(visit as any).second_commercial.first_name} ${(visit as any).second_commercial.last_name}` : 
+                          '-'
+                        }
                       </TableCell>
                       <TableCell>{visit.company?.name || 'N/A'}</TableCell>
                       <TableCell>
@@ -1052,7 +1072,7 @@ export default function AdminDashboard() {
                 })}
                 {paginatedCompletedVisits.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center text-muted-foreground">
                       {completedVisits.length === 0 ? "No hay visitas completadas en los últimos 30 días" : "No hay más visitas en esta página"}
                     </TableCell>
                   </TableRow>

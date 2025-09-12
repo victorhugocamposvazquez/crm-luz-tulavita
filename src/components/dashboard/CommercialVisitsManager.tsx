@@ -257,12 +257,30 @@ export default function CommercialVisitsManager() {
         .order('visit_date', {
         ascending: false
       });
+      
       if (error) {
         console.error('Error fetching visits:', error);
         throw error;
       }
       console.log('[CVM] Raw visits data:', data);
-      const formattedVisits = data?.map(visit => ({
+      
+      // Fetch second commercial data for each visit
+      const visitsWithSecondCommercial = await Promise.all((data || []).map(async (visit) => {
+        let second_commercial = null;
+        if (visit.second_commercial_id) {
+          const { data: secondCommercialData } = await supabase
+            .from('profiles')
+            .select('first_name, last_name, email')
+            .eq('id', visit.second_commercial_id)
+            .single();
+          second_commercial = secondCommercialData;
+        }
+        return {
+          ...visit,
+          second_commercial
+        };
+      }));
+      const formattedVisits = visitsWithSecondCommercial?.map(visit => ({
         ...visit,
         client: visit.client || {
           nombre_apellidos: 'Cliente desconocido',
@@ -508,6 +526,7 @@ export default function CommercialVisitsManager() {
               <TableHead>Cliente</TableHead>
               <TableHead>DNI</TableHead>
               <TableHead>Empresa</TableHead>
+              <TableHead>Segundo Comercial</TableHead>
               <TableHead>Fecha</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Permisos</TableHead>
@@ -518,11 +537,17 @@ export default function CommercialVisitsManager() {
                 <TableBody>
                   {visits.map(visit => <TableRow key={visit.id}>
                        <TableCell className="font-medium">
-                         {visit.client.nombre_apellidos}
-                       </TableCell>
-                       <TableCell>{visit.client.dni}</TableCell>
-                       <TableCell>{visit.company.name}</TableCell>
-                       <TableCell>{formatDate(visit.visit_date)}</TableCell>
+                          {visit.client.nombre_apellidos}
+                        </TableCell>
+                        <TableCell>{visit.client.dni}</TableCell>
+                        <TableCell>{visit.company.name}</TableCell>
+                        <TableCell>
+                          {visit.second_commercial ? 
+                            `${visit.second_commercial.first_name} ${visit.second_commercial.last_name}` : 
+                            '-'
+                          }
+                        </TableCell>
+                        <TableCell>{formatDate(visit.visit_date)}</TableCell>
                        <TableCell>{getStatusBadge(visit)}</TableCell>
                        <TableCell>
                          <Badge variant={visit.approval_status === 'approved' ? 'default' : visit.approval_status === 'rejected' ? 'destructive' : 'secondary'}>

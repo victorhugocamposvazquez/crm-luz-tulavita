@@ -352,17 +352,39 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
   const fetchCommercials = async () => {
     try {
       console.log('Fetching commercials...');
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, first_name, last_name, email')
-        .neq('id', user?.id); // Exclude current user
       
-      if (error) {
-        console.error('Commercials fetch error:', error);
-        throw error;
+      // First get all user IDs that have the commercial role
+      const { data: commercialRoles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'commercial');
+
+      if (rolesError) {
+        console.error('Commercial roles fetch error:', rolesError);
+        throw rolesError;
       }
-      console.log('Commercials fetched:', data);
-      setCommercials(data || []);
+
+      if (commercialRoles && commercialRoles.length > 0) {
+        const commercialIds = commercialRoles.map(role => role.user_id);
+        
+        // Then get the profiles for those users, excluding the current user
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email')
+          .in('id', commercialIds)
+          .neq('id', user?.id); // Exclude current user
+        
+        if (error) {
+          console.error('Commercials fetch error:', error);
+          throw error;
+        }
+        
+        console.log('Commercials fetched:', data);
+        setCommercials(data || []);
+      } else {
+        console.log('No commercials found');
+        setCommercials([]);
+      }
     } catch (error) {
       console.error('Error fetching commercials:', error);
       toast({

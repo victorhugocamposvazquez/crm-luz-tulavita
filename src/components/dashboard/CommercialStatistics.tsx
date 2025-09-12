@@ -58,6 +58,11 @@ interface Visit {
   company: {
     name: string;
   };
+  second_commercial?: {
+    first_name: string | null;
+    last_name: string | null;
+    email: string;
+  };
   notes: string;
   sales?: SaleInVisit[];
   visit_states?: {
@@ -125,6 +130,7 @@ export default function CommercialStatistics() {
           approval_status,
           notes,
           client_id,
+          second_commercial_id,
           latitude,
           longitude,
           location_accuracy,
@@ -142,8 +148,19 @@ export default function CommercialStatistics() {
 
       if (visitsError) throw visitsError;
 
-      // For each visit, fetch associated sales
+      // For each visit, fetch associated sales and second commercial data
       const visitsWithSales = await Promise.all((visitsData || []).map(async (visit) => {
+        // Fetch second commercial data
+        let second_commercial = null;
+        if (visit.second_commercial_id) {
+          const { data: secondCommercialData } = await supabase
+            .from('profiles')
+            .select('first_name, last_name, email')
+            .eq('id', visit.second_commercial_id)
+            .single();
+          second_commercial = secondCommercialData;
+        }
+
         const { data: visitSales } = await supabase
           .from('sales')
           .select(`
@@ -158,9 +175,10 @@ export default function CommercialStatistics() {
 
         return {
           ...visit,
+          second_commercial,
           sales: visitSales?.map(sale => ({
             ...sale,
-            commission_amount: calculateSaleCommission(sale, !!(visit as any).second_commercial_id)
+            commission_amount: calculateSaleCommission(sale, !!visit.second_commercial_id)
           })) || []
         };
       }));
@@ -450,6 +468,7 @@ export default function CommercialStatistics() {
                 <TableHead>Fecha Visita</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Empresa</TableHead>
+                <TableHead>Segundo Comercial</TableHead>
                 <TableHead>Ventas Generadas</TableHead>
                 <TableHead>Comisión Total</TableHead>
                 <TableHead>Notas</TableHead>
@@ -471,6 +490,12 @@ export default function CommercialStatistics() {
                       </div>
                     </TableCell>
                     <TableCell>{visit.company?.name || 'N/A'}</TableCell>
+                    <TableCell>
+                      {visit.second_commercial ? 
+                        `${visit.second_commercial.first_name} ${visit.second_commercial.last_name}` : 
+                        '-'
+                      }
+                    </TableCell>
                     <TableCell>
                       {visit.sales && visit.sales.length > 0 ? (
                         <div className="space-y-1">
@@ -511,7 +536,7 @@ export default function CommercialStatistics() {
               })}
               {completedVisits.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground">
                     No hay visitas completadas en los últimos 30 días
                   </TableCell>
                 </TableRow>
