@@ -168,6 +168,10 @@ export default function VisitDetailsDialog({
               <p>{visit.commercial ? `${visit.commercial.first_name} ${visit.commercial.last_name}` : 'N/A'}</p>
             </div>
             <div>
+              <label className="text-sm font-medium text-muted-foreground">Segundo Comercial</label>
+              <p>{visit.second_commercial ? `${visit.second_commercial.first_name} ${visit.second_commercial.last_name}` : 'Sin segundo comercial'}</p>
+            </div>
+            <div>
               <label className="text-sm font-medium text-muted-foreground">Empresa</label>
               <p>{visit.company?.name}</p>
             </div>

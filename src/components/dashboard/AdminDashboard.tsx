@@ -277,7 +277,7 @@ export default function AdminDashboard() {
         .order('visit_date', { ascending: false });
 
       if (selectedCommercial !== 'all') {
-        visitsQuery = visitsQuery.eq('commercial_id', selectedCommercial);
+        visitsQuery = visitsQuery.or(`commercial_id.eq.${selectedCommercial},second_commercial_id.eq.${selectedCommercial}`);
       }
 
       const { data: visitsData, error: visitsError } = await visitsQuery;
