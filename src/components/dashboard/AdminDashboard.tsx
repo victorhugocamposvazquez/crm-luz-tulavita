@@ -241,11 +241,11 @@ export default function AdminDashboard() {
           commercial = commercialData;
         }
 
-        return {
-          ...sale,
-          commission_amount: calculateSaleCommission(sale, false), // No second commercial info in sales table
-          commercial
-        };
+          return {
+            ...sale,
+            commission_amount: calculateSaleCommission(sale, false), // En listados mostrar comisión completa
+            commercial
+          };
       }));
 
       setSales(salesWithCommercials);
@@ -326,7 +326,7 @@ export default function AdminDashboard() {
           second_commercial,
           sales: visitSales?.map(sale => ({
             ...sale,
-            commission_amount: calculateSaleCommission(sale, !!(visit as any).second_commercial_id)
+            commission_amount: calculateSaleCommission(sale, false) // En listados mostrar comisión completa
           })) || []
         };
       }));
@@ -364,7 +364,7 @@ export default function AdminDashboard() {
         }) || [];
 
         const totalAmount = monthSales.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0);
-        const totalCommission = monthSales.reduce((sum, sale) => sum + calculateSaleCommission(sale, false), 0); // Monthly data doesn't have visit context
+        const totalCommission = monthSales.reduce((sum, sale) => sum + calculateSaleCommission(sale, false), 0); // Datos mensuales sin división
 
         return {
           month: format(month, 'MMM yyyy', { locale: es }),

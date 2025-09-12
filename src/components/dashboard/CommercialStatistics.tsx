@@ -112,7 +112,7 @@ export default function CommercialStatistics() {
 
       if (salesError) throw salesError;
 
-      // Calculate commission using new system
+      // Calculate commission using new system - dividir por segundo comercial en estadísticas
       const processedSales = salesData?.map(sale => ({
         ...sale,
         commission_amount: calculateSaleCommission(sale, false) // Individual sales don't have visit context
@@ -184,7 +184,7 @@ export default function CommercialStatistics() {
           second_commercial,
           sales: visitSales?.map(sale => ({
             ...sale,
-            commission_amount: calculateSaleCommission(sale, !!visit.second_commercial_id)
+            commission_amount: calculateSaleCommission(sale, !!visit.second_commercial_id) // Dividir por segundo comercial en estadísticas
           })) || []
         };
       }));
@@ -219,7 +219,7 @@ export default function CommercialStatistics() {
         }) || [];
 
         const totalAmount = monthSales.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0);
-        const totalCommission = monthSales.reduce((sum, sale) => sum + calculateSaleCommission(sale, false), 0); // Monthly data doesn't have visit context
+        const totalCommission = monthSales.reduce((sum, sale) => sum + calculateSaleCommission(sale, false), 0); // Monthly data - no dividir aquí
 
         return {
           month: format(month, 'MMM yyyy', { locale: es }),

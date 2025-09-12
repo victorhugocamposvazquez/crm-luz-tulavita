@@ -185,8 +185,8 @@ export default function VisitsTable({
             const visitSales = sales.filter(sale => sale.visit_id === visit.id);
             const totalSales = visitSales.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0);
             const totalCommission = visitSales.reduce((sum, sale) => {
-              const hasSecondCommercial = !!visit.second_commercial;
-              const commission = calculateSaleCommission(sale, hasSecondCommercial);
+              // En listados siempre mostrar comisión completa, sin dividir por segundo comercial
+              const commission = calculateSaleCommission(sale, false);
               return sum + commission;
             }, 0);
             
