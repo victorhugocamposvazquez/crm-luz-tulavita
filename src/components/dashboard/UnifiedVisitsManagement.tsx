@@ -1097,6 +1097,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
             notes: visitData.notes,
             visit_state_code: visitData.visitStateCode,
             company_id: visitData.company_id,
+            second_commercial_id: visitData.second_commercial_id || null,
             status: (isComplete ? 'completed' : currentVisitStatus || 'in_progress') as Database['public']['Enums']['visit_status'],
             updated_at: new Date().toISOString()
           })
