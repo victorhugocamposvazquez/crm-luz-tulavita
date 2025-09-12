@@ -323,7 +323,11 @@ export default function CommercialStatistics() {
   }
 
   const totalSales = sales.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0);
-  const totalCommissions = sales.reduce((sum, sale) => sum + sale.commission_amount, 0);
+  // Ajustar comisiones en estadísticas según segundo comercial (usar visitas con ventas ya divididas)
+  const totalCommissions = visits.reduce((acc, visit) => {
+    const visitCommission = (visit.sales || []).reduce((s, sale) => s + (sale.commission_amount || 0), 0);
+    return acc + visitCommission;
+  }, 0);
   const approvedVisits = visits.filter(visit => visit.approval_status === 'approved').length;
   const pendingVisits = visits.filter(visit => visit.approval_status === 'pending').length;
 
