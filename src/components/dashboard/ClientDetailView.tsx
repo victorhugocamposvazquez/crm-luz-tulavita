@@ -49,6 +49,11 @@ interface Visit {
     last_name: string | null;
     email: string;
   } | null;
+  second_commercial?: {
+    first_name: string | null;
+    last_name: string | null;
+    email: string;
+  } | null;
   company?: {
     name: string;
   } | null;
@@ -186,7 +191,7 @@ const fetchVisits = async () => {
 
   // Batch-load related profiles (commercials) and companies to avoid N+1
   const commercialIds = Array.from(new Set(
-    visitsData.map(v => v.commercial_id).filter(Boolean)
+    [...visitsData.map(v => v.commercial_id), ...visitsData.map(v => (v as any).second_commercial_id)].filter(Boolean)
   ));
   const companyIds = Array.from(new Set(
     visitsData.map(v => (v as any).company_id).filter(Boolean)
@@ -213,6 +218,7 @@ const fetchVisits = async () => {
   const enriched = visitsData.map(v => ({
     ...v,
     commercial: profileMap.get(v.commercial_id) || null,
+    second_commercial: profileMap.get((v as any).second_commercial_id) || null,
     company: companyMap.get((v as any).company_id) || null,
   }));
 
@@ -738,6 +744,10 @@ const fetchVisits = async () => {
                 <div>
                   <Label>Comercial</Label>
                   <p>{selectedVisit.commercial ? `${selectedVisit.commercial.first_name} ${selectedVisit.commercial.last_name}` : 'N/A'}</p>
+                </div>
+                <div>
+                  <Label>Segundo Comercial</Label>
+                  <p>{selectedVisit.second_commercial ? `${selectedVisit.second_commercial.first_name} ${selectedVisit.second_commercial.last_name}` : 'Sin segundo comercial'}</p>
                 </div>
                 <div>
                   <Label>Empresa</Label>

@@ -596,6 +596,10 @@ export default function CommercialVisitsManager() {
                   <p>{selectedVisit.client.dni}</p>
                 </div>
                 <div>
+                  <Label>Segundo Comercial</Label>
+                  <p>{selectedVisit.second_commercial ? `${selectedVisit.second_commercial.first_name} ${selectedVisit.second_commercial.last_name}` : 'Sin segundo comercial'}</p>
+                </div>
+                <div>
                   <Label>Empresa</Label>
                   <p>{selectedVisit.company.name}</p>
                 </div>
