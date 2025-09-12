@@ -27,6 +27,11 @@ interface Visit {
     last_name: string | null;
     email: string;
   };
+  second_commercial?: {
+    first_name: string | null;
+    last_name: string | null;
+    email: string;
+  };
   client?: {
     nombre_apellidos: string;
     dni: string;

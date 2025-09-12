@@ -21,6 +21,7 @@ interface Visit {
   approval_status: 'pending' | 'approved' | 'rejected' | 'waiting_admin';
   notes: string;
   client_id: string;
+  second_commercial_id?: string;
   latitude?: number;
   longitude?: number;
   location_accuracy?: number;
@@ -30,6 +31,16 @@ interface Visit {
   };
   company: {
     name: string;
+  };
+  commercial?: {
+    first_name: string | null;
+    last_name: string | null;
+    email: string;
+  };
+  second_commercial?: {
+    first_name: string | null;
+    last_name: string | null;
+    email: string;
   };
   approved_by?: {
     first_name: string;
@@ -229,6 +240,7 @@ export default function CommercialVisitsManager() {
           permission,
           client_id,
           company_id,
+          second_commercial_id,
           latitude,
           longitude,
           location_accuracy,

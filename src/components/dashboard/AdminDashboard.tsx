@@ -47,6 +47,7 @@ interface Visit {
   approval_status: string;
   client_id: string;
   commercial_id: string;
+  second_commercial_id?: string;
   visit_state_code?: string;
   latitude?: number;
   longitude?: number;
@@ -242,7 +243,7 @@ export default function AdminDashboard() {
 
         return {
           ...sale,
-          commission_amount: calculateSaleCommission(sale),
+          commission_amount: calculateSaleCommission(sale, false), // No second commercial info in sales table
           commercial
         };
       }));
@@ -312,7 +313,7 @@ export default function AdminDashboard() {
           commercial,
           sales: visitSales?.map(sale => ({
             ...sale,
-            commission_amount: calculateSaleCommission(sale)
+            commission_amount: calculateSaleCommission(sale, !!(visit as any).second_commercial_id)
           })) || []
         };
       }));
@@ -350,7 +351,7 @@ export default function AdminDashboard() {
         }) || [];
 
         const totalAmount = monthSales.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0);
-        const totalCommission = monthSales.reduce((sum, sale) => sum + calculateSaleCommission(sale), 0);
+        const totalCommission = monthSales.reduce((sum, sale) => sum + calculateSaleCommission(sale, false), 0); // Monthly data doesn't have visit context
 
         return {
           month: format(month, 'MMM yyyy', { locale: es }),

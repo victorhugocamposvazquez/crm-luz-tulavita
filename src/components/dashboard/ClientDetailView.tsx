@@ -253,8 +253,7 @@ const fetchVisits = async () => {
           .maybeSingle()
       ]);
       
-      // Calculate commission using the new system
-      const commissionPercentage = sale.commission_percentage || 0;
+      // Calculate commission using the new system considering second commercial
       const calculatedCommission = calculateSaleCommission({ 
         amount: sale.amount, 
         commission_amount: sale.commission_amount,
@@ -263,7 +262,7 @@ const fetchVisits = async () => {
           unit_price: line.unit_price,
           nulo: line.nulo
         }))
-      });
+      }, false); // Individual sales don't have visit context for second commercial
       
       return { 
         ...sale, 

@@ -27,6 +27,7 @@ interface Visit {
   notes?: string;
   permission: string;
   commercial_id: string;
+  second_commercial_id?: string;
   client_id: string;
   company_id?: string;
   visit_states?: {
@@ -34,6 +35,11 @@ interface Visit {
     description: string;
   };
   commercial?: {
+    first_name: string | null;
+    last_name: string | null;
+    email: string;
+  };
+  second_commercial?: {
     first_name: string | null;
     last_name: string | null;
     email: string;
@@ -244,12 +250,16 @@ export default function AdminVisitsView() {
 
       // Batch-load related data
       const commercialIds = Array.from(new Set(visits.map(v => v.commercial_id).filter(Boolean)));
+      const secondCommercialIds = Array.from(new Set(visits.map(v => v.second_commercial_id).filter(Boolean)));
       const clientIds = Array.from(new Set(visits.map(v => v.client_id).filter(Boolean)));
       const companyIds = Array.from(new Set(visits.map(v => v.company_id).filter(Boolean)));
 
-      const [{ data: profiles }, { data: clients }, { data: companies }] = await Promise.all([
+      const [{ data: profiles }, { data: secondProfiles }, { data: clients }, { data: companies }] = await Promise.all([
         commercialIds.length
           ? supabase.from('profiles').select('id, first_name, last_name, email').in('id', commercialIds)
+          : Promise.resolve({ data: [], error: null } as any),
+        secondCommercialIds.length
+          ? supabase.from('profiles').select('id, first_name, last_name, email').in('id', secondCommercialIds)
           : Promise.resolve({ data: [], error: null } as any),
         clientIds.length
           ? supabase.from('clients').select('id, nombre_apellidos, dni, direccion').in('id', clientIds)
@@ -260,12 +270,14 @@ export default function AdminVisitsView() {
       ]);
 
       const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+      const secondProfileMap = new Map((secondProfiles || []).map(p => [p.id, p]));
       const clientMap = new Map((clients || []).map(c => [c.id, c]));
       const companyMap = new Map((companies || []).map(c => [c.id, c]));
 
       let enrichedVisits = visits.map(v => ({
         ...v,
         commercial: profileMap.get(v.commercial_id) || null,
+        second_commercial: v.second_commercial_id ? secondProfileMap.get(v.second_commercial_id) || null : null,
         client: clientMap.get(v.client_id) || null,
         company: companyMap.get(v.company_id) || null,
       }));

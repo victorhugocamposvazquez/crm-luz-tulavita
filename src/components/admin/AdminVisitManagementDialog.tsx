@@ -20,6 +20,7 @@ interface Visit {
   notes?: string;
   client_id: string;
   commercial_id: string;
+  second_commercial_id?: string;
   visit_state_code?: string;
   client?: {
     id: string;
@@ -27,6 +28,11 @@ interface Visit {
     dni?: string;
   };
   commercial?: {
+    first_name: string | null;
+    last_name: string | null;
+    email: string;
+  } | null;
+  second_commercial?: {
     first_name: string | null;
     last_name: string | null;
     email: string;
@@ -115,6 +121,7 @@ export default function AdminVisitManagementDialog({
   
   // Commercial change state
   const [selectedCommercialId, setSelectedCommercialId] = useState('');
+  const [selectedSecondCommercialId, setSelectedSecondCommercialId] = useState('');
   const [commercials, setCommercials] = useState<Commercial[]>([]);
   
   // Sales management state
@@ -133,6 +140,7 @@ export default function AdminVisitManagementDialog({
       setVisitStateCode(visit.visit_state_code || 'none');
       setSelectedClientId(visit.client_id);
       setSelectedCommercialId(visit.commercial_id);
+      setSelectedSecondCommercialId(visit?.second_commercial_id || '');
       
       fetchClients();
       fetchCommercials();
@@ -278,6 +286,7 @@ export default function AdminVisitManagementDialog({
         visit_state_code?: string; 
         client_id?: string; 
         commercial_id?: string; 
+        second_commercial_id?: string | null;
       } = {
         notes,
         status: status as 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed',
@@ -293,6 +302,10 @@ export default function AdminVisitManagementDialog({
       
       if (selectedCommercialId !== visit.commercial_id) {
         updateData.commercial_id = selectedCommercialId;
+      }
+      
+      if (selectedSecondCommercialId !== (visit.second_commercial_id || '')) {
+        updateData.second_commercial_id = selectedSecondCommercialId || null;
       }
       
       const { error } = await supabase
@@ -541,6 +554,23 @@ export default function AdminVisitManagementDialog({
                   <SelectContent>
                     {Object.entries(statusLabels).map(([key, label]) => (
                       <SelectItem key={key} value={key}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="secondCommercial">Segundo Comercial</Label>
+                <Select value={selectedSecondCommercialId} onValueChange={setSelectedSecondCommercialId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sin segundo comercial" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">Sin segundo comercial</SelectItem>
+                    {commercials.map(commercial => (
+                      <SelectItem key={commercial.id} value={commercial.id}>
+                        {commercial.first_name} {commercial.last_name} ({commercial.email})
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

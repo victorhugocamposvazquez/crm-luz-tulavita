@@ -47,6 +47,7 @@ interface Visit {
   status: string;
   approval_status: string;
   client_id: string;
+  second_commercial_id?: string;
   latitude?: number;
   longitude?: number;
   location_accuracy?: number;
@@ -109,7 +110,7 @@ export default function CommercialStatistics() {
       // Calculate commission using new system
       const processedSales = salesData?.map(sale => ({
         ...sale,
-        commission_amount: calculateSaleCommission(sale)
+        commission_amount: calculateSaleCommission(sale, false) // Individual sales don't have visit context
       })) || [];
 
       setSales(processedSales);
@@ -159,7 +160,7 @@ export default function CommercialStatistics() {
           ...visit,
           sales: visitSales?.map(sale => ({
             ...sale,
-            commission_amount: calculateSaleCommission(sale)
+            commission_amount: calculateSaleCommission(sale, !!(visit as any).second_commercial_id)
           })) || []
         };
       }));
@@ -193,7 +194,7 @@ export default function CommercialStatistics() {
         }) || [];
 
         const totalAmount = monthSales.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0);
-        const totalCommission = monthSales.reduce((sum, sale) => sum + calculateSaleCommission(sale), 0);
+        const totalCommission = monthSales.reduce((sum, sale) => sum + calculateSaleCommission(sale, false), 0); // Monthly data doesn't have visit context
 
         return {
           month: format(month, 'MMM yyyy', { locale: es }),
