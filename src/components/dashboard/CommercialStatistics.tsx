@@ -147,17 +147,23 @@ export default function CommercialStatistics() {
         .order('visit_date', { ascending: false });
 
       if (visitsError) throw visitsError;
+      console.log('[CSTATS] visitsData length:', visitsData?.length || 0, 'second_commercial_ids:', (visitsData || []).map(v => v.second_commercial_id).filter(Boolean));
 
       // For each visit, fetch associated sales and second commercial data
       const visitsWithSales = await Promise.all((visitsData || []).map(async (visit) => {
         // Fetch second commercial data
         let second_commercial = null;
         if (visit.second_commercial_id) {
-          const { data: secondCommercialData } = await supabase
+          console.log(`[CSTATS] Fetching second commercial for visit ${visit.id}:`, visit.second_commercial_id);
+          const { data: secondCommercialData, error: secondCommercialErr } = await supabase
             .from('profiles')
             .select('first_name, last_name, email')
             .eq('id', visit.second_commercial_id)
             .single();
+          if (secondCommercialErr) {
+            console.error(`[CSTATS] Error fetching second commercial for visit ${visit.id}:`, secondCommercialErr);
+          }
+          console.log(`[CSTATS] Second commercial for visit ${visit.id}:`, secondCommercialData);
           second_commercial = secondCommercialData;
         }
 
@@ -183,6 +189,7 @@ export default function CommercialStatistics() {
         };
       }));
 
+      console.log('[CSTATS] Enriched visits sample:', visitsWithSales.slice(0,3).map(v => ({ id: v.id, second: v.second_commercial })));
       setVisits(visitsWithSales);
 
       // Fetch monthly sales data for charts

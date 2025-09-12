@@ -351,7 +351,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
 
   const fetchCommercials = async () => {
     try {
-      console.log('Fetching commercials...');
+      console.log('[UVM] Fetching commercials...');
       
       // First get all user IDs that have the commercial role
       const { data: commercialRoles, error: rolesError } = await supabase
@@ -359,13 +359,15 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
         .select('user_id')
         .eq('role', 'commercial');
 
+      console.log('[UVM] user_roles(commercial) => count:', commercialRoles?.length || 0, 'error:', rolesError || null);
       if (rolesError) {
-        console.error('Commercial roles fetch error:', rolesError);
+        console.error('[UVM] Commercial roles fetch error:', rolesError);
         throw rolesError;
       }
 
       if (commercialRoles && commercialRoles.length > 0) {
         const commercialIds = commercialRoles.map(role => role.user_id);
+        console.log('[UVM] commercialIds:', commercialIds);
         
         // Then get the profiles for those users, excluding the current user
         const { data, error } = await supabase
@@ -374,19 +376,20 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
           .in('id', commercialIds)
           .neq('id', user?.id); // Exclude current user
         
+        console.log('[UVM] profiles(in commercialIds) => count:', data?.length || 0, 'error:', error || null);
         if (error) {
-          console.error('Commercials fetch error:', error);
+          console.error('[UVM] Commercials fetch error:', error);
           throw error;
         }
         
-        console.log('Commercials fetched:', data);
+        console.log('[UVM] Commercials fetched:', data);
         setCommercials(data || []);
       } else {
-        console.log('No commercials found');
+        console.warn('[UVM] No commercials found from user_roles');
         setCommercials([]);
       }
     } catch (error) {
-      console.error('Error fetching commercials:', error);
+      console.error('[UVM] Error fetching commercials:', error);
       toast({
         title: "Error",
         description: "Error al cargar comerciales",

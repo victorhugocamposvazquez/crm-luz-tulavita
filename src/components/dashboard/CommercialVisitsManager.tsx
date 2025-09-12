@@ -263,16 +263,23 @@ export default function CommercialVisitsManager() {
         throw error;
       }
       console.log('[CVM] Raw visits data:', data);
+      const secondComIds = (data || []).map(v => v.second_commercial_id).filter(Boolean);
+      console.log('[CVM] second_commercial_ids in visits:', secondComIds);
       
       // Fetch second commercial data for each visit
       const visitsWithSecondCommercial = await Promise.all((data || []).map(async (visit) => {
         let second_commercial = null;
         if (visit.second_commercial_id) {
-          const { data: secondCommercialData } = await supabase
+          console.log(`[CVM] Fetching second commercial profile for visit ${visit.id}:`, visit.second_commercial_id);
+          const { data: secondCommercialData, error: secondProfileError } = await supabase
             .from('profiles')
             .select('first_name, last_name, email')
             .eq('id', visit.second_commercial_id)
             .single();
+          if (secondProfileError) {
+            console.error(`[CVM] Error fetching second commercial for visit ${visit.id}:`, secondProfileError);
+          }
+          console.log(`[CVM] Second commercial profile for visit ${visit.id}:`, secondCommercialData);
           second_commercial = secondCommercialData;
         }
         return {
@@ -280,6 +287,7 @@ export default function CommercialVisitsManager() {
           second_commercial
         };
       }));
+      console.log('[CVM] Enriched visits sample:', visitsWithSecondCommercial.slice(0,3).map(v => ({ id: v.id, second: v.second_commercial })));
       const formattedVisits = visitsWithSecondCommercial?.map(visit => ({
         ...visit,
         client: visit.client || {
