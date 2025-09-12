@@ -490,7 +490,7 @@ export default function CommercialStatistics() {
               {completedVisits.map((visit) => {
                 const totalSalesAmount = visit.sales?.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0) || 0;
                 // Mostrar comisión completa en columnas (sin dividir por segundo comercial)
-                const totalCommission = visit.sales?.reduce((sum, sale) => sum + calculateSaleCommission(sale, false), 0) || 0;
+                const totalCommission = visit.sales?.reduce((sum, sale) => sum + calculateCommission(calculateEffectiveAmount(sale)), 0) || 0;
                 
                 return (
                   <TableRow key={visit.id}>
