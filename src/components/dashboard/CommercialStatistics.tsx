@@ -159,7 +159,7 @@ export default function CommercialStatistics() {
             .from('profiles')
             .select('first_name, last_name, email')
             .eq('id', visit.second_commercial_id)
-            .single();
+            .maybeSingle();
           if (secondCommercialErr) {
             console.error(`[CSTATS] Error fetching second commercial for visit ${visit.id}:`, secondCommercialErr);
           }
