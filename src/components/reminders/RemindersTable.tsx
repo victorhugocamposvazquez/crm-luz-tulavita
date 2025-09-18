@@ -34,6 +34,7 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(true);
   const [visitCreationDialog, setVisitCreationDialog] = useState<{ open: boolean; reminder: Reminder | null }>({ open: false, reminder: null });
+  const [noteDialog, setNoteDialog] = useState<{ open: boolean; note: string }>({ open: false, note: '' });
   const [selectedCommercial, setSelectedCommercial] = useState<string>('');
   const [selectedCompany, setSelectedCompany] = useState<string>('');
   const [commercials, setCommercials] = useState<Array<{ id: string; name: string; email: string }>>([]);
@@ -337,7 +338,11 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  <div className="max-w-xs truncate" title={reminder.notes}>
+                  <div 
+                    className="max-w-xs truncate cursor-pointer hover:text-primary hover:underline" 
+                    title={reminder.notes ? "Clic para ver la nota completa" : "Sin notas"}
+                    onClick={() => reminder.notes && setNoteDialog({ open: true, note: reminder.notes })}
+                  >
                     {reminder.notes || 'Sin notas'}
                   </div>
                 </TableCell>
@@ -388,6 +393,18 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
           </TableBody>
         </Table>
       </div>
+
+      {/* Note Display Dialog */}
+      <Dialog open={noteDialog.open} onOpenChange={(open) => setNoteDialog({ open, note: '' })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Nota del recordatorio</DialogTitle>
+          </DialogHeader>
+          <div className="max-h-96 overflow-y-auto">
+            <p className="whitespace-pre-wrap text-sm">{noteDialog.note}</p>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Visit Creation Dialog */}
       <Dialog open={visitCreationDialog.open} onOpenChange={(open) => setVisitCreationDialog({ open, reminder: null })}>
