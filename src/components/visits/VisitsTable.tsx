@@ -225,7 +225,9 @@ export default function VisitsTable({
                   })()}
                 </TableCell>
                 <TableCell>
-                  {visit.visit_states?.name ? 
+                  {visit.approval_status === 'rejected' ? 
+                    'Rechazada' 
+                    : visit.visit_states?.name ? 
                     visit.visit_states.name.charAt(0).toUpperCase() + visit.visit_states.name.slice(1).toLowerCase() 
                     : visit.status ? 
                     statusLabels[visit.status as keyof typeof statusLabels]?.charAt(0).toUpperCase() + statusLabels[visit.status as keyof typeof statusLabels]?.slice(1).toLowerCase() 
