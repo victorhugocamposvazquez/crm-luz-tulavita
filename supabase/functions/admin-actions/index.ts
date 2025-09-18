@@ -10,6 +10,7 @@ const getAllowedOrigin = (requestOrigin: string | null) => {
     'https://crm.virvita.es',
     /^https:\/\/.*\.lovable\.dev$/,
     /^https:\/\/.*\.lovable\.app$/,
+    /^https:\/\/.*\.lovableproject\.com$/,
     /^https:\/\/.*\.sandbox\.lovable\.dev$/,
     /^https:\/\/.*\.vercel\.app$/,
   ];
