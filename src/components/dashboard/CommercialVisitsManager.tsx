@@ -21,6 +21,7 @@ interface Visit {
   approval_status: 'pending' | 'approved' | 'rejected' | 'waiting_admin';
   notes: string;
   client_id: string;
+  second_commercial_id?: string;
   latitude?: number;
   longitude?: number;
   location_accuracy?: number;
@@ -30,6 +31,16 @@ interface Visit {
   };
   company: {
     name: string;
+  };
+  commercial?: {
+    first_name: string | null;
+    last_name: string | null;
+    email: string;
+  };
+  second_commercial?: {
+    first_name: string | null;
+    last_name: string | null;
+    email: string;
   };
   approved_by?: {
     first_name: string;
@@ -229,6 +240,7 @@ export default function CommercialVisitsManager() {
           permission,
           client_id,
           company_id,
+          second_commercial_id,
           latitude,
           longitude,
           location_accuracy,
@@ -245,12 +257,38 @@ export default function CommercialVisitsManager() {
         .order('visit_date', {
         ascending: false
       });
+      
       if (error) {
         console.error('Error fetching visits:', error);
         throw error;
       }
       console.log('[CVM] Raw visits data:', data);
-      const formattedVisits = data?.map(visit => ({
+      const secondComIds = (data || []).map(v => v.second_commercial_id).filter(Boolean);
+      console.log('[CVM] second_commercial_ids in visits:', secondComIds);
+      
+      // Fetch second commercial data for each visit
+      const visitsWithSecondCommercial = await Promise.all((data || []).map(async (visit) => {
+        let second_commercial = null;
+        if (visit.second_commercial_id) {
+          console.log(`[CVM] Fetching second commercial profile for visit ${visit.id}:`, visit.second_commercial_id);
+          const { data: secondCommercialData, error: secondProfileError } = await supabase
+            .from('profiles')
+            .select('first_name, last_name, email')
+            .eq('id', visit.second_commercial_id)
+            .maybeSingle();
+          if (secondProfileError) {
+            console.error(`[CVM] Error fetching second commercial for visit ${visit.id}:`, secondProfileError);
+          }
+          console.log(`[CVM] Second commercial profile for visit ${visit.id}:`, secondCommercialData);
+          second_commercial = secondCommercialData;
+        }
+        return {
+          ...visit,
+          second_commercial
+        };
+      }));
+      console.log('[CVM] Enriched visits sample:', visitsWithSecondCommercial.slice(0,3).map(v => ({ id: v.id, second: v.second_commercial })));
+      const formattedVisits = visitsWithSecondCommercial?.map(visit => ({
         ...visit,
         client: visit.client || {
           nombre_apellidos: 'Cliente desconocido',
@@ -496,6 +534,7 @@ export default function CommercialVisitsManager() {
               <TableHead>Cliente</TableHead>
               <TableHead>DNI</TableHead>
               <TableHead>Empresa</TableHead>
+              <TableHead>Segundo Comercial</TableHead>
               <TableHead>Fecha</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Permisos</TableHead>
@@ -506,11 +545,17 @@ export default function CommercialVisitsManager() {
                 <TableBody>
                   {visits.map(visit => <TableRow key={visit.id}>
                        <TableCell className="font-medium">
-                         {visit.client.nombre_apellidos}
-                       </TableCell>
-                       <TableCell>{visit.client.dni}</TableCell>
-                       <TableCell>{visit.company.name}</TableCell>
-                       <TableCell>{formatDate(visit.visit_date)}</TableCell>
+                          {visit.client.nombre_apellidos}
+                        </TableCell>
+                        <TableCell>{visit.client.dni}</TableCell>
+                        <TableCell>{visit.company.name}</TableCell>
+                        <TableCell>
+                          {visit.second_commercial ? 
+                            `${visit.second_commercial.first_name} ${visit.second_commercial.last_name}` : 
+                            '-'
+                          }
+                        </TableCell>
+                        <TableCell>{formatDate(visit.visit_date)}</TableCell>
                        <TableCell>{getStatusBadge(visit)}</TableCell>
                        <TableCell>
                          <Badge variant={visit.approval_status === 'approved' ? 'default' : visit.approval_status === 'rejected' ? 'destructive' : 'secondary'}>
@@ -557,6 +602,10 @@ export default function CommercialVisitsManager() {
                 <div>
                   <Label>DNI</Label>
                   <p>{selectedVisit.client.dni}</p>
+                </div>
+                <div>
+                  <Label>Segundo Comercial</Label>
+                  <p>{selectedVisit.second_commercial ? `${selectedVisit.second_commercial.first_name} ${selectedVisit.second_commercial.last_name}` : 'Sin segundo comercial'}</p>
                 </div>
                 <div>
                   <Label>Empresa</Label>

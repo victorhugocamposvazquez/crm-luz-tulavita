@@ -47,7 +47,7 @@ interface SaleLine {
   unit_price: number;
   financiada: boolean;
   transferencia: boolean;
-  nulo: boolean;
+  nulo?: boolean; // Optional for commercial forms, required for admin
 }
 
 interface ClientPurchase {
@@ -118,6 +118,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
     notes: '',
     status: 'in_progress' as 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed',
     company_id: '',
+    second_commercial_id: '',
     permission: 'pending',
     visitStateCode: ''
   });
@@ -128,6 +129,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
 
   const [loading, setLoading] = useState(false);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [commercials, setCommercials] = useState<{id: string, first_name: string | null, last_name: string | null, email: string}[]>([]);
   const [visitStates, setVisitStates] = useState<{code: string, name: string}[]>([]);
   const [hasApproval, setHasApproval] = useState(false);
   const [editingVisitId, setEditingVisitId] = useState<string | null>(null);
@@ -160,6 +162,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       notes: '',
       status: 'in_progress' as 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed',
       company_id: '',
+      second_commercial_id: '',
       permission: 'pending',
       visitStateCode: ''
     });
@@ -175,6 +178,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
 
   useEffect(() => {
     fetchCompanies();
+    fetchCommercials();
     fetchVisitStates();
     // Auto-request location when component loads
     if (location === null) {
@@ -236,6 +240,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
             notes: visitData.notes || '',
             status: visitData.status as any,
             company_id: visitData.company_id || '',
+            second_commercial_id: visitData.second_commercial_id || '',
             permission: visitData.permission || 'pending',
             visitStateCode: visitData.visit_state_code || ''
           });
@@ -339,6 +344,55 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       toast({
         title: "Error",
         description: "Error al cargar estados de visita",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const fetchCommercials = async () => {
+    try {
+      console.log('[UVM] Fetching commercials...');
+      
+      // First get all user IDs that have the commercial role
+      const { data: commercialRoles, error: rolesError } = await supabase
+        .from('user_roles')
+        .select('user_id')
+        .eq('role', 'commercial');
+
+      console.log('[UVM] user_roles(commercial) => count:', commercialRoles?.length || 0, 'error:', rolesError || null);
+      if (rolesError) {
+        console.error('[UVM] Commercial roles fetch error:', rolesError);
+        throw rolesError;
+      }
+
+      if (commercialRoles && commercialRoles.length > 0) {
+        const commercialIds = commercialRoles.map(role => role.user_id);
+        console.log('[UVM] commercialIds:', commercialIds);
+        
+        // Then get the profiles for those users, excluding the current user
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email')
+          .in('id', commercialIds)
+          .neq('id', user?.id); // Exclude current user
+        
+        console.log('[UVM] profiles(in commercialIds) => count:', data?.length || 0, 'error:', error || null);
+        if (error) {
+          console.error('[UVM] Commercials fetch error:', error);
+          throw error;
+        }
+        
+        console.log('[UVM] Commercials fetched:', data);
+        setCommercials(data || []);
+      } else {
+        console.warn('[UVM] No commercials found from user_roles');
+        setCommercials([]);
+      }
+    } catch (error) {
+      console.error('[UVM] Error fetching commercials:', error);
+      toast({
+        title: "Error",
+        description: "Error al cargar comerciales",
         variant: "destructive"
       });
     }
@@ -580,6 +634,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
           .insert({
             client_id: client.id,
             commercial_id: user.id,
+            second_commercial_id: visitData.second_commercial_id || null,
             company_id: selectedCompany,
             status: 'in_progress' as Database['public']['Enums']['visit_status'],
             approval_status: 'waiting_admin',
@@ -700,6 +755,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
         .insert({
           client_id: clientData.id,
           commercial_id: user.id,
+          second_commercial_id: visitData.second_commercial_id || null,
           company_id: selectedCompany,
           status: 'in_progress' as Database['public']['Enums']['visit_status'],
           approval_status: 'waiting_admin',
@@ -818,6 +874,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
           .insert({
             client_id: client.id,
             commercial_id: user!.id,
+            second_commercial_id: null, // No second commercial for batch visits
             company_id: selectedCompany,
             status: 'in_progress' as Database['public']['Enums']['visit_status'],
             notes: 'Visita creada en lote',
@@ -914,6 +971,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       const visitPayload = {
         client_id: newClient.id,
         commercial_id: user!.id,
+        second_commercial_id: null, // No second commercial for new client creation
         company_id: selectedCompany,
         notes: '',
         status: 'in_progress' as const,
@@ -977,8 +1035,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
       quantity: 1,
       unit_price: 0,
       financiada: false,
-      transferencia: false,
-      nulo: false
+      transferencia: false
     }]);
   };
 
@@ -1040,6 +1097,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
             notes: visitData.notes,
             visit_state_code: visitData.visitStateCode,
             company_id: visitData.company_id,
+            second_commercial_id: visitData.second_commercial_id || null,
             status: (isComplete ? 'completed' : currentVisitStatus || 'in_progress') as Database['public']['Enums']['visit_status'],
             updated_at: new Date().toISOString()
           })
@@ -1056,6 +1114,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
         const visitPayload = {
           client_id: existingClient.id,
           commercial_id: user!.id,
+          second_commercial_id: visitData.second_commercial_id || null,
           company_id: visitData.company_id,
           notes: visitData.notes,
           visit_state_code: visitData.visitStateCode,
@@ -1238,6 +1297,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
           notes: '',
           status: 'in_progress',
           company_id: '',
+          second_commercial_id: '',
           permission: 'pending',
           visitStateCode: ''
         });
@@ -1629,6 +1689,27 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
             </div>
 
             <div className="space-y-2">
+              <Label htmlFor="secondCommercial">Segundo Comercial (Opcional)</Label>
+                <Select 
+                  value={visitData.second_commercial_id || "none"} 
+                  onValueChange={(value) => setVisitData(prev => ({ ...prev, second_commercial_id: value === "none" ? "" : value }))}
+                  disabled={isReadOnly}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecciona un compañero" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Sin segundo comercial</SelectItem>
+                    {commercials.map(commercial => (
+                      <SelectItem key={commercial.id} value={commercial.id}>
+                        {[commercial.first_name, commercial.last_name].filter(Boolean).join(' ') || commercial.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="notes">Notas de la Visita *</Label>
               <Textarea 
                 id="notes" 
@@ -1833,10 +1914,6 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
                       <label className="flex items-center gap-2">
                         <input type="checkbox" checked={line.transferencia} onChange={e => updateSaleLine(index, 'transferencia', e.target.checked)} disabled={isReadOnly} />
                         <span>Transferencia</span>
-                      </label>
-                      <label className="flex items-center gap-2">
-                        <input type="checkbox" checked={line.nulo} onChange={e => updateSaleLine(index, 'nulo', e.target.checked)} disabled={isReadOnly} />
-                        <span>Nulo</span>
                       </label>
                     </div>
 

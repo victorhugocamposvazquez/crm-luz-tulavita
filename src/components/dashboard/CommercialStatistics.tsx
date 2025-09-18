@@ -12,7 +12,7 @@ import { format, subDays, startOfMonth, endOfMonth, eachMonthOfInterval, subMont
 import { es } from 'date-fns/locale';
 import { useAuth } from "@/hooks/useAuth";
 import { useNavigate } from "react-router-dom";
-import { calculateCommission } from '@/lib/commission';
+import { calculateCommission, calculateTotalExcludingNulls, calculateSaleCommission, calculateEffectiveAmount } from '@/lib/commission';
 import { formatCoordinates } from '@/lib/coordinates';
 import { toast } from '@/hooks/use-toast';
 
@@ -22,6 +22,7 @@ interface SaleInVisit {
   amount: number;
   commission_percentage: number;
   commission_amount: number;
+  sale_lines?: Array<{ quantity: number; unit_price: number; nulo: boolean }>;
 }
 
 interface Sale {
@@ -37,6 +38,7 @@ interface Sale {
   company: {
     name: string;
   };
+  sale_lines?: Array<{ quantity: number; unit_price: number; nulo: boolean }>;
 }
 
 interface Visit {
@@ -45,6 +47,7 @@ interface Visit {
   status: string;
   approval_status: string;
   client_id: string;
+  second_commercial_id?: string;
   latitude?: number;
   longitude?: number;
   location_accuracy?: number;
@@ -54,6 +57,11 @@ interface Visit {
   };
   company: {
     name: string;
+  };
+  second_commercial?: {
+    first_name: string | null;
+    last_name: string | null;
+    email: string;
   };
   notes: string;
   sales?: SaleInVisit[];
@@ -85,7 +93,7 @@ export default function CommercialStatistics() {
       const thirtyDaysAgo = subDays(new Date(), 30);
       const sixMonthsAgo = subMonths(new Date(), 6);
 
-      // Fetch sales from last 30 days
+      // Fetch sales from last 30 days - incluir ventas donde es comercial principal
       const { data: salesData, error: salesError } = await supabase
         .from('sales')
         .select(`
@@ -95,24 +103,51 @@ export default function CommercialStatistics() {
           commission_percentage,
           commission_amount,
           client:clients(nombre_apellidos, dni),
-          company:companies(name)
+          company:companies(name),
+          sale_lines(quantity, unit_price, nulo)
         `)
         .eq('commercial_id', user.id)
         .gte('sale_date', thirtyDaysAgo.toISOString())
         .order('sale_date', { ascending: false });
 
+      // Fetch sales from visits where user is second commercial
+      const { data: secondCommercialSalesData, error: secondCommercialSalesError } = await supabase
+        .from('sales')
+        .select(`
+          id,
+          sale_date,
+          amount,
+          commission_percentage,
+          commission_amount,
+          client:clients(nombre_apellidos, dni),
+          company:companies(name),
+          sale_lines(quantity, unit_price, nulo),
+          visit:visits!inner(second_commercial_id)
+        `)
+        .gte('sale_date', thirtyDaysAgo.toISOString())
+        .eq('visit.second_commercial_id', user.id)
+        .order('sale_date', { ascending: false });
+
+      if (secondCommercialSalesError) console.error('Error fetching second commercial sales:', secondCommercialSalesError);
+
       if (salesError) throw salesError;
 
-      // Calculate commission using new system
-      const processedSales = salesData?.map(sale => ({
+      // Combinar ventas principales y de segundo comercial
+      const allSalesData = [
+        ...(salesData || []),
+        ...(secondCommercialSalesData || [])
+      ];
+
+      // Calculate commission using new system - dividir por segundo comercial en estadísticas
+      const processedSales = allSalesData.map(sale => ({
         ...sale,
-        commission_amount: sale.commission_amount || calculateCommission(sale.amount)
-      })) || [];
+        commission_amount: calculateSaleCommission(sale, false) // Individual sales don't have visit context
+      }));
 
       setSales(processedSales);
 
-      // Fetch visits from last 30 days with associated sales
-      const { data: visitsData, error: visitsError } = await supabase
+      // Fetch visits from last 30 days where user is primary or second commercial
+      const { data: primaryVisitsData, error: primaryVisitsError } = await supabase
         .from('visits')
         .select(`
           id,
@@ -121,6 +156,7 @@ export default function CommercialStatistics() {
           approval_status,
           notes,
           client_id,
+          second_commercial_id,
           latitude,
           longitude,
           location_accuracy,
@@ -136,35 +172,122 @@ export default function CommercialStatistics() {
         .gte('visit_date', thirtyDaysAgo.toISOString())
         .order('visit_date', { ascending: false });
 
-      if (visitsError) throw visitsError;
+      const { data: secondaryVisitsData, error: secondaryVisitsError } = await supabase
+        .from('visits')
+        .select(`
+          id,
+          visit_date,
+          status,
+          approval_status,
+          notes,
+          client_id,
+          second_commercial_id,
+          latitude,
+          longitude,
+          location_accuracy,
+          visit_state_code,
+          visit_states (
+            name,
+            description
+          ),
+          client:clients(nombre_apellidos, dni),
+          company:companies(name)
+        `)
+        .eq('second_commercial_id', user.id)
+        .gte('visit_date', thirtyDaysAgo.toISOString())
+        .order('visit_date', { ascending: false });
 
-      // For each visit, fetch associated sales
-      const visitsWithSales = await Promise.all((visitsData || []).map(async (visit) => {
+      if (primaryVisitsError) throw primaryVisitsError;
+      if (secondaryVisitsError) throw secondaryVisitsError;
+
+      // Combinar visitas donde es comercial principal y segundo comercial
+      const allVisitsData = [
+        ...(primaryVisitsData || []),
+        ...(secondaryVisitsData || [])
+      ];
+
+      // Eliminar duplicados por ID si los hubiera
+      const uniqueVisitsData = allVisitsData.filter((visit, index, self) => 
+        index === self.findIndex((v) => v.id === visit.id)
+      );
+      console.log('[CSTATS] uniqueVisitsData length:', uniqueVisitsData?.length || 0, 'second_commercial_ids:', (uniqueVisitsData || []).map(v => v.second_commercial_id).filter(Boolean));
+
+      // For each visit, fetch associated sales and second commercial data
+      const visitsWithSales = await Promise.all((uniqueVisitsData || []).map(async (visit) => {
+        // Fetch second commercial data
+        let second_commercial = null;
+        if (visit.second_commercial_id) {
+          console.log(`[CSTATS] Fetching second commercial for visit ${visit.id}:`, visit.second_commercial_id);
+          const { data: secondCommercialData, error: secondCommercialErr } = await supabase
+            .from('profiles')
+            .select('first_name, last_name, email')
+            .eq('id', visit.second_commercial_id)
+            .maybeSingle();
+          if (secondCommercialErr) {
+            console.error(`[CSTATS] Error fetching second commercial for visit ${visit.id}:`, secondCommercialErr);
+          }
+          console.log(`[CSTATS] Second commercial for visit ${visit.id}:`, secondCommercialData);
+          second_commercial = secondCommercialData;
+        }
+
         const { data: visitSales } = await supabase
           .from('sales')
-          .select('id, sale_date, amount, commission_percentage, commission_amount')
+          .select(`
+            id, 
+            sale_date, 
+            amount, 
+            commission_percentage, 
+            commission_amount,
+            sale_lines(quantity, unit_price, nulo)
+          `)
           .eq('visit_id', visit.id);
 
         return {
           ...visit,
+          second_commercial,
           sales: visitSales?.map(sale => ({
             ...sale,
-            commission_amount: sale.commission_amount || calculateCommission(sale.amount)
+            commission_amount: calculateSaleCommission(sale, !!visit.second_commercial_id) // Dividir por segundo comercial en estadísticas
           })) || []
         };
       }));
 
+      console.log('[CSTATS] Enriched visits sample:', visitsWithSales.slice(0,3).map(v => ({ id: v.id, second: v.second_commercial })));
       setVisits(visitsWithSales);
 
-      // Fetch monthly sales data for charts
-      const { data: monthlySales, error: monthlyError } = await supabase
+      // Fetch monthly sales data for charts - incluir ventas donde es comercial principal
+      const { data: primaryMonthlySales, error: primaryMonthlyError } = await supabase
         .from('sales')
-        .select('sale_date, amount')
+        .select(`
+          sale_date, 
+          amount,
+          sale_lines(quantity, unit_price, nulo)
+        `)
         .eq('commercial_id', user.id)
         .gte('sale_date', sixMonthsAgo.toISOString())
         .order('sale_date');
 
-      if (monthlyError) throw monthlyError;
+      // Fetch monthly sales data where user is second commercial
+      const { data: secondaryMonthlySales, error: secondaryMonthlyError } = await supabase
+        .from('sales')
+        .select(`
+          sale_date, 
+          amount,
+          sale_lines(quantity, unit_price, nulo),
+          visit:visits!inner(second_commercial_id)
+        `)
+        .gte('sale_date', sixMonthsAgo.toISOString())
+        .eq('visit.second_commercial_id', user.id)
+        .order('sale_date');
+
+      if (primaryMonthlyError) throw primaryMonthlyError;
+      if (secondaryMonthlyError) console.error('Error fetching secondary monthly sales:', secondaryMonthlyError);
+
+      // Combinar ventas mensuales
+      const allMonthlySales = [
+        ...(primaryMonthlySales || []),
+        ...(secondaryMonthlySales || [])
+      ];
 
       // Process monthly data
       const months = eachMonthOfInterval({
@@ -173,13 +296,13 @@ export default function CommercialStatistics() {
       });
 
       const monthlyData = months.map(month => {
-        const monthSales = monthlySales?.filter(sale => {
+        const monthSales = allMonthlySales?.filter(sale => {
           const saleDate = new Date(sale.sale_date);
           return saleDate >= startOfMonth(month) && saleDate <= endOfMonth(month);
         }) || [];
 
-        const totalAmount = monthSales.reduce((sum, sale) => sum + sale.amount, 0);
-        const totalCommission = monthSales.reduce((sum, sale) => sum + calculateCommission(sale.amount), 0);
+        const totalAmount = monthSales.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0);
+        const totalCommission = monthSales.reduce((sum, sale) => sum + calculateSaleCommission(sale, false), 0); // Monthly data - no dividir aquí
 
         return {
           month: format(month, 'MMM yyyy', { locale: es }),
@@ -282,8 +405,12 @@ export default function CommercialStatistics() {
     return <div className="min-h-screen flex items-center justify-center">Cargando estadísticas...</div>;
   }
 
-  const totalSales = sales.reduce((sum, sale) => sum + sale.amount, 0);
-  const totalCommissions = sales.reduce((sum, sale) => sum + sale.commission_amount, 0);
+  const totalSales = sales.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0);
+  // Ajustar comisiones en estadísticas según segundo comercial (usar visitas con ventas ya divididas)
+  const totalCommissions = visits.reduce((acc, visit) => {
+    const visitCommission = (visit.sales || []).reduce((s, sale) => s + (sale.commission_amount || 0), 0);
+    return acc + visitCommission;
+  }, 0);
   const approvedVisits = visits.filter(visit => visit.approval_status === 'approved').length;
   const pendingVisits = visits.filter(visit => visit.approval_status === 'pending').length;
 
@@ -435,6 +562,7 @@ export default function CommercialStatistics() {
                 <TableHead>Fecha Visita</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Empresa</TableHead>
+                <TableHead>Segundo Comercial</TableHead>
                 <TableHead>Ventas Generadas</TableHead>
                 <TableHead>Comisión Total</TableHead>
                 <TableHead>Notas</TableHead>
@@ -443,8 +571,9 @@ export default function CommercialStatistics() {
             </TableHeader>
             <TableBody>
               {completedVisits.map((visit) => {
-                const totalSalesAmount = visit.sales?.reduce((sum, sale) => sum + sale.amount, 0) || 0;
-                const totalCommission = visit.sales?.reduce((sum, sale) => sum + sale.commission_amount, 0) || 0;
+                const totalSalesAmount = visit.sales?.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0) || 0;
+                // Mostrar comisión completa en columnas (sin dividir por segundo comercial)
+                const totalCommission = visit.sales?.reduce((sum, sale) => sum + calculateCommission(calculateEffectiveAmount(sale)), 0) || 0;
                 
                 return (
                   <TableRow key={visit.id}>
@@ -456,6 +585,12 @@ export default function CommercialStatistics() {
                       </div>
                     </TableCell>
                     <TableCell>{visit.company?.name || 'N/A'}</TableCell>
+                    <TableCell>
+                      {visit.second_commercial ? 
+                        `${visit.second_commercial.first_name} ${visit.second_commercial.last_name}` : 
+                        '-'
+                      }
+                    </TableCell>
                     <TableCell>
                       {visit.sales && visit.sales.length > 0 ? (
                         <div className="space-y-1">
@@ -496,7 +631,7 @@ export default function CommercialStatistics() {
               })}
               {completedVisits.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center text-muted-foreground">
                     No hay visitas completadas en los últimos 30 días
                   </TableCell>
                 </TableRow>
@@ -522,6 +657,10 @@ export default function CommercialStatistics() {
                 <div>
                   <Label>DNI</Label>
                   <p>{selectedVisit.client.dni}</p>
+                </div>
+                <div>
+                  <Label>Segundo Comercial</Label>
+                  <p>{selectedVisit.second_commercial ? `${selectedVisit.second_commercial.first_name} ${selectedVisit.second_commercial.last_name}` : 'Sin segundo comercial'}</p>
                 </div>
                 <div>
                   <Label>Empresa</Label>

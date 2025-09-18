@@ -7,8 +7,10 @@ const getAllowedOrigin = (requestOrigin: string | null) => {
     'http://localhost:3000',
     'https://lovable.dev',
     'https://crm.ilustracioneslarum.com', // Tu dominio personalizado
+    'https://crm.virvita.es',
     /^https:\/\/.*\.lovable\.dev$/,
     /^https:\/\/.*\.lovable\.app$/,
+    /^https:\/\/.*\.lovableproject\.com$/,
     /^https:\/\/.*\.sandbox\.lovable\.dev$/,
     /^https:\/\/.*\.vercel\.app$/,
   ];

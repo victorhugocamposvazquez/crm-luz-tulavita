@@ -20,7 +20,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useNavigate } from 'react-router-dom';
 import { formatCoordinates } from '@/lib/coordinates';
-import { calculateCommission } from '@/lib/commission';
+import { calculateCommission, calculateTotalExcludingNulls, calculateSaleCommission } from '@/lib/commission';
 
 interface Client {
   id: string;
@@ -390,7 +390,7 @@ export default function VisitSalesManagement() {
 
     const formData = new FormData(e.currentTarget);
     const total = validLines.reduce((sum, line) => sum + (line.quantity * line.unit_price), 0);
-    const commissionAmount = calculateCommission(total);
+    const commissionAmount = calculateSaleCommission({ amount: total, sale_lines: validLines });
 
     const saleData = {
       client_id: formData.get('client_id') as string,
@@ -637,11 +637,11 @@ export default function VisitSalesManagement() {
   };
 
   const calculateTotal = () => {
-    return saleLines.reduce((sum, line) => sum + (line.quantity * line.unit_price), 0);
+    return calculateTotalExcludingNulls(saleLines);
   };
 
   const calculateCommissionAmount = () => {
-    return calculateCommission(calculateTotal());
+    return calculateSaleCommission({ amount: calculateTotal(), sale_lines: saleLines });
   };
 
   const openSaleDialog = (sale?: Sale) => {

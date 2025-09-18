@@ -16,7 +16,7 @@ import { es } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { formatCoordinates } from '@/lib/coordinates';
 import VisitsTable from '@/components/visits/VisitsTable';
-import { calculateCommission } from '@/lib/commission';
+import { calculateCommission, calculateTotalExcludingNulls, calculateSaleCommission, calculateEffectiveAmount } from '@/lib/commission';
 import RemindersTable from '@/components/reminders/RemindersTable';
 import ReminderDialog from '@/components/reminders/ReminderDialog';
 
@@ -49,6 +49,11 @@ interface Visit {
     last_name: string | null;
     email: string;
   } | null;
+  second_commercial?: {
+    first_name: string | null;
+    last_name: string | null;
+    email: string;
+  } | null;
   company?: {
     name: string;
   } | null;
@@ -68,7 +73,7 @@ interface Sale {
   commercial?: {
     first_name: string | null;
     last_name: string | null;
-    email: string;
+    email: string;  
   } | null;
   sale_lines?: Array<{
     products: { product_name: string }[];
@@ -186,7 +191,7 @@ const fetchVisits = async () => {
 
   // Batch-load related profiles (commercials) and companies to avoid N+1
   const commercialIds = Array.from(new Set(
-    visitsData.map(v => v.commercial_id).filter(Boolean)
+    [...visitsData.map(v => v.commercial_id), ...visitsData.map(v => (v as any).second_commercial_id)].filter(Boolean)
   ));
   const companyIds = Array.from(new Set(
     visitsData.map(v => (v as any).company_id).filter(Boolean)
@@ -213,6 +218,7 @@ const fetchVisits = async () => {
   const enriched = visitsData.map(v => ({
     ...v,
     commercial: profileMap.get(v.commercial_id) || null,
+    second_commercial: profileMap.get((v as any).second_commercial_id) || null,
     company: companyMap.get((v as any).company_id) || null,
   }));
 
@@ -253,9 +259,16 @@ const fetchVisits = async () => {
           .maybeSingle()
       ]);
       
-      // Calculate commission using the new system
-      const commissionPercentage = sale.commission_percentage || 0;
-      const calculatedCommission = sale.commission_amount || calculateCommission(sale.amount);
+      // Calculate commission using the new system considering second commercial
+      const calculatedCommission = calculateSaleCommission({ 
+        amount: sale.amount, 
+        commission_amount: sale.commission_amount,
+        sale_lines: (lines || []).map(line => ({
+          quantity: line.quantity,
+          unit_price: line.unit_price,
+          nulo: line.nulo
+        }))
+      }, false); // Individual sales don't have visit context for second commercial
       
       return { 
         ...sale, 
@@ -329,7 +342,7 @@ const fetchVisits = async () => {
   };
 
   // Estadísticas calculadas
-  const totalSales = sales.reduce((sum, sale) => sum + sale.amount, 0);
+  const totalSales = sales.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0);
   const totalCommissions = sales.reduce((sum, sale) => sum + sale.commission_amount, 0);
   const averageSale = sales.length > 0 ? totalSales / sales.length : 0;
   const totalProducts = sales.reduce((sum, sale) => sum + (sale.sale_lines?.length || 0), 0);
@@ -354,14 +367,15 @@ const fetchVisits = async () => {
   const monthlySalesData = sales.reduce((acc, sale) => {
     const month = format(new Date(sale.sale_date), 'yyyy-MM');
     const existing = acc.find(item => item.month === month);
+    const effectiveAmount = calculateEffectiveAmount(sale);
     if (existing) {
-      existing.amount += sale.amount;
+      existing.amount += effectiveAmount;
       existing.count += 1;
     } else {
       acc.push({
         month,
         monthLabel: format(new Date(sale.sale_date), 'MMM yyyy', { locale: es }),
-        amount: sale.amount,
+        amount: effectiveAmount,
         count: 1
       });
     }
@@ -700,13 +714,20 @@ const fetchVisits = async () => {
           </CardHeader>
           <CardContent>
             <VisitsTable
-              visits={visits as any}
-              sales={sales}
-              onViewVisit={handleViewVisit as any}
-              loading={loading}
-              showClientColumns={false}
-              emptyMessage="No hay visitas registradas para este cliente"
-            />
+            visits={visits as any}
+            sales={sales}
+            onViewVisit={handleViewVisit as any}
+            onCreateReminder={(visit: any) => {
+              setSelectedClient({
+                id: clientId,
+                name: client?.nombre_apellidos || ''
+              });
+              setReminderDialogOpen(true);
+            }}
+            loading={loading}
+            showClientColumns={false}
+            emptyMessage="No hay visitas registradas para este cliente"
+          />
           </CardContent>
         </Card>
       </div>
@@ -723,6 +744,10 @@ const fetchVisits = async () => {
                 <div>
                   <Label>Comercial</Label>
                   <p>{selectedVisit.commercial ? `${selectedVisit.commercial.first_name} ${selectedVisit.commercial.last_name}` : 'N/A'}</p>
+                </div>
+                <div>
+                  <Label>Segundo Comercial</Label>
+                  <p>{selectedVisit.second_commercial ? `${selectedVisit.second_commercial.first_name} ${selectedVisit.second_commercial.last_name}` : 'Sin segundo comercial'}</p>
                 </div>
                 <div>
                   <Label>Empresa</Label>

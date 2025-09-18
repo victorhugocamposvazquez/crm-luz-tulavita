@@ -1,11 +1,12 @@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Eye } from 'lucide-react';
+import { Eye, Settings, Bell } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Link } from 'react-router-dom';
-import { calculateCommission } from '@/lib/commission';
+import { calculateCommission, calculateSaleCommission, calculateEffectiveAmount } from '@/lib/commission';
+import { useAuth } from '@/hooks/useAuth';
 
 interface Visit {
   id: string;
@@ -26,6 +27,11 @@ interface Visit {
     last_name: string | null;
     email: string;
   };
+  second_commercial?: {
+    first_name: string | null;
+    last_name: string | null;
+    email: string;
+  };
   client?: {
     nombre_apellidos: string;
     dni: string;
@@ -40,12 +46,15 @@ interface Sale {
   amount: number;
   commission_amount: number;
   visit_id?: string;
+  sale_lines?: Array<{ quantity: number; unit_price: number; nulo: boolean }>;
 }
 
 interface VisitsTableProps {
   visits: Visit[];
   sales: Sale[];
   onViewVisit: (visit: Visit) => void | Promise<void>;
+  onAdminManageVisit?: (visit: Visit) => void;
+  onCreateReminder?: (visit: Visit) => void;
   loading: boolean;
   showClientColumns?: boolean;
   emptyMessage?: string;
@@ -83,11 +92,15 @@ const getStatusDisplay = (status: string, approvalStatus?: string) => {
 export default function VisitsTable({ 
   visits, 
   sales, 
-  onViewVisit, 
+  onViewVisit,
+  onAdminManageVisit,
+  onCreateReminder,
   loading, 
   showClientColumns = false,
   emptyMessage = "No hay visitas registradas" 
 }: VisitsTableProps) {
+  const { userRole } = useAuth();
+  const isAdmin = userRole?.role === 'admin';
   if (loading) {
     return <div className="text-center py-4">Cargando visitas...</div>;
   }
@@ -148,6 +161,7 @@ export default function VisitsTable({
             </>
           )}
           <TableHead>Comercial</TableHead>
+          <TableHead>Segundo Comercial</TableHead>
           <TableHead>Empresa</TableHead>
           <TableHead>Fecha</TableHead>
           <TableHead>Estado</TableHead>
@@ -161,7 +175,7 @@ export default function VisitsTable({
       <TableBody>
         {visits.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={showClientColumns ? 11 : 9} className="text-center py-8 text-muted-foreground">
+            <TableCell colSpan={showClientColumns ? 12 : 10} className="text-center py-8 text-muted-foreground">
               {emptyMessage}
             </TableCell>
           </TableRow>
@@ -169,10 +183,10 @@ export default function VisitsTable({
           visits.map((visit) => {
             // Find sales for this visit and calculate commission properly
             const visitSales = sales.filter(sale => sale.visit_id === visit.id);
-            const totalSales = visitSales.reduce((sum, sale) => sum + sale.amount, 0);
-            // Calculate commission using stored amount or calculate with new system
+            const totalSales = visitSales.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0);
             const totalCommission = visitSales.reduce((sum, sale) => {
-              const commission = sale.commission_amount || calculateCommission(sale.amount);
+              // En listados siempre mostrar comisión completa, sin dividir por segundo comercial
+              const commission = calculateSaleCommission(sale, false);
               return sum + commission;
             }, 0);
             
@@ -188,11 +202,17 @@ export default function VisitsTable({
                          {visit.client?.nombre_apellidos || 'Sin nombre'}
                        </Link>
                      </TableCell>
-                    <TableCell>{visit.client?.dni || 'Sin DNI'}</TableCell>
+                    <TableCell>{visit.client?.dni || '-'}</TableCell>
                   </>
                 )}
                 <TableCell className="font-medium">
                   {getCommercialName(visit.commercial)}
+                </TableCell>
+                <TableCell>
+                  {visit.second_commercial ? 
+                    getCommercialName(visit.second_commercial) : 
+                    '-'
+                  }
                 </TableCell>
                 <TableCell>{visit.company?.name || 'N/A'}</TableCell>
                 <TableCell>
@@ -205,7 +225,9 @@ export default function VisitsTable({
                   })()}
                 </TableCell>
                 <TableCell>
-                  {visit.visit_states?.name ? 
+                  {visit.approval_status === 'rejected' ? 
+                    'Rechazada' 
+                    : visit.visit_states?.name ? 
                     visit.visit_states.name.charAt(0).toUpperCase() + visit.visit_states.name.slice(1).toLowerCase() 
                     : visit.status ? 
                     statusLabels[visit.status as keyof typeof statusLabels]?.charAt(0).toUpperCase() + statusLabels[visit.status as keyof typeof statusLabels]?.slice(1).toLowerCase() 
@@ -222,9 +244,36 @@ export default function VisitsTable({
                   {totalCommission > 0 ? `€${totalCommission.toFixed(2)}` : '-'}
                 </TableCell>
                 <TableCell>
-                  <Button size="sm" variant="outline" onClick={() => onViewVisit(visit)}>
-                    <Eye className="h-4 w-4" />
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => onViewVisit(visit)}
+                      title="Ver detalles"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    {onCreateReminder && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onCreateReminder(visit)}
+                        title="Crear recordatorio"
+                      >
+                        <Bell className="h-4 w-4" />
+                      </Button>
+                    )}
+                    {isAdmin && onAdminManageVisit && (
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => onAdminManageVisit(visit)}
+                        title="Administrar visita"
+                      >
+                        <Settings className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </TableCell>
               </TableRow>
             );

@@ -10,14 +10,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Users, Euro, MapPin, TrendingUp, Eye, Bell } from 'lucide-react';
+import { Users, Euro, MapPin, TrendingUp, Eye, Bell, Settings } from 'lucide-react';
 import { formatCoordinates } from '@/lib/coordinates';
-import { calculateCommission } from '@/lib/commission';
+import { calculateCommission, calculateTotalExcludingNulls, calculateSaleCommission, calculateEffectiveAmount } from '@/lib/commission';
 import { format, subDays, startOfMonth, endOfMonth, eachMonthOfInterval, subMonths, startOfDay, endOfDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
 import ReminderDialog from '@/components/reminders/ReminderDialog';
 import ClientPagination from '@/components/dashboard/ClientPagination';
+import AdminVisitManagementDialog from '@/components/admin/AdminVisitManagementDialog';
 
 interface Sale {
   id: string;
@@ -25,6 +26,7 @@ interface Sale {
   amount: number;
   commission_percentage: number;
   commission_amount: number;
+  sale_lines?: Array<{ quantity: number; unit_price: number; nulo: boolean }>;
   client: {
     nombre_apellidos: string;
     dni: string;
@@ -44,11 +46,14 @@ interface Visit {
   status: string;
   approval_status: string;
   client_id: string;
+  commercial_id: string;
+  second_commercial_id?: string;
   visit_state_code?: string;
   latitude?: number;
   longitude?: number;
   location_accuracy?: number;
   client: {
+    id: string;
     nombre_apellidos: string;
     dni: string;
   };
@@ -56,8 +61,9 @@ interface Visit {
     name: string;
   };
   commercial?: {
-    first_name: string;
-    last_name: string;
+    first_name: string | null;
+    last_name: string | null;
+    email: string;
   } | null;
   notes: string;
   sales?: any[];
@@ -83,6 +89,8 @@ export default function AdminDashboard() {
   const [monthlySalesData, setMonthlySalesData] = useState<any[]>([]);
   const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
   const [visitSales, setVisitSales] = useState<any[]>([]);
+  const [adminManagementVisit, setAdminManagementVisit] = useState<Visit | null>(null);
+  const [adminDialogOpen, setAdminDialogOpen] = useState(false);
   const [selectedCommercial, setSelectedCommercial] = useState<string>('all');
   const [commercials, setCommercials] = useState<any[]>([]);
   const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
@@ -121,13 +129,16 @@ export default function AdminDashboard() {
       // Fetch today's sales
       const { data: todaySalesData, error: todaySalesError } = await supabase
         .from('sales')
-        .select('amount')
+        .select(`
+          amount,
+          sale_lines(quantity, unit_price, nulo)
+        `)
         .gte('sale_date', startToday.toISOString())
         .lte('sale_date', endToday.toISOString());
 
       if (todaySalesError) throw todaySalesError;
 
-      const todaySalesAmount = todaySalesData?.reduce((sum, sale) => sum + sale.amount, 0) || 0;
+      const todaySalesAmount = todaySalesData?.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0) || 0;
 
       // Fetch today's visits count
       const { count: todayVisitsCount, error: todayVisitsError } = await supabase
@@ -141,22 +152,28 @@ export default function AdminDashboard() {
       // Fetch current month sales
       const { data: monthSalesData, error: monthSalesError } = await supabase
         .from('sales')
-        .select('amount')
+        .select(`
+          amount,
+          sale_lines(quantity, unit_price, nulo)
+        `)
         .gte('sale_date', startOfCurrentMonth.toISOString());
 
       if (monthSalesError) throw monthSalesError;
 
-      const monthSalesAmount = monthSalesData?.reduce((sum, sale) => sum + sale.amount, 0) || 0;
+      const monthSalesAmount = monthSalesData?.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0) || 0;
 
       // Fetch total sales (without filters) for the stats card
       const { data: totalSalesData, error: totalSalesError } = await supabase
         .from('sales')
-        .select('amount')
+        .select(`
+          amount,
+          sale_lines(quantity, unit_price, nulo)  
+        `)
         .gte('sale_date', thirtyDaysAgo.toISOString());
 
       if (totalSalesError) throw totalSalesError;
 
-      const totalSalesAmount = totalSalesData?.reduce((sum, sale) => sum + sale.amount, 0) || 0;
+      const totalSalesAmount = totalSalesData?.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0) || 0;
 
       setStats({
         totalClients: clientsCount || 0,
@@ -198,6 +215,7 @@ export default function AdminDashboard() {
           commission_percentage,
           commission_amount,
           commercial_id,
+          sale_lines(quantity, unit_price, nulo),
           client:clients(nombre_apellidos, dni),
           company:companies(name)
         `)
@@ -223,11 +241,11 @@ export default function AdminDashboard() {
           commercial = commercialData;
         }
 
-        return {
-          ...sale,
-          commission_amount: sale.commission_amount || calculateCommission(sale.amount),
-          commercial
-        };
+          return {
+            ...sale,
+            commission_amount: calculateSaleCommission(sale, false), // En listados mostrar comisión completa
+            commercial
+          };
       }));
 
       setSales(salesWithCommercials);
@@ -243,6 +261,7 @@ export default function AdminDashboard() {
           notes,
           client_id,
           commercial_id,
+          second_commercial_id,
           visit_state_code,
           latitude,
           longitude,
@@ -251,14 +270,14 @@ export default function AdminDashboard() {
             name,
             description
           ),
-          client:clients(nombre_apellidos, dni),
+          client:clients(id, nombre_apellidos, dni),
           company:companies(name)
         `)
         .gte('visit_date', thirtyDaysAgo.toISOString())
         .order('visit_date', { ascending: false });
 
       if (selectedCommercial !== 'all') {
-        visitsQuery = visitsQuery.eq('commercial_id', selectedCommercial);
+        visitsQuery = visitsQuery.or(`commercial_id.eq.${selectedCommercial},second_commercial_id.eq.${selectedCommercial}`);
       }
 
       const { data: visitsData, error: visitsError } = await visitsQuery;
@@ -271,24 +290,43 @@ export default function AdminDashboard() {
         if (visit.commercial_id) {
           const { data: commercialData } = await supabase
             .from('profiles')
-            .select('first_name, last_name')
+            .select('first_name, last_name, email')
             .eq('id', visit.commercial_id)
             .single();
           commercial = commercialData;
         }
 
+        // Fetch second commercial data
+        let second_commercial = null;
+        if (visit.second_commercial_id) {
+          const { data: secondCommercialData } = await supabase
+            .from('profiles')
+            .select('first_name, last_name, email')
+            .eq('id', visit.second_commercial_id)
+            .single();
+          second_commercial = secondCommercialData;
+        }
+
         // Fetch visit sales
         const { data: visitSales } = await supabase
           .from('sales')
-          .select('id, sale_date, amount, commission_percentage, commission_amount')
+          .select(`
+            id, 
+            sale_date, 
+            amount, 
+            commission_percentage, 
+            commission_amount,
+            sale_lines(quantity, unit_price, nulo)
+          `)
           .eq('visit_id', visit.id);
 
         return {
           ...visit,
           commercial,
+          second_commercial,
           sales: visitSales?.map(sale => ({
             ...sale,
-            commission_amount: sale.commission_amount || calculateCommission(sale.amount)
+            commission_amount: calculateSaleCommission(sale, false) // En listados mostrar comisión completa
           })) || []
         };
       }));
@@ -298,7 +336,11 @@ export default function AdminDashboard() {
       // Fetch monthly sales data for charts
       let monthlySalesQuery = supabase
         .from('sales')
-        .select('sale_date, amount')
+        .select(`
+          sale_date, 
+          amount,
+          sale_lines(quantity, unit_price, nulo)
+        `)
         .gte('sale_date', sixMonthsAgo.toISOString())
         .order('sale_date');
 
@@ -321,8 +363,8 @@ export default function AdminDashboard() {
           return saleDate >= startOfMonth(month) && saleDate <= endOfMonth(month);
         }) || [];
 
-        const totalAmount = monthSales.reduce((sum, sale) => sum + sale.amount, 0);
-        const totalCommission = monthSales.reduce((sum, sale) => sum + calculateCommission(sale.amount), 0);
+        const totalAmount = monthSales.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0);
+        const totalCommission = monthSales.reduce((sum, sale) => sum + calculateSaleCommission(sale, false), 0); // Datos mensuales sin división
 
         return {
           month: format(month, 'MMM yyyy', { locale: es }),
@@ -352,6 +394,20 @@ export default function AdminDashboard() {
       name: visit.client.nombre_apellidos
     });
     setReminderDialogOpen(true);
+  };
+
+  const handleAdminManageVisit = (visit: Visit) => {
+    setAdminManagementVisit(visit);
+    setAdminDialogOpen(true);
+  };
+
+  const handleAdminDialogClose = () => {
+    setAdminDialogOpen(false);
+    setAdminManagementVisit(null);
+  };
+
+  const handleVisitUpdated = () => {
+    fetchDashboardData();
   };
 
   const handleReminderCreated = () => {
@@ -465,7 +521,7 @@ export default function AdminDashboard() {
     return <div className="min-h-screen flex items-center justify-center">Cargando dashboard...</div>;
   }
 
-  const totalSales = sales.reduce((sum, sale) => sum + sale.amount, 0);
+  const totalSales = sales.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0);
   const totalCommissions = sales.reduce((sum, sale) => sum + sale.commission_amount, 0);
   const approvedVisits = visits.filter(visit => visit.approval_status === 'approved').length;
   const completedVisits = visits.filter(visit => visit.status === 'completed');
@@ -919,6 +975,7 @@ export default function AdminDashboard() {
                   <TableHead>Fecha Visita</TableHead>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Comercial</TableHead>
+                  <TableHead>Segundo Comercial</TableHead>
                   <TableHead>Empresa</TableHead>
                   <TableHead>Resultado de la visita</TableHead>
                   <TableHead>Notas</TableHead>
@@ -929,7 +986,7 @@ export default function AdminDashboard() {
               </TableHeader>
               <TableBody>
                 {paginatedCompletedVisits.map((visit) => {
-                  const totalSalesAmount = visit.sales?.reduce((sum, sale) => sum + sale.amount, 0) || 0;
+                  const totalSalesAmount = visit.sales?.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0) || 0;
                   const totalCommission = visit.sales?.reduce((sum, sale) => sum + sale.commission_amount, 0) || 0;
                   
                   return (
@@ -943,6 +1000,12 @@ export default function AdminDashboard() {
                       </TableCell>
                       <TableCell>
                         {visit.commercial ? `${visit.commercial.first_name} ${visit.commercial.last_name}` : 'N/A'}
+                      </TableCell>
+                      <TableCell>
+                        {(visit as any).second_commercial ? 
+                          `${(visit as any).second_commercial.first_name} ${(visit as any).second_commercial.last_name}` : 
+                          '-'
+                        }
                       </TableCell>
                       <TableCell>{visit.company?.name || 'N/A'}</TableCell>
                       <TableCell>
@@ -994,6 +1057,14 @@ export default function AdminDashboard() {
                           >
                             <Bell className="h-4 w-4" />
                           </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleAdminManageVisit(visit)}
+                            title="Administrar visita"
+                          >
+                            <Settings className="h-4 w-4" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -1001,7 +1072,7 @@ export default function AdminDashboard() {
                 })}
                 {paginatedCompletedVisits.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center text-muted-foreground">
+                    <TableCell colSpan={10} className="text-center text-muted-foreground">
                       {completedVisits.length === 0 ? "No hay visitas completadas en los últimos 30 días" : "No hay más visitas en esta página"}
                     </TableCell>
                   </TableRow>
@@ -1177,6 +1248,13 @@ export default function AdminDashboard() {
           onReminderCreated={handleReminderCreated}
         />
       )}
+
+      <AdminVisitManagementDialog
+        visit={adminManagementVisit}
+        isOpen={adminDialogOpen}
+        onClose={handleAdminDialogClose}
+        onVisitUpdated={handleVisitUpdated}
+      />
     </div>
   );
 }

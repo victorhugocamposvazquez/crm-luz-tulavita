@@ -11,10 +11,13 @@ import { Badge } from '@/components/ui/badge';
 import { Search, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import VisitsTable from '@/components/visits/VisitsTable';
-import { calculateCommission } from '@/lib/commission';
+import { calculateCommission, calculateTotalExcludingNulls, calculateSaleCommission } from '@/lib/commission';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import ClientPagination from '@/components/dashboard/ClientPagination';
+import VisitDetailsDialog from '@/components/visits/VisitDetailsDialog';
+import AdminVisitManagementDialog from '@/components/admin/AdminVisitManagementDialog';
+import ReminderDialog from '@/components/reminders/ReminderDialog';
 
 interface Visit {
   id: string;
@@ -24,6 +27,7 @@ interface Visit {
   notes?: string;
   permission: string;
   commercial_id: string;
+  second_commercial_id?: string;
   client_id: string;
   company_id?: string;
   visit_states?: {
@@ -35,10 +39,16 @@ interface Visit {
     last_name: string | null;
     email: string;
   };
+  second_commercial?: {
+    first_name: string | null;
+    last_name: string | null;
+    email: string;
+  };
   client?: {
+    id: string;
     nombre_apellidos: string;
-    dni: string;
-    direccion: string;
+    dni?: string;
+    direccion?: string;  
   };
   company?: {
     name: string;
@@ -94,6 +104,8 @@ export default function AdminVisitsView() {
   const [loading, setLoading] = useState(true);
   const [selectedVisit, setSelectedVisit] = useState<Visit | null>(null);
   const [visitSales, setVisitSales] = useState<Sale[]>([]);
+  const [adminManagementVisit, setAdminManagementVisit] = useState<Visit | null>(null);
+  const [adminDialogOpen, setAdminDialogOpen] = useState(false);
   const [filters, setFilters] = useState({
     commercial: '',
     dni: '',
@@ -108,6 +120,10 @@ export default function AdminVisitsView() {
     pageSize: 20,
     totalItems: 0
   });
+
+  // Reminder dialog state
+  const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
+  const [selectedClientForReminder, setSelectedClientForReminder] = useState<{ id: string; name: string } | null>(null);
 
   // Redirect if not admin
   useEffect(() => {
@@ -168,7 +184,7 @@ export default function AdminVisitsView() {
 
         // Calculate commission using the new system
         const commissionPercentage = sale.commission_percentage || 0;
-        const calculatedCommission = sale.commission_amount || calculateCommission(sale.amount);
+        const calculatedCommission = calculateSaleCommission({ amount: sale.amount, commission_amount: sale.commission_amount });
 
         return {
           ...sale,
@@ -234,12 +250,16 @@ export default function AdminVisitsView() {
 
       // Batch-load related data
       const commercialIds = Array.from(new Set(visits.map(v => v.commercial_id).filter(Boolean)));
+      const secondCommercialIds = Array.from(new Set(visits.map(v => v.second_commercial_id).filter(Boolean)));
       const clientIds = Array.from(new Set(visits.map(v => v.client_id).filter(Boolean)));
       const companyIds = Array.from(new Set(visits.map(v => v.company_id).filter(Boolean)));
 
-      const [{ data: profiles }, { data: clients }, { data: companies }] = await Promise.all([
+      const [{ data: profiles }, { data: secondProfiles }, { data: clients }, { data: companies }] = await Promise.all([
         commercialIds.length
           ? supabase.from('profiles').select('id, first_name, last_name, email').in('id', commercialIds)
+          : Promise.resolve({ data: [], error: null } as any),
+        secondCommercialIds.length
+          ? supabase.from('profiles').select('id, first_name, last_name, email').in('id', secondCommercialIds)
           : Promise.resolve({ data: [], error: null } as any),
         clientIds.length
           ? supabase.from('clients').select('id, nombre_apellidos, dni, direccion').in('id', clientIds)
@@ -250,12 +270,14 @@ export default function AdminVisitsView() {
       ]);
 
       const profileMap = new Map((profiles || []).map(p => [p.id, p]));
+      const secondProfileMap = new Map((secondProfiles || []).map(p => [p.id, p]));
       const clientMap = new Map((clients || []).map(c => [c.id, c]));
       const companyMap = new Map((companies || []).map(c => [c.id, c]));
 
       let enrichedVisits = visits.map(v => ({
         ...v,
         commercial: profileMap.get(v.commercial_id) || null,
+        second_commercial: v.second_commercial_id ? secondProfileMap.get(v.second_commercial_id) || null : null,
         client: clientMap.get(v.client_id) || null,
         company: companyMap.get(v.company_id) || null,
       }));
@@ -292,6 +314,29 @@ export default function AdminVisitsView() {
     // Find sales for this specific visit
     const relatedSales = sales.filter(sale => sale.visit_id === visit.id);
     setVisitSales(relatedSales);
+  };
+
+  const handleAdminManageVisit = (visit: Visit) => {
+    setAdminManagementVisit(visit);
+    setAdminDialogOpen(true);
+  };
+
+  const handleAdminDialogClose = () => {
+    setAdminDialogOpen(false);
+    setAdminManagementVisit(null);
+  };
+
+  const handleVisitUpdated = () => {
+    fetchVisits();
+    fetchSales();
+  };
+
+  const handleCreateReminder = (visit: Visit) => {
+    setSelectedClientForReminder({
+      id: visit.client_id,
+      name: visit.client.nombre_apellidos
+    });
+    setReminderDialogOpen(true);
   };
 
   const handleFilterChange = (key: string, value: string) => {
@@ -444,6 +489,8 @@ export default function AdminVisitsView() {
             visits={paginatedVisits as any}
             sales={sales}
             onViewVisit={handleViewVisit as any}
+            onAdminManageVisit={handleAdminManageVisit as any}
+            onCreateReminder={handleCreateReminder as any}
             loading={loading}
             showClientColumns={true}
             emptyMessage="No se encontraron visitas con los filtros aplicados"
@@ -465,129 +512,32 @@ export default function AdminVisitsView() {
       </Card>
 
       {/* Visit Detail Dialog */}
-      {selectedVisit && (
-        <Dialog open={!!selectedVisit} onOpenChange={() => setSelectedVisit(null)}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>Detalles de la Visita</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label>Cliente</Label>
-                  <p className="font-medium">{selectedVisit.client?.nombre_apellidos}</p>
-                </div>
-                <div>
-                  <Label>DNI</Label>
-                  <p>{selectedVisit.client?.dni}</p>
-                </div>
-                <div>
-                  <Label>Comercial</Label>
-                  <p>{selectedVisit.commercial ? `${selectedVisit.commercial.first_name} ${selectedVisit.commercial.last_name}` : 'N/A'}</p>
-                </div>
-                <div>
-                  <Label>Empresa</Label>
-                  <p>{selectedVisit.company?.name || 'N/A'}</p>
-                </div>
-                <div>
-                  <Label>Fecha</Label>
-                  <p>{format(new Date(selectedVisit.visit_date), "dd/MM/yyyy HH:mm", { locale: es })}</p>
-                </div>
-                <div>
-                  <Label>Estado</Label>
-                  <div>
-                    <Badge className={statusColors[selectedVisit.status as keyof typeof statusColors] || 'bg-gray-100 text-gray-800'}>
-                      {statusLabels[selectedVisit.status as keyof typeof statusLabels] || selectedVisit.status}
-                    </Badge>
-                  </div>
-                </div>
-                {selectedVisit.visit_states && (
-                  <div>
-                    <Label>Resultado de la visita</Label>
-                    <div>
-                      <Badge variant="outline">
-                        {selectedVisit.visit_states.name.charAt(0).toUpperCase() + selectedVisit.visit_states.name.slice(1).toLowerCase()}
-                      </Badge>
-                    </div>
-                  </div>
-                )}
-              </div>
+      <VisitDetailsDialog
+        visit={selectedVisit}
+        sales={visitSales}
+        onClose={() => setSelectedVisit(null)}
+        onAdminManageVisit={handleAdminManageVisit}
+        showClientInfo={true}
+      />
 
-              {selectedVisit.notes && (
-                <div>
-                  <Label>Notas</Label>
-                  <p className="text-sm bg-muted p-2 rounded">{selectedVisit.notes}</p>
-                </div>
-              )}
+      <AdminVisitManagementDialog
+        visit={adminManagementVisit}
+        isOpen={adminDialogOpen}
+        onClose={handleAdminDialogClose}
+        onVisitUpdated={handleVisitUpdated}
+      />
 
-              {visitSales.length > 0 && (
-                <div>
-                  <Label>Ventas</Label>
-                  <div className="mt-2 space-y-4">
-                    {visitSales.map((sale, index) => (
-                      <div key={sale.id} className="border rounded p-3">
-                        <div className="flex justify-between items-start mb-2">
-                          <div>
-                            <p className="font-medium">Venta #{index + 1}</p>
-                            <p className="text-sm text-muted-foreground">{format(new Date(sale.sale_date), "dd/MM/yyyy HH:mm", { locale: es })}</p>
-                          </div>
-                          <p className="font-bold text-green-600">€{sale.amount.toFixed(2)}</p>
-                        </div>
-                        
-                        {sale.sale_lines && sale.sale_lines.length > 0 && (
-                          <div className="mt-2">
-                            <p className="text-sm font-medium mb-1">Productos:</p>
-                            <div className="space-y-1">
-                              {sale.sale_lines.map((line: any, lineIndex: number) => (
-                                <div key={lineIndex} className="text-xs bg-muted/50 p-2 rounded">
-                                  <div className="flex justify-between">
-                                    <div>
-                                      {line.products && line.products.length > 1 ? (
-                                        // Pack: mostrar productos en líneas separadas
-                                        <div className="space-y-1">
-                                          <div className="font-medium">
-                                            {line.quantity}x Pack - €{line.unit_price.toFixed(2)}
-                                          </div>
-                                          {line.products.map((product: any, productIndex: number) => (
-                                            <div key={productIndex} className="ml-2 text-muted-foreground">
-                                              • {product.product_name || 'Sin nombre'}
-                                            </div>
-                                          ))}
-                                        </div>
-                                      ) : (
-                                        // Producto individual
-                                        <span>
-                                          {line.quantity}x {line.products?.[0]?.product_name || 'Sin producto'} - €{line.unit_price.toFixed(2)}
-                                        </span>
-                                      )}
-                                    </div>
-                                    <span>€{(line.quantity * line.unit_price).toFixed(2)}</span>
-                                  </div>
-                                  <div className="flex gap-2 mt-1 text-xs">
-                                   <span className={`px-2 py-1 rounded ${line.financiada ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                                     {line.financiada ? '✓' : '✗'} Financiada
-                                   </span>
-                                   <span className={`px-2 py-1 rounded ${line.transferencia ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
-                                     {line.transferencia ? '✓' : '✗'} Transferencia
-                                   </span>
-                                   <span className={`px-2 py-1 rounded ${line.nulo ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-600'}`}>
-                                     {line.nulo ? '✓' : '✗'} Nulo
-                                   </span>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
+      {/* Reminder Dialog */}
+      <ReminderDialog
+        open={reminderDialogOpen}
+        onOpenChange={setReminderDialogOpen}
+        clientId={selectedClientForReminder?.id || ''}
+        clientName={selectedClientForReminder?.name || ''}
+        onReminderCreated={() => {
+          // Refresh data if needed
+          fetchVisits();
+        }}
+      />
     </div>
   );
 }
