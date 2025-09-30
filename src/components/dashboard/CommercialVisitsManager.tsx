@@ -28,6 +28,7 @@ interface Visit {
   client: {
     nombre_apellidos: string;
     dni: string;
+    localidad?: string;
   };
   company: {
     name: string;
@@ -227,6 +228,10 @@ export default function CommercialVisitsManager() {
         data: debugData
       } = await supabase.from('visits').select('id, status, approval_status, created_at').eq('commercial_id', user?.id);
       console.log('[CVM] Debug - All visits for user:', debugData);
+      // Get today's date in YYYY-MM-DD format for filtering
+      const today = new Date();
+      const todayString = today.toISOString().split('T')[0];
+      
       const {
         data,
         error
@@ -250,10 +255,11 @@ export default function CommercialVisitsManager() {
             description
           ),
           approved_by,
-          client:clients(nombre_apellidos, dni),
+          client:clients(nombre_apellidos, dni, localidad),
           company:companies(name)
         `).eq('commercial_id', user?.id)
         .neq('status', 'completed')  // Exclude completed visits (shown in stats)
+        .or(`approval_status.neq.rejected,and(approval_status.eq.rejected,visit_date.gte.${todayString})`)  // Exclude rejected visits from yesterday or earlier
         .order('visit_date', {
         ascending: false
       });
@@ -292,7 +298,8 @@ export default function CommercialVisitsManager() {
         ...visit,
         client: visit.client || {
           nombre_apellidos: 'Cliente desconocido',
-          dni: ''
+          dni: '',
+          localidad: ''
         },
         company: visit.company || {
           name: 'Empresa desconocida'
@@ -533,6 +540,7 @@ export default function CommercialVisitsManager() {
                    <TableRow>
               <TableHead>Cliente</TableHead>
               <TableHead>DNI</TableHead>
+              <TableHead>Localidad</TableHead>
               <TableHead>Empresa</TableHead>
               <TableHead>Segundo Comercial</TableHead>
               <TableHead>Fecha</TableHead>
@@ -548,6 +556,7 @@ export default function CommercialVisitsManager() {
                           {visit.client.nombre_apellidos}
                         </TableCell>
                         <TableCell>{visit.client.dni}</TableCell>
+                        <TableCell>{visit.client.localidad || '-'}</TableCell>
                         <TableCell>{visit.company.name}</TableCell>
                         <TableCell>
                           {visit.second_commercial ? 
