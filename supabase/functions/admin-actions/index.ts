@@ -5,6 +5,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const getAllowedOrigin = (requestOrigin: string | null) => {
   const allowedOrigins = [
     'http://localhost:3000',
+    'http://localhost:8080',
     'https://lovable.dev',
     'https://crm.ilustracioneslarum.com', // Tu dominio personalizado
     'https://crm.virvita.es',
