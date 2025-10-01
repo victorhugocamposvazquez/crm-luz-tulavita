@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -57,13 +57,7 @@ export default function RemindersManagement() {
 
   const isAdmin = userRole?.role === 'admin';
 
-  useEffect(() => {
-    fetchReminders();
-    fetchCommercials();
-    fetchCompanies();
-  }, [filters]);
-
-  const fetchReminders = async () => {
+  const fetchReminders = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -71,7 +65,7 @@ export default function RemindersManagement() {
         .from('renewal_reminders')
         .select(`
           *,
-          client:clients(nombre_apellidos, dni, direccion)
+          client:clients!inner(nombre_apellidos, dni, direccion)
         `)
         .order('reminder_date', { ascending: true });
 
@@ -96,27 +90,26 @@ export default function RemindersManagement() {
 
       if (error) throw error;
       
-      // Transform the data to match our interface and fetch creator info separately
-      const transformedReminders: Reminder[] = await Promise.all((data || []).map(async (item) => {
-        // Fetch creator info separately
-        let creator;
-        try {
-          const { data: creatorData } = await supabase
-            .from('profiles')
-            .select('first_name, last_name, email')
-            .eq('id', item.created_by)
-            .single();
-          creator = creatorData;
-        } catch (error) {
-          console.error('Error fetching creator:', error);
-          creator = undefined;
-        }
+      // OPTIMIZACIÓN N+1: Fetch all creator data in batch
+      const creatorIds = [...new Set((data || []).map(item => item.created_by).filter(Boolean))];
+      const creatorsMap = new Map();
+      
+      if (creatorIds.length > 0) {
+        const { data: creatorsData } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email')
+          .in('id', creatorIds);
+        
+        (creatorsData || []).forEach(creator => {
+          creatorsMap.set(creator.id, creator);
+        });
+      }
 
-        return {
-          ...item,
-          status: item.status as 'pending' | 'completed' | 'cancelled',
-          creator
-        };
+      // Transform the data with pre-loaded creator info
+      const transformedReminders: Reminder[] = (data || []).map((item) => ({
+        ...item,
+        status: item.status as 'pending' | 'completed' | 'cancelled',
+        creator: creatorsMap.get(item.created_by) || undefined
       }));
       
       setReminders(transformedReminders);
@@ -130,7 +123,13 @@ export default function RemindersManagement() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters.client_name, filters.dni, filters.status, filters.start_date, filters.end_date]);
+
+  useEffect(() => {
+    fetchReminders();
+    fetchCommercials();
+    fetchCompanies();
+  }, [fetchReminders]);
 
   const fetchCommercials = async () => {
     try {
@@ -196,7 +195,7 @@ export default function RemindersManagement() {
     }
   };
 
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setFilters({
       client_name: '',
       dni: '',
@@ -204,7 +203,14 @@ export default function RemindersManagement() {
       start_date: '',
       end_date: ''
     });
-  };
+  }, []);
+
+  const updateFilter = useCallback((key: keyof typeof filters, value: string) => {
+    setFilters(prev => ({
+      ...prev,
+      [key]: value
+    }));
+  }, []);
 
   const handleReminderSelection = (reminderId: string, checked: boolean) => {
     setSelectedReminders(prev => 
@@ -435,7 +441,7 @@ export default function RemindersManagement() {
               <Input
                 placeholder="Buscar por nombre..."
                 value={filters.client_name}
-                onChange={(e) => setFilters(prev => ({ ...prev, client_name: e.target.value }))}
+                onChange={(e) => updateFilter('client_name', e.target.value)}
               />
             </div>
             <div>
@@ -443,12 +449,12 @@ export default function RemindersManagement() {
               <Input
                 placeholder="Buscar por DNI..."
                 value={filters.dni}
-                onChange={(e) => setFilters(prev => ({ ...prev, dni: e.target.value }))}
+                onChange={(e) => updateFilter('dni', e.target.value)}
               />
             </div>
             <div>
               <label className="text-sm font-medium">Estado</label>
-              <Select value={filters.status} onValueChange={(value) => setFilters(prev => ({ ...prev, status: value }))}>
+              <Select value={filters.status} onValueChange={(value) => updateFilter('status', value)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
@@ -463,7 +469,7 @@ export default function RemindersManagement() {
               <Input
                 type="date"
                 value={filters.start_date}
-                onChange={(e) => setFilters(prev => ({ ...prev, start_date: e.target.value }))}
+                onChange={(e) => updateFilter('start_date', e.target.value)}
               />
             </div>
             <div>
@@ -471,7 +477,7 @@ export default function RemindersManagement() {
               <Input
                 type="date"
                 value={filters.end_date}
-                onChange={(e) => setFilters(prev => ({ ...prev, end_date: e.target.value }))}
+                onChange={(e) => updateFilter('end_date', e.target.value)}
               />
             </div>
           </div>
