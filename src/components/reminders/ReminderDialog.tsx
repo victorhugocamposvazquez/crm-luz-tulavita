@@ -75,12 +75,21 @@ export default function ReminderDialog({
         return today;
       case 'tomorrow':
         return addDays(today, 1);
-      case 'six_months':
-        return addMonths(today, 6);
-      case 'eleven_months':
-        return addMonths(today, 11);
-      case 'five_years':
-        return addYears(today, 5);
+      case 'six_months': {
+        const futureDate = addMonths(today, 6);
+        // Set to day 1 of the month
+        return new Date(futureDate.getFullYear(), futureDate.getMonth(), 1);
+      }
+      case 'eleven_months': {
+        const futureDate = addMonths(today, 11);
+        // Set to day 1 of the month
+        return new Date(futureDate.getFullYear(), futureDate.getMonth(), 1);
+      }
+      case 'five_years': {
+        const futureDate = addYears(today, 5);
+        // Set to day 1 of the month
+        return new Date(futureDate.getFullYear(), futureDate.getMonth(), 1);
+      }
       default:
         return specificDate;
     }
