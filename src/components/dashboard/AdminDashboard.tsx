@@ -252,7 +252,7 @@ export default function AdminDashboard() {
 
       setSales(salesWithCommercials);
 
-      // Build visits query with optional commercial filter
+      // Build visits query with optional commercial filter (SIN sales anidadas)
       let visitsQuery = supabase
         .from('visits')
         .select(`
@@ -273,15 +273,7 @@ export default function AdminDashboard() {
             description
           ),
           client:clients(id, nombre_apellidos, dni),
-          company:companies(name),
-          sales(
-            id, 
-            sale_date, 
-            amount, 
-            commission_percentage, 
-            commission_amount,
-            sale_lines(quantity, unit_price, nulo)
-          )
+          company:companies(name)
         `)
         .gte('visit_date', thirtyDaysAgo.toISOString())
         .order('visit_date', { ascending: false });
@@ -292,6 +284,47 @@ export default function AdminDashboard() {
 
       const { data: visitsData, error: visitsError } = await visitsQuery;
       if (visitsError) throw visitsError;
+
+      // Fetch sales separately for all visits (in batches to avoid URL length limits)
+      const visitIds = (visitsData || []).map(visit => visit.id);
+      let visitSalesMap = new Map();
+      
+      if (visitIds.length > 0) {
+        // Process in batches of 100 to avoid URL length limits
+        const batchSize = 200;
+        const batches = [];
+        
+        for (let i = 0; i < visitIds.length; i += batchSize) {
+          batches.push(visitIds.slice(i, i + batchSize));
+        }
+        
+        for (const batch of batches) {
+          const { data: batchSales, error: salesError } = await supabase
+            .from('sales')
+            .select(`
+              id, 
+              visit_id,
+              sale_date, 
+              amount, 
+              commission_percentage, 
+              commission_amount,
+              sale_lines(quantity, unit_price, nulo)
+            `)
+            .in('visit_id', batch);
+
+          if (salesError) {
+            console.error('Error fetching batch visit sales:', salesError);
+          } else {
+            // Group sales by visit_id
+            (batchSales || []).forEach(sale => {
+              if (!visitSalesMap.has(sale.visit_id)) {
+                visitSalesMap.set(sale.visit_id, []);
+              }
+              visitSalesMap.get(sale.visit_id).push(sale);
+            });
+          }
+        }
+      }
 
       // OPTIMIZACIÓN N+1: Fetch all commercial data in batch for visits
       const visitCommercialIds = [...new Set([
@@ -313,7 +346,7 @@ export default function AdminDashboard() {
       }
 
       const visitsWithSales = (visitsData || []).map((visit) => {
-        const visitSales = Array.isArray(visit.sales) ? visit.sales : [];
+        const visitSales = visitSalesMap.get(visit.id) || [];
         
         return {
           ...visit,
@@ -904,10 +937,10 @@ export default function AdminDashboard() {
                 <PieChart>
                   <Pie
                     data={(() => {
-                      const visitsWithSales = visits.filter(v => v.sales && v.sales.length > 0).length;
+                      const visitsWithSales = visits.filter(v => v.sales && Array.isArray(v.sales) && v.sales.length > 0).length;
                       const visitsWithoutSales = visits.length - visitsWithSales;
 
-                      return [
+                      const chartData = [
                         {
                           name: 'Con ventas',
                           value: visitsWithSales,
@@ -919,6 +952,9 @@ export default function AdminDashboard() {
                           color: '#6b7280'
                         }
                       ].filter(item => item.value > 0);
+
+
+                      return chartData;
                     })()}
                     cx="50%"
                     cy="50%"
@@ -929,21 +965,14 @@ export default function AdminDashboard() {
                     dataKey="value"
                   >
                     {(() => {
-                      const visitsWithSales = visits.filter(v => v.sales && v.sales.length > 0).length;
+                      const visitsWithSales = visits.filter(v => v.sales && Array.isArray(v.sales) && v.sales.length > 0).length;
                       const visitsWithoutSales = visits.length - visitsWithSales;
 
                       return [
-                        {
-                          name: 'Con ventas',
-                          value: visitsWithSales,
-                          color: '#22c55e'
-                        },
-                        {
-                          name: 'Sin ventas', 
-                          value: visitsWithoutSales,
-                          color: '#6b7280'
-                        }
-                      ].filter(item => item.value > 0)
+                        { color: '#22c55e' },
+                        { color: '#6b7280' }
+                      ]
+                      .slice(0, visitsWithSales > 0 && visitsWithoutSales > 0 ? 2 : 1)
                       .map((entry, index) => (
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ));
@@ -982,6 +1011,7 @@ export default function AdminDashboard() {
                 {paginatedCompletedVisits.map((visit) => {
                   const totalSalesAmount = visit.sales?.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0) || 0;
                   const totalCommission = visit.sales?.reduce((sum, sale) => sum + sale.commission_amount, 0) || 0;
+                  
                   
                   return (
                     <TableRow key={visit.id}>
