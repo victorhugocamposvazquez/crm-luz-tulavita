@@ -229,23 +229,25 @@ export default function AdminDashboard() {
       const { data: salesData, error: salesError } = await salesQuery;
       if (salesError) throw salesError;
 
-      // Fetch commercial data separately to avoid relation issues
-      const salesWithCommercials = await Promise.all((salesData || []).map(async (sale) => {
-        let commercial = null;
-        if (sale.commercial_id) {
-          const { data: commercialData } = await supabase
-            .from('profiles')
-            .select('first_name, last_name')
-            .eq('id', sale.commercial_id)
-            .single();
-          commercial = commercialData;
-        }
+      // OPTIMIZACIÓN N+1: Fetch commercial data in batch instead of individual queries
+      const commercialIds = [...new Set((salesData || []).map(sale => sale.commercial_id).filter(Boolean))];
+      const commercialsMap = new Map();
+      
+      if (commercialIds.length > 0) {
+        const { data: commercialsData } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name')
+          .in('id', commercialIds);
+        
+        (commercialsData || []).forEach(commercial => {
+          commercialsMap.set(commercial.id, commercial);
+        });
+      }
 
-          return {
-            ...sale,
-            commission_amount: calculateSaleCommission(sale, false), // En listados mostrar comisión completa
-            commercial
-          };
+      const salesWithCommercials = (salesData || []).map((sale) => ({
+        ...sale,
+        commission_amount: calculateSaleCommission(sale, false), // En listados mostrar comisión completa
+        commercial: commercialsMap.get(sale.commercial_id) || null
       }));
 
       setSales(salesWithCommercials);
@@ -271,7 +273,15 @@ export default function AdminDashboard() {
             description
           ),
           client:clients(id, nombre_apellidos, dni),
-          company:companies(name)
+          company:companies(name),
+          sales(
+            id, 
+            sale_date, 
+            amount, 
+            commission_percentage, 
+            commission_amount,
+            sale_lines(quantity, unit_price, nulo)
+          )
         `)
         .gte('visit_date', thirtyDaysAgo.toISOString())
         .order('visit_date', { ascending: false });
@@ -283,53 +293,38 @@ export default function AdminDashboard() {
       const { data: visitsData, error: visitsError } = await visitsQuery;
       if (visitsError) throw visitsError;
 
-      // For each visit, fetch associated sales and commercial data separately
-      const visitsWithSales = await Promise.all((visitsData || []).map(async (visit) => {
-        // Fetch commercial data
-        let commercial = null;
-        if (visit.commercial_id) {
-          const { data: commercialData } = await supabase
-            .from('profiles')
-            .select('first_name, last_name, email')
-            .eq('id', visit.commercial_id)
-            .single();
-          commercial = commercialData;
-        }
+      // OPTIMIZACIÓN N+1: Fetch all commercial data in batch for visits
+      const visitCommercialIds = [...new Set([
+        ...(visitsData || []).map(visit => visit.commercial_id).filter(Boolean),
+        ...(visitsData || []).map(visit => visit.second_commercial_id).filter(Boolean)
+      ])];
+      
+      const visitCommercialsMap = new Map();
+      
+      if (visitCommercialIds.length > 0) {
+        const { data: visitCommercialsData } = await supabase
+          .from('profiles')
+          .select('id, first_name, last_name, email')
+          .in('id', visitCommercialIds);
+        
+        (visitCommercialsData || []).forEach(commercial => {
+          visitCommercialsMap.set(commercial.id, commercial);
+        });
+      }
 
-        // Fetch second commercial data
-        let second_commercial = null;
-        if (visit.second_commercial_id) {
-          const { data: secondCommercialData } = await supabase
-            .from('profiles')
-            .select('first_name, last_name, email')
-            .eq('id', visit.second_commercial_id)
-            .single();
-          second_commercial = secondCommercialData;
-        }
-
-        // Fetch visit sales
-        const { data: visitSales } = await supabase
-          .from('sales')
-          .select(`
-            id, 
-            sale_date, 
-            amount, 
-            commission_percentage, 
-            commission_amount,
-            sale_lines(quantity, unit_price, nulo)
-          `)
-          .eq('visit_id', visit.id);
-
+      const visitsWithSales = (visitsData || []).map((visit) => {
+        const visitSales = Array.isArray(visit.sales) ? visit.sales : [];
+        
         return {
           ...visit,
-          commercial,
-          second_commercial,
-          sales: visitSales?.map(sale => ({
+          commercial: visitCommercialsMap.get(visit.commercial_id) || null,
+          second_commercial: visitCommercialsMap.get(visit.second_commercial_id) || null,
+          sales: visitSales.map(sale => ({
             ...sale,
             commission_amount: calculateSaleCommission(sale, false) // En listados mostrar comisión completa
-          })) || []
+          }))
         };
-      }));
+      });
 
       setVisits(visitsWithSales);
 
@@ -527,7 +522,6 @@ export default function AdminDashboard() {
   const completedVisits = visits.filter(visit => visit.status === 'completed');
   const inProgressVisits = visits.filter(visit => visit.status === 'in_progress');
   const rejectedVisits = visits.filter(visit => visit.approval_status === 'rejected');
-  
   // Paginated completed visits
   const paginatedCompletedVisits = completedVisits.slice(
     (completedVisitsPagination.currentPage - 1) * completedVisitsPagination.pageSize,
