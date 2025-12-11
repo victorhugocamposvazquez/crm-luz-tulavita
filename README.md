@@ -66,6 +66,12 @@ crm-3w/
 - **URL**: https://crm-3w.vercel.app
 - **Configuración**: SPA routing con rewrites automáticos
 
+### Producción
+- **Plataforma**: Vercel
+- **URL**: https://crm-dev-ten.vercel.app/
+- **Configuración**: SPA routing con rewrites automáticos
+
+
 ### Variables de Entorno (Vercel)
 ```bash
 VITE_SUPABASE_URL=https://kamfdjczamfgumkiw.jpw.supabase.co
