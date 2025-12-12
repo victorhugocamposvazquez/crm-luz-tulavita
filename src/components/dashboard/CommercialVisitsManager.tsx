@@ -14,6 +14,7 @@ import { formatCoordinates } from '@/lib/coordinates';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 import UnifiedVisitsManagement from './UnifiedVisitsManagement';
+import VisitProgressHistory from '@/components/visits/VisitProgressHistory';
 interface Visit {
   id: string;
   visit_date: string;
@@ -728,6 +729,10 @@ export default function CommercialVisitsManager() {
                 </div>}
 
               {/* Ventas */}
+              <div className="border-t pt-4">
+                <VisitProgressHistory visitId={selectedVisit.id} />
+              </div>
+
               <div className="border-t pt-4">
                 <Label>Ventas</Label>
                 {visitSales.length > 0 ? (

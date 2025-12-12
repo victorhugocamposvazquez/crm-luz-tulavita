@@ -7,6 +7,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useAuth } from '@/hooks/useAuth';
 import VisitSalesSection from './VisitSalesSection';
+import VisitProgressHistory from './VisitProgressHistory';
 
 import { formatCoordinates } from '@/lib/coordinates';
 
@@ -222,6 +223,10 @@ export default function VisitDetailsDialog({
               <p className="text-sm bg-muted p-2 rounded">{visit.notes}</p>
             </div>
           )}
+
+          <div className="border-t pt-4">
+            <VisitProgressHistory visitId={visit.id} />
+          </div>
 
           {sales.length > 0 && (
             <div>

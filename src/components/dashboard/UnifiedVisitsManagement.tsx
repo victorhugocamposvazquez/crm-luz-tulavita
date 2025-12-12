@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
@@ -14,6 +14,7 @@ import { Loader2, MapPin, Plus, Minus } from 'lucide-react';
 import { formatCoordinates } from '@/lib/coordinates';
 import { normalizeDNI, normalizeClientData, validateDNI } from '@/lib/clientUtils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { createVisitProgress, detectVisitChanges } from '@/lib/visitProgressService';
 
 interface Client {
   id: string;
@@ -135,6 +136,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
   const [editingVisitId, setEditingVisitId] = useState<string | null>(null);
   const [currentVisitStatus, setCurrentVisitStatus] = useState<string | null>(null);
   const [isReadOnly, setIsReadOnly] = useState(false);
+  const [originalVisitData, setOriginalVisitData] = useState<{ visit_state_code: string | null; notes: string | null } | null>(null);
 
   const resetToInitialState = () => {
     console.log('=== RESETTING TO INITIAL STATE ===');
@@ -243,6 +245,12 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
             second_commercial_id: visitData.second_commercial_id || '',
             permission: visitData.permission || 'pending',
             visitStateCode: visitData.visit_state_code || ''
+          });
+
+          // Store original visit data for change detection
+          setOriginalVisitData({
+            visit_state_code: visitData.visit_state_code || null,
+            notes: visitData.notes || null
           });
 
           // Store current visit status for read-only checking
@@ -1268,6 +1276,33 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
               console.log('Product created for line:', product.product_name);
             }
           }
+        }
+      }
+
+      const changeDetection = detectVisitChanges(
+        { visit_state_code: originalVisitData?.visit_state_code, notes: originalVisitData?.notes },
+        { visit_state_code: visitData.visitStateCode, note: visitData.notes }
+      );
+
+      const shouldRegisterProgress = !editingVisitId || changeDetection.hasChanges || isComplete;
+      
+      if (shouldRegisterProgress && location) {
+        console.log('Registering visit progress history...', { changeDetection, isComplete });
+        const { error: progressError } = await createVisitProgress({
+          visit_id: visit.id,
+          commercial_id: user!.id,
+          latitude: location.latitude,
+          longitude: location.longitude,
+          location_accuracy: location.accuracy,
+          visit_state_code: visitData.visitStateCode || null,
+          note: visitData.notes || null,
+        });
+
+        if (progressError) {
+          console.error('Error registering progress history:', progressError);
+          // Don't fail the whole operation, just log the error
+        } else {
+          console.log('Progress history registered successfully');
         }
       }
 
