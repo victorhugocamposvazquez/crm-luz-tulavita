@@ -41,7 +41,7 @@ export default function Layout({ children, currentView, onViewChange }: LayoutPr
     { name: 'Usuarios', icon: Users, view: 'users' },
     { name: 'Empresas', icon: Building2, view: 'companies' },
     { name: 'Clientes', icon: Users, view: 'clients' },
-    { name: 'Albaranes', icon: Users, view: 'clients' },
+    { name: 'Albaranes', icon: Users, view: 'albaranes' },
     { name: 'Visitas', icon: MapPin, view: 'visits' },
     { name: 'Recordatorios', icon: Bell, view: 'reminders' },
   ] : [
