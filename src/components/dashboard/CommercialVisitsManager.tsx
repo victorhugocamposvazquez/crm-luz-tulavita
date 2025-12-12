@@ -69,28 +69,19 @@ export default function CommercialVisitsManager() {
   const [visitSales, setVisitSales] = useState<any[]>([]);
   const [localGeolocationObtained, setLocalGeolocationObtained] = useState(false);
   
-  // Check geolocation status whenever the popup opens
   useEffect(() => {
-    const checkGeolocationInPopup = async () => {
-      if (selectedVisit && editMode) {
-        console.log('=== CHECKING GEOLOCATION STATUS FOR POPUP ===');
-        
-        // Try to get current location to check if permissions are granted
+    if (selectedVisit && editMode && !localGeolocationObtained) {
+      const checkGeolocationInPopup = async () => {
         try {
           const currentLocation = await requestLocation();
-          console.log('Geolocation check result:', currentLocation);
           setLocalGeolocationObtained(!!currentLocation);
         } catch (error) {
-          console.log('Geolocation check failed:', error);
           setLocalGeolocationObtained(false);
         }
-      }
-    };
-    
-    if (selectedVisit && editMode) {
+      };
       checkGeolocationInPopup();
     }
-  }, [selectedVisit, editMode, requestLocation]);
+  }, [selectedVisit, editMode]);
   const [stats, setStats] = useState({
     total: 0,
     pending: 0,
@@ -597,7 +588,7 @@ export default function CommercialVisitsManager() {
 
       {/* Visit Detail Dialog */}
       {selectedVisit && <Dialog open={!!selectedVisit} onOpenChange={() => setSelectedVisit(null)}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editMode ? 'Editar Visita' : 'Detalles de la Visita'}
