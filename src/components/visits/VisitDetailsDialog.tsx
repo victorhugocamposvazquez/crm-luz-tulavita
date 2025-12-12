@@ -146,7 +146,7 @@ export default function VisitDetailsDialog({
 
   return (
     <Dialog open={!!visit} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Detalles de la Visita</DialogTitle>
         </DialogHeader>
