@@ -18,6 +18,8 @@ import VisitProgressHistory from '@/components/visits/VisitProgressHistory';
 interface Visit {
   id: string;
   visit_date: string;
+  created_at: string;
+  updated_at: string;
   status: 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed';
   approval_status: 'pending' | 'approved' | 'rejected' | 'waiting_admin';
   notes: string;
@@ -230,6 +232,8 @@ export default function CommercialVisitsManager() {
       } = await supabase.from('visits').select(`
           id,
           visit_date,
+          created_at,
+          updated_at,
           status,
           approval_status,
           notes,
@@ -535,7 +539,8 @@ export default function CommercialVisitsManager() {
               <TableHead>Localidad</TableHead>
               <TableHead>Empresa</TableHead>
               <TableHead>Segundo Comercial</TableHead>
-              <TableHead>Fecha</TableHead>
+              <TableHead>Creación</TableHead>
+              <TableHead>Actualización</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Permisos</TableHead>
               <TableHead>Notas</TableHead>
@@ -556,7 +561,8 @@ export default function CommercialVisitsManager() {
                             '-'
                           }
                         </TableCell>
-                        <TableCell>{formatDate(visit.visit_date)}</TableCell>
+                        <TableCell>{formatDate(visit.created_at)}</TableCell>
+                        <TableCell>{formatDate(visit.updated_at)}</TableCell>
                        <TableCell>{getStatusBadge(visit)}</TableCell>
                        <TableCell>
                          <Badge variant={visit.approval_status === 'approved' ? 'default' : visit.approval_status === 'rejected' ? 'destructive' : 'secondary'}>
