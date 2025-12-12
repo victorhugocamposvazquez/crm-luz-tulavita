@@ -72,11 +72,17 @@ crm-3w/
 - **Configuración**: SPA routing con rewrites automáticos
 
 
-### Variables de Entorno (Vercel)
+### Variables de Entorno producccion (Vercel)
 ```bash
 VITE_SUPABASE_URL=https://kamfdjczamfgumkiw.jpw.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 ```
+### Variables de Entorno desarrollo (Vercel)
+```bash
+VITE_SUPABASE_URL=https://oslvdbmcwzfwekulqabk.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
+
 
 ## 💻 Desarrollo Local
 
