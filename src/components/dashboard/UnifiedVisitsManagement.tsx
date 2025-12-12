@@ -138,6 +138,16 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
   const [isReadOnly, setIsReadOnly] = useState(false);
   const [originalVisitData, setOriginalVisitData] = useState<{ visit_state_code: string | null; notes: string | null } | null>(null);
 
+  const hasVisitChanges = (): boolean => {
+    if (!editingVisitId) return true;
+    if (!originalVisitData) return true;
+    
+    const stateChanged = originalVisitData.visit_state_code !== visitData.visitStateCode;
+    const notesChanged = (originalVisitData.notes || '') !== (visitData.notes || '');
+    
+    return stateChanged || notesChanged;
+  };
+
   const resetToInitialState = () => {
     console.log('=== RESETTING TO INITIAL STATE ===');
     setCurrentStep('nif-input');
@@ -1968,7 +1978,7 @@ export default function UnifiedVisitsManagement({ onSuccess }: UnifiedVisitsMana
         {!isReadOnly && <div className="flex gap-4">
             <Button 
               onClick={() => handleSaveVisit(false)} 
-              disabled={loading || !visitData.company_id || !visitData.notes.trim() || !visitData.visitStateCode} 
+              disabled={loading || !visitData.company_id || !visitData.notes.trim() || !visitData.visitStateCode || !hasVisitChanges()} 
               variant="outline" 
               className="flex-1"
             >
