@@ -11,13 +11,13 @@ import { Badge } from '@/components/ui/badge';
 import { Search, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import VisitsTable from '@/components/visits/VisitsTable';
-import { calculateCommission, calculateTotalExcludingNulls, calculateSaleCommission } from '@/lib/commission';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { calculateCommission, calculateSaleCommission } from '@/lib/commission';
 import ClientPagination from '@/components/dashboard/ClientPagination';
 import VisitDetailsDialog from '@/components/visits/VisitDetailsDialog';
 import AdminVisitManagementDialog from '@/components/admin/AdminVisitManagementDialog';
 import ReminderDialog from '@/components/reminders/ReminderDialog';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface Visit {
   id: string;
@@ -30,29 +30,11 @@ interface Visit {
   second_commercial_id?: string;
   client_id: string;
   company_id?: string;
-  visit_states?: {
-    name: string;
-    description: string;
-  };
-  commercial?: {
-    first_name: string | null;
-    last_name: string | null;
-    email: string;
-  };
-  second_commercial?: {
-    first_name: string | null;
-    last_name: string | null;
-    email: string;
-  };
-  client?: {
-    id: string;
-    nombre_apellidos: string;
-    dni?: string;
-    direccion?: string;  
-  };
-  company?: {
-    name: string;
-  };
+  visit_states?: { name: string; description: string };
+  commercial?: { first_name: string | null; last_name: string | null; email: string };
+  second_commercial?: { first_name: string | null; last_name: string | null; email: string };
+  client?: { id: string; nombre_apellidos: string; dni?: string };
+  company?: { name: string };
 }
 
 interface Commercial {
@@ -65,18 +47,9 @@ interface Commercial {
 interface Sale {
   id: string;
   amount: number;
-  sale_date: string;
-  commission_percentage: number;
   commission_amount: number;
   visit_id: string;
-  sale_lines?: {
-    products: { product_name: string }[];
-    quantity: number;
-    unit_price: number;
-    financiada: boolean;
-    transferencia: boolean;
-    nulo: boolean;
-  }[];
+  sale_lines?: { quantity: number; unit_price: number; nulo: boolean }[];
 }
 
 export default function AdminVisitsView() {
@@ -96,19 +69,16 @@ export default function AdminVisitsView() {
     endDate: '',
     status: ''
   });
-  
-  // Pagination
+
   const [visitsPagination, setVisitsPagination] = useState({
     currentPage: 1,
     pageSize: 20,
     totalItems: 0
   });
 
-  // Reminder dialog
   const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
   const [selectedClientForReminder, setSelectedClientForReminder] = useState<{ id: string; name: string } | null>(null);
 
-  // Redirect if not admin
   useEffect(() => {
     if (userRole?.role !== 'admin') {
       toast({
@@ -120,7 +90,6 @@ export default function AdminVisitsView() {
     }
   }, [userRole]);
 
-  // Fetch commercials
   useEffect(() => {
     if (userRole?.role === 'admin') {
       fetchCommercials();
@@ -133,12 +102,11 @@ export default function AdminVisitsView() {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email')
-        .in('id', (await supabase.from('user_roles').select('user_id').eq('role', 'commercial')).data?.map(r => r.user_id) || []);
+        .select('id, first_name, last_name, email');
       if (error) throw error;
       setCommercials(data || []);
     } catch (error) {
-      console.error(error);
+      console.error('Error fetching commercials:', error);
     }
   };
 
@@ -148,7 +116,7 @@ export default function AdminVisitsView() {
       if (error) throw error;
       setSales(salesData || []);
     } catch (error) {
-      console.error(error);
+      console.error('Error fetching sales:', error);
     }
   };
 
@@ -156,72 +124,70 @@ export default function AdminVisitsView() {
     try {
       setLoading(true);
 
+      // Traer todas las visitas sin filtrar
       let query = supabase.from('visits').select('*').order('visit_date', { ascending: false });
 
-      // Apply filters
       if (filters.commercial) query = query.eq('commercial_id', filters.commercial);
       if (filters.startDate) query = query.gte('visit_date', filters.startDate);
       if (filters.endDate) query = query.lte('visit_date', filters.endDate + 'T23:59:59.999Z');
-      if (filters.status) {
-        if (filters.status === 'in_progress') query = query.eq('status', 'in_progress');
-        else if (filters.status === 'approved') query = query.eq('approval_status', 'approved');
-      }
+      if (filters.status === 'in_progress') query = query.eq('status', 'in_progress');
+      if (filters.status === 'approved') query = query.eq('approval_status', 'approved');
 
       const { data: visitsData, error } = await query;
       if (error) throw error;
-      const visitsFetched = visitsData || [];
 
-      // Fetch related data separately
-      const clientIds = Array.from(new Set(visitsFetched.map(v => v.client_id).filter(Boolean)));
-      const commercialIds = Array.from(new Set(visitsFetched.map(v => v.commercial_id).filter(Boolean)));
-      const secondCommercialIds = Array.from(new Set(visitsFetched.map(v => v.second_commercial_id).filter(Boolean)));
-      const companyIds = Array.from(new Set(visitsFetched.map(v => v.company_id).filter(Boolean)));
+      const allVisits = visitsData || [];
 
-      const [{ data: clients }, { data: commercialProfiles }, { data: secondCommercialProfiles }, { data: companies }] = await Promise.all([
+      // IDs únicos de clientes y comerciales
+      const clientIds = Array.from(new Set(allVisits.map(v => v.client_id).filter(Boolean)));
+      const commercialIds = Array.from(new Set(allVisits.map(v => v.commercial_id).filter(Boolean)));
+      const secondCommercialIds = Array.from(new Set(allVisits.map(v => v.second_commercial_id).filter(Boolean)));
+
+      const [clientsResp, commercialsResp, secondCommercialsResp] = await Promise.all([
         clientIds.length ? supabase.from('clients').select('*').in('id', clientIds) : Promise.resolve({ data: [] }),
         commercialIds.length ? supabase.from('profiles').select('*').in('id', commercialIds) : Promise.resolve({ data: [] }),
         secondCommercialIds.length ? supabase.from('profiles').select('*').in('id', secondCommercialIds) : Promise.resolve({ data: [] }),
-        companyIds.length ? supabase.from('companies').select('*').in('id', companyIds) : Promise.resolve({ data: [] }),
       ]);
 
-      const clientMap = new Map((clients || []).map(c => [c.id, c]));
-      const commercialMap = new Map((commercialProfiles || []).map(c => [c.id, c]));
-      const secondCommercialMap = new Map((secondCommercialProfiles || []).map(c => [c.id, c]));
-      const companyMap = new Map((companies || []).map(c => [c.id, c]));
+      const clientMap = new Map((clientsResp.data || []).map(c => [c.id, c]));
+      const commercialMap = new Map((commercialsResp.data || []).map(c => [c.id, c]));
+      const secondCommercialMap = new Map((secondCommercialsResp.data || []).map(c => [c.id, c]));
 
-      let enrichedVisits = visitsFetched.map(v => ({
+      let enrichedVisits = allVisits.map(v => ({
         ...v,
         client: clientMap.get(v.client_id) || null,
         commercial: commercialMap.get(v.commercial_id) || null,
         second_commercial: v.second_commercial_id ? secondCommercialMap.get(v.second_commercial_id) || null : null,
-        company: companyMap.get(v.company_id) || null
       }));
 
-      // Apply DNI filter client-side
       if (filters.dni) {
         enrichedVisits = enrichedVisits.filter(v => v.client?.dni?.toLowerCase().includes(filters.dni.toLowerCase()));
       }
 
       setVisits(enrichedVisits);
       setVisitsPagination(prev => ({ ...prev, totalItems: enrichedVisits.length }));
-
     } catch (error) {
-      console.error(error);
-      toast({ title: "Error", description: "Error al cargar visitas", variant: "destructive" });
+      console.error('Error fetching visits:', error);
+      toast({ title: "Error", description: "Error al cargar las visitas", variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleFilterChange = (key: string, value: string) => setFilters(prev => ({ ...prev, [key]: value }));
-  const clearFilters = () => setFilters({ commercial: '', dni: '', startDate: '', endDate: '', status: '' });
+  const handleFilterChange = (key: string, value: string) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const clearFilters = () => {
+    setFilters({ commercial: '', dni: '', startDate: '', endDate: '', status: '' });
+  };
 
   useEffect(() => {
     if (userRole?.role === 'admin') {
-      const timer = setTimeout(() => fetchVisits(), 300);
-      return () => clearTimeout(timer);
+      const debounceTimer = setTimeout(() => fetchVisits(), 300);
+      return () => clearTimeout(debounceTimer);
     }
-  }, [filters]);
+  }, [filters, userRole]);
 
   const handleViewVisit = (visit: Visit) => {
     setSelectedVisit(visit);
@@ -240,14 +206,14 @@ export default function AdminVisitsView() {
   };
 
   const handleCreateReminder = (visit: Visit) => {
-    if (!visit.client) return;
-    setSelectedClientForReminder({ id: visit.client_id, name: visit.client.nombre_apellidos });
+    setSelectedClientForReminder({ id: visit.client_id, name: visit.client?.nombre_apellidos || '' });
     setReminderDialogOpen(true);
   };
 
-  const getCommercialName = (c: any) => {
-    if (!c) return 'Sin comercial';
-    return [c.first_name, c.last_name].filter(Boolean).join(' ') || c.email;
+  const getCommercialName = (commercial: any) => {
+    if (!commercial) return 'Sin comercial';
+    const name = [commercial.first_name, commercial.last_name].filter(Boolean).join(' ');
+    return name || commercial.email;
   };
 
   if (userRole?.role !== 'admin') return null;
@@ -256,11 +222,100 @@ export default function AdminVisitsView() {
     (visitsPagination.currentPage - 1) * visitsPagination.pageSize,
     visitsPagination.currentPage * visitsPagination.pageSize
   );
+
   const totalPages = Math.ceil(visits.length / visitsPagination.pageSize);
 
   return (
     <div className="space-y-6">
-      {/* Filtros, Tabla, Diálogos */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Gestión de Visitas</h1>
+          <p className="text-muted-foreground">Vista completa de todas las visitas de comerciales</p>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <Search className="h-5 w-5" />
+              <span>Filtros</span>
+            </div>
+            {Object.values(filters).some(v => v) && (
+              <Button variant="ghost" size="sm" onClick={clearFilters} className="h-6 w-6 p-0">
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div>
+              <Label htmlFor="commercial">Comercial</Label>
+              <Select
+                value={filters.commercial || undefined}
+                onValueChange={(value) => handleFilterChange('commercial', value === 'all' ? '' : value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos los comerciales" />
+                </SelectTrigger>
+                <SelectContent className="z-50 bg-background">
+                  <SelectItem value="all">Todos los comerciales</SelectItem>
+                  {commercials.map(c => (
+                    <SelectItem key={c.id} value={c.id}>{getCommercialName(c)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="dni">DNI Cliente</Label>
+              <Input
+                id="dni"
+                placeholder="DNI del cliente..."
+                value={filters.dni}
+                onChange={(e) => handleFilterChange('dni', e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="status">Estado</Label>
+              <Select
+                value={filters.status || undefined}
+                onValueChange={(value) => handleFilterChange('status', value === 'all' ? '' : value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos los estados" />
+                </SelectTrigger>
+                <SelectContent className="z-50 bg-background">
+                  <SelectItem value="all">Todos los estados</SelectItem>
+                  <SelectItem value="in_progress">En progreso</SelectItem>
+                  <SelectItem value="approved">Confirmadas</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="startDate">Fecha desde</Label>
+              <Input
+                id="startDate"
+                type="date"
+                value={filters.startDate}
+                onChange={(e) => handleFilterChange('startDate', e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="endDate">Fecha hasta</Label>
+              <Input
+                id="endDate"
+                type="date"
+                value={filters.endDate}
+                onChange={(e) => handleFilterChange('endDate', e.target.value)}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Visits Table */}
       <Card>
         <CardHeader>
           <CardTitle>Lista de visitas ({visits.length})</CardTitle>
@@ -276,24 +331,45 @@ export default function AdminVisitsView() {
             showClientColumns={true}
             emptyMessage="No se encontraron visitas con los filtros aplicados"
           />
+
           {visits.length > visitsPagination.pageSize && (
-            <ClientPagination
-              currentPage={visitsPagination.currentPage}
-              totalPages={totalPages}
-              pageSize={visitsPagination.pageSize}
-              totalItems={visits.length}
-              onPageChange={(page) => setVisitsPagination(prev => ({ ...prev, currentPage: page }))}
-              onPageSizeChange={(pageSize) => setVisitsPagination(prev => ({ ...prev, pageSize, currentPage: 1 }))}
-            />
+            <div className="mt-4">
+              <ClientPagination
+                currentPage={visitsPagination.currentPage}
+                totalPages={totalPages}
+                pageSize={visitsPagination.pageSize}
+                totalItems={visits.length}
+                onPageChange={(page) => setVisitsPagination(prev => ({ ...prev, currentPage: page }))}
+                onPageSizeChange={(pageSize) => setVisitsPagination(prev => ({ ...prev, pageSize, currentPage: 1 }))}
+              />
+            </div>
           )}
         </CardContent>
       </Card>
 
-      <VisitDetailsDialog visit={selectedVisit} sales={visitSales} onClose={() => setSelectedVisit(null)} onAdminManageVisit={handleAdminManageVisit} showClientInfo={true} />
+      {/* Dialogs */}
+      <VisitDetailsDialog
+        visit={selectedVisit}
+        sales={visitSales}
+        onClose={() => setSelectedVisit(null)}
+        onAdminManageVisit={handleAdminManageVisit}
+        showClientInfo={true}
+      />
 
-      <AdminVisitManagementDialog visit={adminManagementVisit} isOpen={adminDialogOpen} onClose={handleAdminDialogClose} onVisitUpdated={fetchVisits} />
+      <AdminVisitManagementDialog
+        visit={adminManagementVisit}
+        isOpen={adminDialogOpen}
+        onClose={handleAdminDialogClose}
+        onVisitUpdated={fetchVisits}
+      />
 
-      <ReminderDialog open={reminderDialogOpen} onOpenChange={setReminderDialogOpen} clientId={selectedClientForReminder?.id || ''} clientName={selectedClientForReminder?.name || ''} onReminderCreated={fetchVisits} />
+      <ReminderDialog
+        open={reminderDialogOpen}
+        onOpenChange={setReminderDialogOpen}
+        clientId={selectedClientForReminder?.id || ''}
+        clientName={selectedClientForReminder?.name || ''}
+        onReminderCreated={fetchVisits}
+      />
     </div>
   );
 }
