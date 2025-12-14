@@ -1000,7 +1000,7 @@ export default function AdminDashboard() {
                   <TableHead>Comercial</TableHead>
                   <TableHead>Segundo Comercial</TableHead>
                   <TableHead>Empresa</TableHead>
-                  <TableHead>Resultado de la visita</TableHead>
+                  <TableHead>Resultado de la visitaa</TableHead>
                   <TableHead>Notas</TableHead>
                   <TableHead>Ventas Generadas</TableHead>
                   <TableHead>Comisión Total</TableHead>
