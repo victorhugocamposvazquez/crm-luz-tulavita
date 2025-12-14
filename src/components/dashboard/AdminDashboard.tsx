@@ -344,22 +344,22 @@ export default function AdminDashboard() {
           visitCommercialsMap.set(commercial.id, commercial);
         });
       }
-
       const visitsWithSalesMapped = (visitsData || []).map((visit) => {
         const salesForVisit = visitSales.filter(sale => sale.visit_id === visit.id) || [];
         
         return {
           ...visit,
+          client: visit.client, // <--- agregar esto
           commercial: visitCommercialsMap.get(visit.commercial_id) || null,
           second_commercial: visitCommercialsMap.get(visit.second_commercial_id) || null,
-          sales: visitSales.map(sale => ({
+          sales: salesForVisit.map(sale => ({
             ...sale,
-            commission_amount: calculateSaleCommission(sale, false) // En listados mostrar comisión completa
+            commission_amount: calculateSaleCommission(sale, false)
           }))
         };
       });
-
-      setVisits(visitsWithSales);
+      
+      setVisits(visitsWithSalesMapped);
 
       // Fetch monthly sales data for charts
       let monthlySalesQuery = supabase
@@ -1125,7 +1125,7 @@ export default function AdminDashboard() {
         <Dialog open={!!selectedVisit} onOpenChange={() => setSelectedVisit(null)}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Detalles de la Visita</DialogTitle>
+              <DialogTitle>Detalles de la Visitaa</DialogTitle>
             </DialogHeader>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
