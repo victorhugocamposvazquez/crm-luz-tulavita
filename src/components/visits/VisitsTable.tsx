@@ -53,13 +53,13 @@ interface Sale {
 interface Client {
   id: string;
   nombre_apellidos: string;
-  dni: string;
+  dni?: string;
 }
 
 interface VisitsTableProps {
   visits: Visit[];
   sales: Sale[];
-  clients?: Client[];
+  allClients?: Client[];
   onViewVisit: (visit: Visit) => void | Promise<void>;
   onAdminManageVisit?: (visit: Visit) => void;
   onCreateReminder?: (visit: Visit) => void;
@@ -88,23 +88,21 @@ const getStatusDisplay = (status: string, approvalStatus?: string) => {
   if (approvalStatus === 'rejected') {
     return { label: 'Rechazada', color: 'bg-red-500 text-white hover:bg-red-500' };
   }
-
   const label = statusLabels[status as keyof typeof statusLabels] || status;
   const color = statusColors[status as keyof typeof statusColors] || 'bg-gray-100 text-gray-800 hover:bg-gray-100';
-
   return { label, color };
 };
 
-export default function VisitsTable({
-  visits,
-  sales,
-  clients,
+export default function VisitsTable({ 
+  visits, 
+  sales, 
+  allClients,
   onViewVisit,
   onAdminManageVisit,
   onCreateReminder,
-  loading,
+  loading, 
   showClientColumns = false,
-  emptyMessage = "No hay visitas registradas"
+  emptyMessage = "No hay visitas registradas" 
 }: VisitsTableProps) {
   const { userRole } = useAuth();
   const isAdmin = userRole?.role === 'admin';
@@ -121,27 +119,61 @@ export default function VisitsTable({
 
   const getClientName = (visit: Visit) => {
     if (visit.client?.nombre_apellidos) return visit.client.nombre_apellidos;
-    if (clients) {
-      const client = clients.find(c => c.id === visit.client_id);
-      if (client) return client.nombre_apellidos;
+
+    if (allClients && visit.client_id) {
+      const found = allClients.find(c => c.id === visit.client_id);
+      if (found) return found.nombre_apellidos;
     }
+
     return 'Sin nombre';
   };
 
   const getClientDNI = (visit: Visit) => {
     if (visit.client?.dni) return visit.client.dni;
-    if (clients) {
-      const client = clients.find(c => c.id === visit.client_id);
-      if (client) return client.dni;
+
+    if (allClients && visit.client_id) {
+      const found = allClients.find(c => c.id === visit.client_id);
+      if (found) return found.dni || '-';
     }
+
     return '-';
   };
 
+  const truncateNotes = (notes: string | undefined, maxLength: number = 50) => {
+    if (!notes) return '-';
+    if (notes.length <= maxLength) return notes;
+    return notes.substring(0, maxLength) + '...';
+  };
+
   const renderNotesCell = (visit: Visit) => {
-    if (!visit.notes) return <span className="text-muted-foreground cursor-pointer hover:text-muted-foreground/80" onClick={() => onViewVisit(visit)}>-</span>;
+    if (!visit.notes) {
+      return (
+        <span 
+          className="text-muted-foreground cursor-pointer hover:text-muted-foreground/80"
+          onClick={() => onViewVisit(visit)}
+        >
+          -
+        </span>
+      );
+    }
+    
+    if (visit.notes.length <= 50) {
+      return (
+        <span 
+          className="cursor-pointer hover:text-foreground/80"
+          onClick={() => onViewVisit(visit)}
+        >
+          {visit.notes}
+        </span>
+      );
+    }
+    
     return (
-      <span className="cursor-pointer hover:text-foreground/80" onClick={() => onViewVisit(visit)}>
-        {visit.notes.length > 50 ? `${visit.notes.substring(0, 50)}...` : visit.notes}
+      <span 
+        className="cursor-pointer hover:text-foreground/80"
+        onClick={() => onViewVisit(visit)}
+      >
+        {visit.notes.substring(0, 50)}...
       </span>
     );
   };
@@ -180,28 +212,39 @@ export default function VisitsTable({
           visits.map((visit) => {
             const visitSales = sales.filter(sale => sale.visit_id === visit.id);
             const totalSales = visitSales.reduce((sum, sale) => sum + calculateEffectiveAmount(sale), 0);
-            const totalCommission = visitSales.reduce((sum, sale) => sum + calculateSaleCommission(sale, false), 0);
-
+            const totalCommission = visitSales.reduce((sum, sale) => {
+              const commission = calculateSaleCommission(sale, false);
+              return sum + commission;
+            }, 0);
+            
             return (
               <TableRow key={visit.id}>
                 {showClientColumns && (
                   <>
-                    <TableCell className="font-medium">
-                      <Link
-                        to={`/client/${visit.client_id || visit.id}`}
-                        className="text-primary hover:text-primary/80 hover:underline"
-                      >
-                        {getClientName(visit)}
-                      </Link>
-                    </TableCell>
+                     <TableCell className="font-medium">
+                       <Link 
+                         to={`/client/${visit.client_id || visit.id}`}
+                         className="text-primary hover:text-primary/80 hover:underline"
+                       >
+                         {getClientName(visit)}
+                       </Link>
+                     </TableCell>
                     <TableCell>{getClientDNI(visit)}</TableCell>
                   </>
                 )}
-                <TableCell className="font-medium">{getCommercialName(visit.commercial)}</TableCell>
-                <TableCell>{visit.second_commercial ? getCommercialName(visit.second_commercial) : '-'}</TableCell>
+                <TableCell className="font-medium">
+                  {getCommercialName(visit.commercial)}
+                </TableCell>
+                <TableCell>
+                  {visit.second_commercial ? getCommercialName(visit.second_commercial) : '-'}
+                </TableCell>
                 <TableCell>{visit.company?.name || 'N/A'}</TableCell>
-                <TableCell>{visit.created_at ? format(new Date(visit.created_at), "dd/MM/yyyy HH:mm", { locale: es }) : '-'}</TableCell>
-                <TableCell>{visit.updated_at ? format(new Date(visit.updated_at), "dd/MM/yyyy HH:mm", { locale: es }) : '-'}</TableCell>
+                <TableCell>
+                  {visit.created_at ? format(new Date(visit.created_at), "dd/MM/yyyy HH:mm", { locale: es }) : '-'}
+                </TableCell>
+                <TableCell>
+                  {visit.updated_at ? format(new Date(visit.updated_at), "dd/MM/yyyy HH:mm", { locale: es }) : '-'}
+                </TableCell>
                 <TableCell>
                   {(() => {
                     const statusDisplay = getStatusDisplay(visit.status, visit.approval_status);
@@ -209,21 +252,51 @@ export default function VisitsTable({
                   })()}
                 </TableCell>
                 <TableCell>
-                  {visit.approval_status === 'rejected' ? 'Rechazada' : visit.visit_states?.name || statusLabels[visit.status as keyof typeof statusLabels] || '-'}
+                  {visit.approval_status === 'rejected' ? 
+                    'Rechazada' 
+                    : visit.visit_states?.name ? 
+                    visit.visit_states.name.charAt(0).toUpperCase() + visit.visit_states.name.slice(1).toLowerCase() 
+                    : visit.status ? 
+                    statusLabels[visit.status as keyof typeof statusLabels]?.charAt(0).toUpperCase() + statusLabels[visit.status as keyof typeof statusLabels]?.slice(1).toLowerCase() 
+                    : '-'
+                  }
                 </TableCell>
-                <TableCell className="max-w-xs">{renderNotesCell(visit)}</TableCell>
-                <TableCell>{totalSales > 0 ? `€${totalSales.toFixed(2)}` : '-'}</TableCell>
-                <TableCell>{totalCommission > 0 ? `€${totalCommission.toFixed(2)}` : '-'}</TableCell>
+                <TableCell className="max-w-xs">
+                  {renderNotesCell(visit)}
+                </TableCell>
+                <TableCell>
+                  {totalSales > 0 ? `€${totalSales.toFixed(2)}` : '-'}
+                </TableCell>
+                <TableCell>
+                  {totalCommission > 0 ? `€${totalCommission.toFixed(2)}` : '-'}
+                </TableCell>
                 <TableCell>
                   <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => onViewVisit(visit)} title="Ver detalles"><Eye className="h-4 w-4" /></Button>
+                    <Button 
+                      size="sm" 
+                      variant="outline" 
+                      onClick={() => onViewVisit(visit)}
+                      title="Ver detalles"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
                     {onCreateReminder && (
-                      <Button size="sm" variant="outline" onClick={() => onCreateReminder(visit)} title="Crear recordatorio">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => onCreateReminder(visit)}
+                        title="Crear recordatorio"
+                      >
                         <Bell className="h-4 w-4" />
                       </Button>
                     )}
                     {isAdmin && onAdminManageVisit && (
-                      <Button size="sm" variant="outline" onClick={() => onAdminManageVisit(visit)} title="Administrar visita">
+                      <Button 
+                        size="sm" 
+                        variant="outline" 
+                        onClick={() => onAdminManageVisit(visit)}
+                        title="Administrar visita"
+                      >
                         <Settings className="h-4 w-4" />
                       </Button>
                     )}
