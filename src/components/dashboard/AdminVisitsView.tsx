@@ -364,7 +364,7 @@ export default function AdminVisitsView() {
 
       {/* VISITS TABLE */}
       <Card>
-        <CardHeader><CardTitle>Lista de visitas ({visits.length})</CardTitle></CardHeader>
+        <CardHeader><CardTitle>Lista de visitass ({visits.length})</CardTitle></CardHeader>
         <CardContent>
           <VisitsTable
             visits={paginatedVisits as any}
