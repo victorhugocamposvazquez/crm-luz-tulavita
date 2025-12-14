@@ -221,7 +221,7 @@ export default function AdminVisitsView() {
           )
         `)
         .order('visit_date', { ascending: false });
-
+  
       // Apply filters
       if (filters.commercial) {
         query = query.eq('commercial_id', filters.commercial);
@@ -234,62 +234,95 @@ export default function AdminVisitsView() {
       if (filters.endDate) {
         query = query.lte('visit_date', filters.endDate + 'T23:59:59.999Z');
       }
-
+  
       // Aplicar filtro de estado
       if (filters.status === 'in_progress') {
         query = query.eq('status', 'in_progress');
       } else if (filters.status === 'approved') {
         query = query.eq('approval_status', 'approved');
       }
-
+  
       const { data: visitsData, error } = await query;
-
+  
       if (error) throw error;
-
+  
       const visits = visitsData || [];
-
-      // Batch-load related data
-      const commercialIds = Array.from(new Set(visits.map(v => v.commercial_id).filter(Boolean)));
-      const secondCommercialIds = Array.from(new Set(visits.map(v => v.second_commercial_id).filter(Boolean)));
-      const clientIds = Array.from(new Set(visits.map(v => v.client_id).filter(Boolean)));
-      const companyIds = Array.from(new Set(visits.map(v => v.company_id).filter(Boolean)));
-
-      const [{ data: profiles }, { data: secondProfiles }, { data: clients }, { data: companies }] = await Promise.all([
-        commercialIds.length
-          ? supabase.from('profiles').select('id, first_name, last_name, email').in('id', commercialIds)
-          : Promise.resolve({ data: [], error: null } as any),
-        secondCommercialIds.length
-          ? supabase.from('profiles').select('id, first_name, last_name, email').in('id', secondCommercialIds)
-          : Promise.resolve({ data: [], error: null } as any),
-        clientIds.length
+  
+      // Si no hay visitas, no hay nada que enriquecer
+      if (visits.length === 0) {
+        setVisits([]);
+        setVisitsPagination(prev => ({ ...prev, totalItems: 0 }));
+        return;
+      }
+  
+      // Extraer IDs únicos (filtrando nulls y undefined)
+      const commercialIds = [...new Set(visits.map(v => v.commercial_id).filter(Boolean))] as string[];
+      const secondCommercialIds = [...new Set(visits.map(v => v.second_commercial_id).filter(Boolean))] as string[];
+      const clientIds = [...new Set(visits.map(v => v.client_id).filter(Boolean))] as string[];
+      const companyIds = [...new Set(visits.map(v => v.company_id).filter(Boolean))] as string[];
+  
+      // Combinar IDs de comerciales para una sola consulta
+      const allCommercialIds = [...new Set([...commercialIds, ...secondCommercialIds])];
+  
+      // Debug: verificar que tenemos IDs de clientes
+      console.log('Client IDs to fetch:', clientIds);
+  
+      // Ejecutar todas las consultas en paralelo
+      const results = await Promise.all([
+        allCommercialIds.length > 0
+          ? supabase.from('profiles').select('id, first_name, last_name, email').in('id', allCommercialIds)
+          : Promise.resolve({ data: [], error: null }),
+        clientIds.length > 0
           ? supabase.from('clients').select('id, nombre_apellidos, dni, direccion').in('id', clientIds)
-          : Promise.resolve({ data: [], error: null } as any),
-        companyIds.length
+          : Promise.resolve({ data: [], error: null }),
+        companyIds.length > 0
           ? supabase.from('companies').select('id, name').in('id', companyIds)
-          : Promise.resolve({ data: [], error: null } as any),
+          : Promise.resolve({ data: [], error: null }),
       ]);
-
-      const profileMap = new Map((profiles || []).map(p => [p.id, p]));
-      const secondProfileMap = new Map((secondProfiles || []).map(p => [p.id, p]));
-      const clientMap = new Map((clients || []).map(c => [c.id, c]));
-      const companyMap = new Map((companies || []).map(c => [c.id, c]));
-
-      let enrichedVisits = visits.map(v => ({
-        ...v,
-        commercial: profileMap.get(v.commercial_id) || null,
-        second_commercial: v.second_commercial_id ? secondProfileMap.get(v.second_commercial_id) || null : null,
-        client: clientMap.get(v.client_id) || null,
-        company: companyMap.get(v.company_id) || null,
-      }));
-
+  
+      const [profilesResult, clientsResult, companiesResult] = results;
+  
+      // Verificar errores en las consultas
+      if (profilesResult.error) console.error('Error fetching profiles:', profilesResult.error);
+      if (clientsResult.error) console.error('Error fetching clients:', clientsResult.error);
+      if (companiesResult.error) console.error('Error fetching companies:', companiesResult.error);
+  
+      // Debug: verificar datos de clientes
+      console.log('Clients fetched:', clientsResult.data);
+  
+      // Crear mapas para búsqueda rápida
+      const profileMap = new Map((profilesResult.data || []).map(p => [p.id, p]));
+      const clientMap = new Map((clientsResult.data || []).map(c => [c.id, c]));
+      const companyMap = new Map((companiesResult.data || []).map(c => [c.id, c]));
+  
+      // Debug: verificar el mapa de clientes
+      console.log('Client map size:', clientMap.size);
+  
+      // Enriquecer las visitas con los datos relacionados
+      let enrichedVisits = visits.map(v => {
+        const client = v.client_id ? clientMap.get(v.client_id) : null;
+        
+        // Debug por visita si es necesario
+        if (v.client_id && !client) {
+          console.warn(`Client not found for visit ${v.id}, client_id: ${v.client_id}`);
+        }
+  
+        return {
+          ...v,
+          commercial: v.commercial_id ? profileMap.get(v.commercial_id) || null : null,
+          second_commercial: v.second_commercial_id ? profileMap.get(v.second_commercial_id) || null : null,
+          client: client || null,
+          company: v.company_id ? companyMap.get(v.company_id) || null : null,
+        };
+      });
+  
       // Apply DNI filter client-side since it's a nested field
       if (filters.dni) {
         enrichedVisits = enrichedVisits.filter(visit => {
-          const client = visit.client as any;
-          return client?.dni?.toLowerCase().includes(filters.dni.toLowerCase());
+          return visit.client?.dni?.toLowerCase().includes(filters.dni.toLowerCase());
         });
       }
-
+  
       setVisits(enrichedVisits as Visit[]);
       
       // Update pagination total items
