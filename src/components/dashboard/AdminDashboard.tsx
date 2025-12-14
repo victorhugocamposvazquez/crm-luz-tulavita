@@ -272,7 +272,7 @@ export default function AdminDashboard() {
             name,
             description
           ),
-          client:clients(id, nombre_apellidos, dni),
+          client:clients!inner(id, nombre_apellidos, dni),
           company:companies(name)
         `)
         .gte('visit_date', thirtyDaysAgo.toISOString())
