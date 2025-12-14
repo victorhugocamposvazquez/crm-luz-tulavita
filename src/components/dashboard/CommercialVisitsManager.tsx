@@ -14,9 +14,12 @@ import { formatCoordinates } from '@/lib/coordinates';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 import UnifiedVisitsManagement from './UnifiedVisitsManagement';
+import VisitProgressHistory from '@/components/visits/VisitProgressHistory';
 interface Visit {
   id: string;
   visit_date: string;
+  created_at: string;
+  updated_at: string;
   status: 'in_progress' | 'completed' | 'no_answer' | 'not_interested' | 'postponed';
   approval_status: 'pending' | 'approved' | 'rejected' | 'waiting_admin';
   notes: string;
@@ -68,28 +71,19 @@ export default function CommercialVisitsManager() {
   const [visitSales, setVisitSales] = useState<any[]>([]);
   const [localGeolocationObtained, setLocalGeolocationObtained] = useState(false);
   
-  // Check geolocation status whenever the popup opens
   useEffect(() => {
-    const checkGeolocationInPopup = async () => {
-      if (selectedVisit && editMode) {
-        console.log('=== CHECKING GEOLOCATION STATUS FOR POPUP ===');
-        
-        // Try to get current location to check if permissions are granted
+    if (selectedVisit && editMode && !localGeolocationObtained) {
+      const checkGeolocationInPopup = async () => {
         try {
           const currentLocation = await requestLocation();
-          console.log('Geolocation check result:', currentLocation);
           setLocalGeolocationObtained(!!currentLocation);
         } catch (error) {
-          console.log('Geolocation check failed:', error);
           setLocalGeolocationObtained(false);
         }
-      }
-    };
-    
-    if (selectedVisit && editMode) {
+      };
       checkGeolocationInPopup();
     }
-  }, [selectedVisit, editMode, requestLocation]);
+  }, [selectedVisit, editMode]);
   const [stats, setStats] = useState({
     total: 0,
     pending: 0,
@@ -238,6 +232,8 @@ export default function CommercialVisitsManager() {
       } = await supabase.from('visits').select(`
           id,
           visit_date,
+          created_at,
+          updated_at,
           status,
           approval_status,
           notes,
@@ -543,7 +539,8 @@ export default function CommercialVisitsManager() {
               <TableHead>Localidad</TableHead>
               <TableHead>Empresa</TableHead>
               <TableHead>Segundo Comercial</TableHead>
-              <TableHead>Fecha</TableHead>
+              <TableHead>Creación</TableHead>
+              <TableHead>Actualización</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Permisos</TableHead>
               <TableHead>Notas</TableHead>
@@ -564,7 +561,8 @@ export default function CommercialVisitsManager() {
                             '-'
                           }
                         </TableCell>
-                        <TableCell>{formatDate(visit.visit_date)}</TableCell>
+                        <TableCell>{formatDate(visit.created_at)}</TableCell>
+                        <TableCell>{formatDate(visit.updated_at)}</TableCell>
                        <TableCell>{getStatusBadge(visit)}</TableCell>
                        <TableCell>
                          <Badge variant={visit.approval_status === 'approved' ? 'default' : visit.approval_status === 'rejected' ? 'destructive' : 'secondary'}>
@@ -596,7 +594,7 @@ export default function CommercialVisitsManager() {
 
       {/* Visit Detail Dialog */}
       {selectedVisit && <Dialog open={!!selectedVisit} onOpenChange={() => setSelectedVisit(null)}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editMode ? 'Editar Visita' : 'Detalles de la Visita'}
@@ -728,6 +726,10 @@ export default function CommercialVisitsManager() {
                 </div>}
 
               {/* Ventas */}
+              <div className="border-t pt-4">
+                <VisitProgressHistory visitId={selectedVisit.id} />
+              </div>
+
               <div className="border-t pt-4">
                 <Label>Ventas</Label>
                 {visitSales.length > 0 ? (

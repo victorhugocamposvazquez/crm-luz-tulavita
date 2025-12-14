@@ -15,6 +15,7 @@ interface Visit {
   client_id?: string;
   commercial_id?: string;
   created_at?: string;
+  updated_at?: string;
   approval_status?: string;
   notes?: string;
   permission?: string;
@@ -163,7 +164,8 @@ export default function VisitsTable({
           <TableHead>Comercial</TableHead>
           <TableHead>Segundo Comercial</TableHead>
           <TableHead>Empresa</TableHead>
-          <TableHead>Fecha</TableHead>
+          <TableHead>Creación</TableHead>
+          <TableHead>Actualización</TableHead>
           <TableHead>Estado</TableHead>
           <TableHead>Resultado de la visita</TableHead>
           <TableHead>Notas</TableHead>
@@ -175,7 +177,7 @@ export default function VisitsTable({
       <TableBody>
         {visits.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={showClientColumns ? 12 : 10} className="text-center py-8 text-muted-foreground">
+            <TableCell colSpan={showClientColumns ? 13 : 11} className="text-center py-8 text-muted-foreground">
               {emptyMessage}
             </TableCell>
           </TableRow>
@@ -216,7 +218,10 @@ export default function VisitsTable({
                 </TableCell>
                 <TableCell>{visit.company?.name || 'N/A'}</TableCell>
                 <TableCell>
-                  {format(new Date(visit.visit_date), "dd/MM/yyyy HH:mm", { locale: es })}
+                  {visit.created_at ? format(new Date(visit.created_at), "dd/MM/yyyy HH:mm", { locale: es }) : '-'}
+                </TableCell>
+                <TableCell>
+                  {visit.updated_at ? format(new Date(visit.updated_at), "dd/MM/yyyy HH:mm", { locale: es }) : '-'}
                 </TableCell>
                 <TableCell>
                   {(() => {

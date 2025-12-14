@@ -440,6 +440,60 @@ export type Database = {
         }
         Relationships: []
       }
+      visit_progress_history: {
+        Row: {
+          id: string
+          visit_id: string
+          commercial_id: string
+          latitude: number | null
+          longitude: number | null
+          location_accuracy: number | null
+          recorded_at: string
+          visit_state_code: string | null
+          note: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          visit_id: string
+          commercial_id: string
+          latitude?: number | null
+          longitude?: number | null
+          location_accuracy?: number | null
+          recorded_at?: string
+          visit_state_code?: string | null
+          note?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          visit_id?: string
+          commercial_id?: string
+          latitude?: number | null
+          longitude?: number | null
+          location_accuracy?: number | null
+          recorded_at?: string
+          visit_state_code?: string | null
+          note?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visit_progress_history_visit_id_fkey"
+            columns: ["visit_id"]
+            isOneToOne: false
+            referencedRelation: "visits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visit_progress_history_visit_state_code_fkey"
+            columns: ["visit_state_code"]
+            isOneToOne: false
+            referencedRelation: "visit_states"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
       visit_states: {
         Row: {
           code: string
