@@ -205,7 +205,7 @@ export default function AdminVisitsView() {
             </div>
 
             <div>
-              <Label htmlFor="endDate">Fecha hasta</Label>
+              <Label htmlFor="endDate">Fecha hasta:</Label>
               <Input id="endDate" type="date" value={filters.endDate} onChange={(e) => handleFilterChange('endDate', e.target.value)} />
             </div>
           </div>
