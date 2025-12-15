@@ -2,9 +2,14 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-// Variables Vite estáticas para que el build reemplace correctamente en producción
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? "https://oslvdbmcwzfwekulqabk.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "sb_publishable_gcGxmugcVAA6445C7n5ZfA_dHS7BWnY";
+//VARIABLES PRODUCCION
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? "https://kamfdjczamfgumkiwjpw.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImthbWZkamN6YW1mZ3Vta2l3anB3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQwNzM5NDQsImV4cCI6MjA2OTY0OTk0NH0.ut5c7kjfAqOOy4dhP1XJxhU9W6VkLJpGSxz4DKQIMwU";
+
+// Variables Vite estáticas para que el build reemplace correctamente en desarrollo
+/* const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? "https://oslvdbmcwzfwekulqabk.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "sb_publishable_gcGxmugcVAA6445C7n5ZfA_dHS7BWnY"; */
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
