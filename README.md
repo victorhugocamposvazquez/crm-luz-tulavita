@@ -68,9 +68,10 @@ crm-3w/
 
 ### Variables de Entorno (Vercel)
 ```bash
-VITE_SUPABASE_URL=https://kamfdjczamfgumkiw.jpw.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+VITE_SUPABASE_URL=https://oslvdbmcwzfwekulqabk.supabase.co
+VITE_SUPABASE_ANON_KEY=<tu_anon_key_aqui>
 ```
+> ⚠️ **Nota**: No incluir credenciales reales en el README. Configurar en Vercel Dashboard.
 
 ## 💻 Desarrollo Local
 
