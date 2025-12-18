@@ -11,7 +11,7 @@ import CommercialStatistics from '@/components/dashboard/CommercialStatistics';
 import AdminVisitsView from '@/components/dashboard/AdminVisitsView';
 import RemindersManagement from '@/components/reminders/RemindersManagement';
 import DeliveriesManagement from '@/components/deliveries/DeliveriesManagement';
-import RepartidorDeliveriesView from '@/components/deliveries/RepartidorDeliveriesView';
+import DeliveryUserView from '@/components/deliveries/DeliveryUserView';
 
 const ClientManagement = lazy(() => import('@/components/dashboard/ClientManagement'));
 
@@ -39,7 +39,7 @@ export default function Dashboard() {
     const isDelivery = userRole?.role === 'delivery';
     
     if (isDelivery) {
-      return <RepartidorDeliveriesView />;
+      return <DeliveryUserView />;
     }
     
     switch (currentView) {

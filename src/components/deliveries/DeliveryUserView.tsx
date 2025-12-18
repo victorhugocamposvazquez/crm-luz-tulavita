@@ -71,7 +71,7 @@ interface VisitHistory {
   };
 }
 
-export default function RepartidorDeliveriesView() {
+export default function DeliveryUserView() {
   const { user } = useAuth();
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [loading, setLoading] = useState(true);

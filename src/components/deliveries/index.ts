@@ -1,3 +1,3 @@
 export { default as DeliveriesManagement } from './DeliveriesManagement';
 export { default as DeliveryDetailDialog } from './DeliveryDetailDialog';
-export { default as RepartidorDeliveriesView } from './RepartidorDeliveriesView';
+export { default as DeliveryUserView } from './DeliveryUserView';
