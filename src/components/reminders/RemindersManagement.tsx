@@ -50,6 +50,7 @@ export default function RemindersManagement() {
   const [selectedReminders, setSelectedReminders] = useState<string[]>([]);
   const [noteDialog, setNoteDialog] = useState<{ open: boolean; note: string }>({ open: false, note: '' });
   const [visitCreationDialog, setVisitCreationDialog] = useState<{ open: boolean; reminder: Reminder | null }>({ open: false, reminder: null });
+  const [bulkVisitDialog, setBulkVisitDialog] = useState<{ open: boolean; reminders: Reminder[] }>({ open: false, reminders: [] });
   const [selectedCommercial, setSelectedCommercial] = useState<string>('');
   const [selectedCompany, setSelectedCompany] = useState<string>('');
   const [commercials, setCommercials] = useState<Array<{ id: string; name: string; email: string }>>([]);
@@ -314,11 +315,9 @@ export default function RemindersManagement() {
     if (!visitCreationDialog.reminder || !selectedCommercial || !selectedCompany) return;
 
     try {
-      // Prepare notes from reminder with proper formatting
       const reminderNotes = visitCreationDialog.reminder.notes || '';
       const visitNotes = reminderNotes ? `${reminderNotes}\n\n--\n\n` : '--\n\n';
 
-      // Create approved and in_progress visit
       const { data: visitData, error: visitError } = await supabase
         .from('visits')
         .insert({
@@ -335,7 +334,6 @@ export default function RemindersManagement() {
 
       if (visitError) throw visitError;
 
-      // Delete reminder after creating visit (without confirmation)
       await handleDelete(visitCreationDialog.reminder.id, false);
 
       toast({
@@ -352,6 +350,88 @@ export default function RemindersManagement() {
       toast({
         title: "Error",
         description: "No se pudo crear la visita",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleOpenBulkVisitDialog = () => {
+    const selectedReminderObjects = reminders.filter(
+      r => selectedReminders.includes(r.id) && r.status === 'pending'
+    );
+    
+    if (selectedReminderObjects.length === 0) {
+      toast({
+        title: "Sin recordatorios válidos",
+        description: "Selecciona al menos un recordatorio pendiente para crear visitas",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setBulkVisitDialog({ open: true, reminders: selectedReminderObjects });
+    setSelectedCommercial('');
+    setSelectedCompany('');
+  };
+
+  const handleRemoveFromBulkDialog = (reminderId: string) => {
+    const updatedReminders = bulkVisitDialog.reminders.filter(r => r.id !== reminderId);
+    if (updatedReminders.length === 0) {
+      setBulkVisitDialog({ open: false, reminders: [] });
+    } else {
+      setBulkVisitDialog({ open: true, reminders: updatedReminders });
+    }
+    setSelectedReminders(prev => prev.filter(id => id !== reminderId));
+  };
+
+  const handleCreateBulkVisits = async () => {
+    if (bulkVisitDialog.reminders.length === 0 || !selectedCommercial || !selectedCompany) return;
+
+    try {
+      const visitsToCreate = bulkVisitDialog.reminders.map(reminder => {
+        const reminderNotes = reminder.notes || '';
+        const visitNotes = reminderNotes ? `${reminderNotes}\n\n--\n\n` : '--\n\n';
+        
+        return {
+          client_id: reminder.client_id,
+          commercial_id: selectedCommercial,
+          company_id: selectedCompany,
+          status: 'in_progress' as const,
+          approval_status: 'approved' as const,
+          notes: visitNotes,
+          visit_date: new Date().toISOString()
+        };
+      });
+
+      const { error: visitError } = await supabase
+        .from('visits')
+        .insert(visitsToCreate);
+
+      if (visitError) throw visitError;
+
+      const reminderIds = bulkVisitDialog.reminders.map(r => r.id);
+      const { error: deleteError } = await supabase
+        .from('renewal_reminders')
+        .delete()
+        .in('id', reminderIds);
+
+      if (deleteError) throw deleteError;
+
+      toast({
+        title: "Visitas creadas",
+        description: `Se han creado ${visitsToCreate.length} visitas aprobadas para el comercial seleccionado`,
+      });
+
+      setBulkVisitDialog({ open: false, reminders: [] });
+      setSelectedCommercial('');
+      setSelectedCompany('');
+      setSelectedReminders([]);
+      fetchReminders();
+    } catch (error: any) {
+      console.error('Error creating bulk visits:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron crear las visitas",
         variant: "destructive",
       });
     }
@@ -489,16 +569,26 @@ export default function RemindersManagement() {
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>Recordatorios ({reminders.length})</span>
-            {selectedReminders.length > 0 && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleDeleteMultiple}
-                className="flex items-center gap-2"
-              >
-                <Trash2 className="h-4 w-4" />
-                Eliminar seleccionados ({selectedReminders.length})
-              </Button>
+            {selectedReminders.length > 1 && (
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={handleOpenBulkVisitDialog}
+                  className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  Crear visitas ({selectedReminders.length})
+                </Button>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleDeleteMultiple}
+                  className="flex items-center gap-2"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Eliminar seleccionados ({selectedReminders.length})
+                </Button>
+              </div>
             )}
           </CardTitle>
         </CardHeader>
@@ -576,9 +666,11 @@ export default function RemindersManagement() {
                               onClick={() => {
                                 setVisitCreationDialog({ open: true, reminder });
                                 setSelectedCommercial('');
+                                setSelectedCompany('');
                               }}
-                              className="text-blue-600 border-blue-600 hover:bg-blue-50"
+                              className="text-blue-600 border-blue-600 hover:bg-blue-50 disabled:opacity-50 disabled:cursor-not-allowed"
                               title="Crear visita"
+                              disabled={selectedReminders.length > 1}
                             >
                               <UserPlus className="h-4 w-4" />
                             </Button>
@@ -587,8 +679,9 @@ export default function RemindersManagement() {
                             size="sm"
                             variant="outline"
                             onClick={() => handleDelete(reminder.id)}
-                            className="text-red-600 border-red-600 hover:bg-red-50"
+                            className="text-red-600 border-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
                             title="Eliminar recordatorio"
+                            disabled={selectedReminders.length > 1}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -673,6 +766,79 @@ export default function RemindersManagement() {
             </Button>
             <Button onClick={handleCreateVisit} disabled={!selectedCommercial || !selectedCompany}>
               Crear visita
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Visit Creation Dialog */}
+      <Dialog open={bulkVisitDialog.open} onOpenChange={(open) => setBulkVisitDialog({ open, reminders: [] })}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Crear visitas desde recordatorios</DialogTitle>
+            <DialogDescription>
+              Se crearán {bulkVisitDialog.reminders.length} visitas aprobadas y en progreso para los siguientes clientes:
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="max-h-40 overflow-y-auto border rounded-md p-2">
+              {bulkVisitDialog.reminders.map((reminder, index) => (
+                <div key={reminder.id} className="flex items-center justify-between text-sm py-1 border-b last:border-b-0">
+                  <span>
+                    <span className="font-medium">{index + 1}.</span> {reminder.client?.nombre_apellidos || 'Cliente'}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleRemoveFromBulkDialog(reminder.id)}
+                    className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Comercial</label>
+              <Select value={selectedCommercial} onValueChange={setSelectedCommercial}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar comercial..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {commercials.map((commercial) => (
+                    <SelectItem key={commercial.id} value={commercial.id}>
+                      {commercial.name} ({commercial.email})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div>
+              <label className="text-sm font-medium">Empresa</label>
+              <Select value={selectedCompany} onValueChange={setSelectedCompany}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Seleccionar empresa..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {companies.map((company) => (
+                    <SelectItem key={company.id} value={company.id}>
+                      {company.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkVisitDialog({ open: false, reminders: [] })}>
+              Cancelar
+            </Button>
+            <Button onClick={handleCreateBulkVisits} disabled={!selectedCommercial || !selectedCompany}>
+              Crear {bulkVisitDialog.reminders.length} visitas
             </Button>
           </DialogFooter>
         </DialogContent>
