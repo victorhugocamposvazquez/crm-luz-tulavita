@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -12,8 +12,9 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from '@/hooks/use-toast';
-import { Truck, User, MapPin, Calendar, FileText, DollarSign, Package, Plus, Loader2, Eye, Play, CheckCircle } from 'lucide-react';
+import { Truck, User, MapPin, Calendar, FileText, DollarSign, Plus, Loader2, Eye, Play, CheckCircle, Filter, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -30,7 +31,6 @@ interface Delivery {
     status: string;
     notes?: string;
     client_id: string;
-    commercial_id: string;
     company_id: string;
     client?: {
       id: string;
@@ -38,10 +38,6 @@ interface Delivery {
       direccion: string;
       dni?: string;
       telefono1?: string;
-    };
-    commercial?: {
-      first_name: string;
-      last_name: string;
     };
   };
 }
@@ -90,7 +86,12 @@ export default function RepartidorDeliveriesView() {
   const [addNoteDialogOpen, setAddNoteDialogOpen] = useState(false);
   const [newNote, setNewNote] = useState('');
   const [savingNote, setSavingNote] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [filters, setFilters] = useState({
+    client: '',
+    dni: '',
+    startDate: '',
+    status: 'all'
+  });
 
   const fetchDeliveries = useCallback(async () => {
     if (!user) return;
@@ -113,28 +114,13 @@ export default function RepartidorDeliveriesView() {
         const { data: visitsData } = await supabase
           .from('visits')
           .select(`
-            id, visit_date, status, notes, client_id, commercial_id, company_id,
+            id, visit_date, status, notes, client_id, company_id,
             client:clients(id, nombre_apellidos, direccion, dni, telefono1)
           `)
           .in('id', visitIds);
 
-        const commercialIds = [...new Set((visitsData || []).map(v => v.commercial_id))];
-        const commercialsMap = new Map();
-
-        if (commercialIds.length > 0) {
-          const { data: commercialsData } = await supabase
-            .from('profiles')
-            .select('id, first_name, last_name')
-            .in('id', commercialIds);
-
-          (commercialsData || []).forEach(c => commercialsMap.set(c.id, c));
-        }
-
         (visitsData || []).forEach(v => {
-          visitsMap.set(v.id, {
-            ...v,
-            commercial: commercialsMap.get(v.commercial_id)
-          });
+          visitsMap.set(v.id, v);
         });
       }
 
@@ -143,10 +129,6 @@ export default function RepartidorDeliveriesView() {
         status: item.status as 'pending' | 'in_progress' | 'completed' | 'cancelled',
         visit: visitsMap.get(item.visit_id)
       }));
-
-      if (statusFilter !== 'all') {
-        transformedDeliveries = transformedDeliveries.filter(d => d.status === statusFilter);
-      }
 
       setDeliveries(transformedDeliveries);
     } catch (error: any) {
@@ -159,11 +141,37 @@ export default function RepartidorDeliveriesView() {
     } finally {
       setLoading(false);
     }
-  }, [user, statusFilter]);
+  }, [user]);
 
   useEffect(() => {
     fetchDeliveries();
-  }, [fetchDeliveries]);
+
+    const channel = supabase
+      .channel('delivery-notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'delivery_notifications',
+          filter: `user_id=eq.${user?.id}`
+        },
+        async (payload) => {
+          fetchDeliveries();
+          if (payload.new && typeof payload.new === 'object' && 'id' in payload.new) {
+            await (supabase as any)
+              .from('delivery_notifications')
+              .delete()
+              .eq('id', (payload.new as any).id);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchDeliveries, user?.id]);
 
   const fetchDeliveryDetails = async (delivery: Delivery) => {
     if (!delivery.visit_id) return;
@@ -498,117 +506,197 @@ export default function RepartidorDeliveriesView() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin" />
-        <span className="ml-2">Cargando repartos...</span>
-      </div>
-    );
-  }
+  const hasActiveFilters = Object.entries(filters).some(([key, value]) => 
+    key === 'status' ? value !== 'all' : value.trim() !== ''
+  );
+
+  const clearFilters = () => {
+    setFilters({
+      client: '',
+      dni: '',
+      startDate: '',
+      status: 'all'
+    });
+  };
+
+  const updateFilter = (key: string, value: string) => {
+    setFilters(prev => ({ ...prev, [key]: value }));
+  };
+
+  const filteredDeliveries = deliveries.filter(delivery => {
+    if (filters.client && !delivery.visit?.client?.nombre_apellidos?.toLowerCase().includes(filters.client.toLowerCase())) {
+      return false;
+    }
+    if (filters.dni && !delivery.visit?.client?.dni?.toLowerCase().includes(filters.dni.toLowerCase())) {
+      return false;
+    }
+    if (filters.startDate && delivery.visit?.visit_date) {
+      const visitDate = new Date(delivery.visit.visit_date).toISOString().split('T')[0];
+      if (visitDate < filters.startDate) return false;
+    }
+    if (filters.status !== 'all' && delivery.status !== filters.status) {
+      return false;
+    }
+    return true;
+  });
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            <Truck className="h-6 w-6" />
-            Mis Repartos
-          </h2>
+          <h1 className="text-2xl font-bold">Mis Repartos</h1>
           <p className="text-muted-foreground">Gestiona los repartos asignados</p>
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-48">
-            <SelectValue placeholder="Filtrar por estado" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="pending">Pendientes</SelectItem>
-            <SelectItem value="in_progress">En Progreso</SelectItem>
-            <SelectItem value="completed">Completados</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
 
-      {deliveries.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Truck className="h-12 w-12 text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">No tienes repartos asignados</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {deliveries.map((delivery) => (
-            <Card key={delivery.id} className="hover:shadow-md transition-shadow">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">
-                    {delivery.visit?.client?.nombre_apellidos || 'Cliente'}
-                  </CardTitle>
-                  <Badge className={getStatusColor(delivery.status)}>
-                    {getStatusLabel(delivery.status)}
-                  </Badge>
-                </div>
-                <CardDescription className="flex items-center gap-1">
-                  <MapPin className="h-3 w-3" />
-                  {delivery.visit?.client?.direccion || 'Sin dirección'}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Calendar className="h-4 w-4" />
-                    {delivery.visit?.visit_date ? 
-                      format(new Date(delivery.visit.visit_date), 'dd/MM/yyyy', { locale: es }) : 
-                      'Sin fecha'
-                    }
-                  </div>
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <User className="h-4 w-4" />
-                    Comercial: {delivery.visit?.commercial ? 
-                      `${delivery.visit.commercial.first_name} ${delivery.visit.commercial.last_name}` : 
-                      'N/A'
-                    }
-                  </div>
-                </div>
-                <div className="flex gap-2 mt-4">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="flex-1"
-                    onClick={() => handleViewDetail(delivery)}
-                  >
-                    <Eye className="h-4 w-4 mr-1" />
-                    Ver
-                  </Button>
-                  {delivery.status === 'pending' && (
-                    <Button 
-                      size="sm" 
-                      className="flex-1"
-                      onClick={() => handleStartDelivery(delivery)}
-                    >
-                      <Play className="h-4 w-4 mr-1" />
-                      Iniciar
-                    </Button>
-                  )}
-                  {delivery.status === 'in_progress' && (
-                    <Button 
-                      size="sm" 
-                      variant="default"
-                      className="flex-1 bg-green-600 hover:bg-green-700"
-                      onClick={() => handleCompleteDelivery(delivery)}
-                    >
-                      <CheckCircle className="h-4 w-4 mr-1" />
-                      Completar
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Filter className="h-5 w-5" />
+              Filtros
+            </div>
+            <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 w-8 p-0" title="Limpiar filtros">
+              <X className="h-4 w-4" />
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div>
+              <Label htmlFor="client">Cliente</Label>
+              <Input
+                id="client"
+                placeholder="Nombre del cliente..."
+                value={filters.client}
+                onChange={(e) => updateFilter('client', e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="dni">DNI</Label>
+              <Input
+                id="dni"
+                placeholder="DNI del cliente..."
+                value={filters.dni}
+                onChange={(e) => updateFilter('dni', e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="startDate">Fecha Visita</Label>
+              <Input
+                id="startDate"
+                type="date"
+                value={filters.startDate}
+                onChange={(e) => updateFilter('startDate', e.target.value)}
+              />
+            </div>
+            <div>
+              <Label htmlFor="status">Estado</Label>
+              <Select value={filters.status} onValueChange={(value) => updateFilter('status', value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Todos los estados" />
+                </SelectTrigger>
+                <SelectContent className="z-50 bg-background">
+                  <SelectItem value="all">Todos los estados</SelectItem>
+                  <SelectItem value="pending">Pendientes</SelectItem>
+                  <SelectItem value="in_progress">En Progreso</SelectItem>
+                  <SelectItem value="completed">Completados</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Lista de repartos ({filteredDeliveries.length})</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin" />
+              <span className="ml-2">Cargando repartos...</span>
+            </div>
+          ) : filteredDeliveries.length === 0 ? (
+            <div className="text-center py-8">
+              <Truck className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <p className="text-muted-foreground">No se encontraron repartos con los filtros aplicados</p>
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>DNI</TableHead>
+                  <TableHead>Dirección</TableHead>
+                  <TableHead>Fecha Visita</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead>Acciones</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredDeliveries.map((delivery) => (
+                  <TableRow key={delivery.id}>
+                    <TableCell className="font-medium">
+                      {delivery.visit?.client?.nombre_apellidos || 'N/A'}
+                    </TableCell>
+                    <TableCell>
+                      {delivery.visit?.client?.dni || 'N/A'}
+                    </TableCell>
+                    <TableCell className="max-w-[200px] truncate">
+                      {delivery.visit?.client?.direccion || 'N/A'}
+                    </TableCell>
+                    <TableCell>
+                      {delivery.visit?.visit_date ? 
+                        format(new Date(delivery.visit.visit_date), 'dd/MM/yyyy', { locale: es }) : 
+                        'N/A'
+                      }
+                    </TableCell>
+                    <TableCell>
+                      <Badge className={getStatusColor(delivery.status)}>
+                        {getStatusLabel(delivery.status)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex gap-2">
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => handleViewDetail(delivery)}
+                          title="Ver detalles"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        {delivery.status === 'pending' && (
+                          <Button 
+                            size="sm"
+                            onClick={() => handleStartDelivery(delivery)}
+                            title="Iniciar reparto"
+                          >
+                            <Play className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {delivery.status === 'in_progress' && (
+                          <Button 
+                            size="sm" 
+                            variant="default"
+                            className="bg-green-600 hover:bg-green-700"
+                            onClick={() => handleCompleteDelivery(delivery)}
+                            title="Completar reparto"
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
 
       <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh]">

@@ -158,11 +158,18 @@ export default function UserManagement() {
 
       if (profileError) throw profileError;
 
-      // Update role
+      // Delete existing role and insert new one
+      await supabase
+        .from('user_roles')
+        .delete()
+        .eq('user_id', editingUser.id);
+
       const { error: roleError } = await supabase
         .from('user_roles')
-        .update({ role: role })
-        .eq('user_id', editingUser.id);
+        .insert({ 
+          user_id: editingUser.id, 
+          role: role 
+        });
 
       if (roleError) throw roleError;
 

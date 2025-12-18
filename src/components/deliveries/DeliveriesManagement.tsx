@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
-import { Truck, Trash2, UserPlus, Filter, X, Eye } from 'lucide-react';
+import { Truck, Trash2, UserPlus, Filter, X, Eye, UserCog } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import DeliveryDetailDialog from './DeliveryDetailDialog';
@@ -29,6 +29,7 @@ interface Delivery {
     visit_date: string;
     status: string;
     notes?: string;
+    commercial_id?: string;
     client?: {
       id: string;
       nombre_apellidos: string;
@@ -80,8 +81,10 @@ export default function DeliveriesManagement() {
   const [deliveryUsers, setDeliveryUsers] = useState<Array<{ id: string; name: string; email: string }>>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
-    client_name: '',
-    deliveryUser: 'all',
+    client: '',
+    dni: '',
+    commercial: 'all',
+    startDate: '',
     status: 'all',
   });
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
@@ -90,6 +93,8 @@ export default function DeliveriesManagement() {
   const [selectedDeliveries, setSelectedDeliveries] = useState<string[]>([]);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [selectedDeliveryForDetail, setSelectedDeliveryForDetail] = useState<Delivery | null>(null);
+  const [changeDeliveryUserDialogOpen, setChangeDeliveryUserDialogOpen] = useState(false);
+  const [newDeliveryUserId, setNewDeliveryUserId] = useState<string>('');
 
   const isAdmin = userRole?.role === 'admin';
 
@@ -169,13 +174,25 @@ export default function DeliveriesManagement() {
 
       let filtered = transformedDeliveries;
 
-      if (filters.client_name.trim()) {
+      if (filters.client.trim()) {
         filtered = filtered.filter(d => 
-          d.visit?.client?.nombre_apellidos?.toLowerCase().includes(filters.client_name.toLowerCase())
+          d.visit?.client?.nombre_apellidos?.toLowerCase().includes(filters.client.toLowerCase())
         );
       }
-      if (filters.deliveryUser !== 'all') {
-        filtered = filtered.filter(d => d.delivery_id === filters.deliveryUser);
+      if (filters.dni.trim()) {
+        filtered = filtered.filter(d => 
+          d.visit?.client?.dni?.toLowerCase().includes(filters.dni.toLowerCase())
+        );
+      }
+      if (filters.commercial !== 'all') {
+        filtered = filtered.filter(d => d.visit?.commercial_id === filters.commercial);
+      }
+      if (filters.startDate) {
+        filtered = filtered.filter(d => {
+          if (!d.visit?.visit_date) return false;
+          const visitDate = new Date(d.visit.visit_date).toISOString().split('T')[0];
+          return visitDate >= filters.startDate;
+        });
       }
       if (filters.status !== 'all') {
         filtered = filtered.filter(d => d.status === filters.status);
@@ -278,12 +295,33 @@ export default function DeliveriesManagement() {
   useEffect(() => {
     fetchDeliveries();
     fetchDeliveryUsers();
+
+    const channel = supabase
+      .channel('admin-deliveries-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'deliveries'
+        },
+        () => {
+          fetchDeliveries();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [fetchDeliveries]);
 
   const clearFilters = useCallback(() => {
     setFilters({
-      client_name: '',
-      deliveryUser: 'all',
+      client: '',
+      dni: '',
+      commercial: 'all',
+      startDate: '',
       status: 'all',
     });
   }, []);
@@ -381,6 +419,36 @@ export default function DeliveriesManagement() {
     }
   };
 
+  const handleChangeDeliveryUser = async () => {
+    if (selectedDeliveries.length === 0 || !newDeliveryUserId) return;
+
+    try {
+      const { error } = await supabase
+        .from('deliveries')
+        .update({ delivery_id: newDeliveryUserId })
+        .in('id', selectedDeliveries);
+
+      if (error) throw error;
+
+      toast({
+        title: "Repartidor actualizado",
+        description: `Se ha cambiado el repartidor de ${selectedDeliveries.length} reparto(s)`,
+      });
+
+      setChangeDeliveryUserDialogOpen(false);
+      setNewDeliveryUserId('');
+      setSelectedDeliveries([]);
+      fetchDeliveries();
+    } catch (error: any) {
+      console.error('Error changing delivery user:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo cambiar el repartidor",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleDeleteSingle = async (deliveryId: string) => {
     if (!confirm('¿Estás seguro de que quieres eliminar este reparto?')) return;
 
@@ -452,7 +520,7 @@ export default function DeliveriesManagement() {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold">Gestión de Repartos</h2>
-          <p className="text-muted-foreground">Asigna visitas existentes a deliveryUsers</p>
+          <p className="text-muted-foreground">Asigna visitas existentes a los repartidores</p>
         </div>
         <Button onClick={handleOpenAssignDialog} className="flex items-center gap-2">
           <Truck className="h-4 w-4" />
@@ -473,37 +541,59 @@ export default function DeliveriesManagement() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <div>
               <label className="text-sm font-medium">Cliente</label>
               <Input
-                placeholder="Buscar por cliente..."
-                value={filters.client_name}
-                onChange={(e) => updateFilter('client_name', e.target.value)}
+                placeholder="Nombre del cliente..."
+                value={filters.client}
+                onChange={(e) => updateFilter('client', e.target.value)}
               />
             </div>
             <div>
-              <label className="text-sm font-medium">Repartidor</label>
-              <Select value={filters.deliveryUser} onValueChange={(value) => updateFilter('deliveryUser', value)}>
+              <label className="text-sm font-medium">DNI</label>
+              <Input
+                placeholder="DNI del cliente..."
+                value={filters.dni}
+                onChange={(e) => updateFilter('dni', e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Comercial</label>
+              <Select value={filters.commercial} onValueChange={(value) => updateFilter('commercial', value)}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Todos los comerciales" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  {deliveryUsers.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
-                  ))}
+                  <SelectItem value="all">Todos los comerciales</SelectItem>
+                  {Array.from(new Set(deliveries.map(d => d.visit?.commercial_id).filter(Boolean))).map((id) => {
+                    const delivery = deliveries.find(d => d.visit?.commercial_id === id);
+                    const commercial = delivery?.visit?.commercial;
+                    return (
+                      <SelectItem key={id} value={id as string}>
+                        {commercial ? `${commercial.first_name || ''} ${commercial.last_name || ''}`.trim() || commercial.email : id}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium">Fecha Visita</label>
+              <Input
+                type="date"
+                value={filters.startDate}
+                onChange={(e) => updateFilter('startDate', e.target.value)}
+              />
             </div>
             <div>
               <label className="text-sm font-medium">Estado</label>
               <Select value={filters.status} onValueChange={(value) => updateFilter('status', value)}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Todos los estados" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="all">Todos los estados</SelectItem>
                   <SelectItem value="pending">Pendiente</SelectItem>
                   <SelectItem value="in_progress">En Progreso</SelectItem>
                   <SelectItem value="completed">Completado</SelectItem>
@@ -520,15 +610,28 @@ export default function DeliveriesManagement() {
           <CardTitle className="flex items-center justify-between">
             <span>Repartos ({deliveries.length})</span>
             {selectedDeliveries.length > 0 && (
-              <Button
-                variant="destructive"
-                size="sm"
-                onClick={handleDeleteDeliveries}
-                className="flex items-center gap-2"
-              >
-                <Trash2 className="h-4 w-4" />
-                Eliminar ({selectedDeliveries.length})
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setChangeDeliveryUserDialogOpen(true)}
+                  className="flex items-center gap-2"
+                >
+                  <UserCog className="h-4 w-4" />
+                  Cambiar Repartidor ({selectedDeliveries.length})
+                </Button>
+                {selectedDeliveries.length > 1 && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleDeleteDeliveries}
+                    className="flex items-center gap-2"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    Eliminar ({selectedDeliveries.length})
+                  </Button>
+                )}
+              </div>
             )}
           </CardTitle>
         </CardHeader>
@@ -554,7 +657,8 @@ export default function DeliveriesManagement() {
                     <TableHead>Comercial Original</TableHead>
                     <TableHead>Repartidor</TableHead>
                     <TableHead>Estado</TableHead>
-                    <TableHead>Fecha Asignación</TableHead>
+                    <TableHead>Creación</TableHead>
+                    <TableHead>Actualización</TableHead>
                     <TableHead>Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -575,13 +679,13 @@ export default function DeliveriesManagement() {
                       </TableCell>
                       <TableCell>
                         {delivery.visit?.commercial ? 
-                          `${delivery.visit.commercial.first_name} ${delivery.visit.commercial.last_name}` : 
+                          `${delivery.visit.commercial.first_name || ''} ${delivery.visit.commercial.last_name || ''}`.trim() || delivery.visit.commercial.email : 
                           'N/A'
                         }
                       </TableCell>
                       <TableCell>
                         {delivery.deliveryUser ? 
-                          `${delivery.deliveryUser.first_name} ${delivery.deliveryUser.last_name}` : 
+                          `${delivery.deliveryUser.first_name || ''} ${delivery.deliveryUser.last_name || ''}`.trim() || delivery.deliveryUser.email : 
                           'N/A'
                         }
                       </TableCell>
@@ -592,6 +696,9 @@ export default function DeliveriesManagement() {
                       </TableCell>
                       <TableCell>
                         {format(new Date(delivery.created_at), 'dd/MM/yyyy HH:mm', { locale: es })}
+                      </TableCell>
+                      <TableCell>
+                        {format(new Date(delivery.updated_at), 'dd/MM/yyyy HH:mm', { locale: es })}
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -609,6 +716,7 @@ export default function DeliveriesManagement() {
                             onClick={() => handleDeleteSingle(delivery.id)}
                             className="text-red-600 border-red-600 hover:bg-red-50"
                             title="Eliminar reparto"
+                            disabled={selectedDeliveries.length > 1}
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
@@ -618,7 +726,7 @@ export default function DeliveriesManagement() {
                   ))}
                   {deliveries.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                         No hay repartos que coincidan con los filtros
                       </TableCell>
                     </TableRow>
@@ -694,7 +802,7 @@ export default function DeliveriesManagement() {
                           </TableCell>
                           <TableCell>
                             {visit.commercial ? 
-                              `${visit.commercial.first_name} ${visit.commercial.last_name}` : 
+                              `${visit.commercial.first_name || ''} ${visit.commercial.last_name || ''}`.trim() || visit.commercial.email : 
                               'N/A'
                             }
                           </TableCell>
@@ -730,6 +838,40 @@ export default function DeliveriesManagement() {
         onOpenChange={setDetailDialogOpen}
         delivery={selectedDeliveryForDetail}
       />
+
+      <Dialog open={changeDeliveryUserDialogOpen} onOpenChange={setChangeDeliveryUserDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cambiar Repartidor</DialogTitle>
+            <DialogDescription>
+              Selecciona el nuevo repartidor para {selectedDeliveries.length} reparto(s)
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            <Select value={newDeliveryUserId} onValueChange={setNewDeliveryUserId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Seleccionar repartidor..." />
+              </SelectTrigger>
+              <SelectContent>
+                {deliveryUsers.map((r) => (
+                  <SelectItem key={r.id} value={r.id}>{r.name || r.email}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setChangeDeliveryUserDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleChangeDeliveryUser} disabled={!newDeliveryUserId}>
+              <UserCog className="mr-2 h-4 w-4" />
+              Cambiar Repartidor
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
