@@ -53,6 +53,7 @@ interface Sale {
     quantity: number;
     unit_price: number;
     financiada: boolean;
+    transferencia: boolean;
     nulo: boolean;
     products: { product_name: string }[];
   }[];
@@ -96,7 +97,7 @@ export default function DeliveryDetailDialog({ open, onOpenChange, delivery }: D
         const { data: lines } = await supabase
           .from('sale_lines')
           .select(`
-            quantity, unit_price, financiada, nulo,
+            quantity, unit_price, financiada, transferencia, nulo,
             sale_lines_products(product_name)
           `)
           .eq('sale_id', sale.id);
@@ -107,6 +108,7 @@ export default function DeliveryDetailDialog({ open, onOpenChange, delivery }: D
             quantity: line.quantity,
             unit_price: line.unit_price,
             financiada: line.financiada,
+            transferencia: line.transferencia,
             nulo: line.nulo,
             products: line.sale_lines_products || []
           }))
@@ -312,7 +314,7 @@ export default function DeliveryDetailDialog({ open, onOpenChange, delivery }: D
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <DollarSign className="h-5 w-5" />
-                  Ventas Asociadas ({sales.length})
+                  Ventas ({sales.length})
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -324,39 +326,64 @@ export default function DeliveryDetailDialog({ open, onOpenChange, delivery }: D
                   <p className="text-muted-foreground text-center py-4">No hay ventas asociadas a esta visita</p>
                 ) : (
                   <div className="space-y-4">
-                    {sales.map((sale) => (
+                    {sales.map((sale, saleIndex) => (
                       <div key={sale.id} className="border rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <p className="font-medium">
-                            {format(new Date(sale.sale_date), 'dd/MM/yyyy', { locale: es })}
-                          </p>
-                          <div className="text-right">
-                            <p className="font-bold text-lg">{sale.amount.toFixed(2)} €</p>
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <p className="font-bold text-lg">Venta #{saleIndex + 1}</p>
                             <p className="text-sm text-muted-foreground">
-                              Comisión: {sale.commission_amount?.toFixed(2) || '0.00'} €
+                              {format(new Date(sale.sale_date), 'dd/MM/yyyy HH:mm', { locale: es })}
                             </p>
                           </div>
+                          <p className="font-bold text-lg text-green-600">{sale.amount.toFixed(2).replace('.', ',')} €</p>
                         </div>
                         
                         {sale.sale_lines && sale.sale_lines.length > 0 && (
                           <>
-                            <Separator className="my-3" />
-                            <div className="space-y-2">
-                              <p className="text-sm font-medium flex items-center gap-1">
-                                <Package className="h-4 w-4" />
-                                Productos
-                              </p>
+                            <p className="font-semibold mt-4 mb-2">Productos:</p>
+                            <div className="space-y-3">
                               {sale.sale_lines.map((line, idx) => (
-                                <div key={idx} className="flex items-center justify-between text-sm bg-muted/50 rounded p-2">
-                                  <div>
-                                    <span className="font-medium">
-                                      {line.products.map(p => p.product_name).join(', ') || 'Producto'}
-                                    </span>
-                                    <span className="text-muted-foreground ml-2">x{line.quantity}</span>
-                                    {line.financiada && <Badge variant="outline" className="ml-2">Financiada</Badge>}
-                                    {line.nulo && <Badge variant="destructive" className="ml-2">Nulo</Badge>}
+                                <div key={idx} className="bg-muted/30 rounded-lg p-3">
+                                  <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                      <p className="font-medium">
+                                        {line.quantity}x {line.products[0]?.product_name || 'Pack'} - {line.unit_price.toFixed(2).replace('.', ',')} €
+                                      </p>
+                                      {line.products.length > 1 && (
+                                        <div className="mt-1 ml-4 text-sm text-muted-foreground">
+                                          {line.products.slice(1).map((p, pIdx) => (
+                                            <p key={pIdx}>• {p.product_name}</p>
+                                          ))}
+                                        </div>
+                                      )}
+                                      {line.products.length === 1 && line.products[0]?.product_name?.toLowerCase().includes('pack') && (
+                                        <div className="mt-1 ml-4 text-sm text-muted-foreground">
+                                          <p>• Productos incluidos en el pack</p>
+                                        </div>
+                                      )}
+                                    </div>
+                                    <p className="font-medium">{(line.quantity * line.unit_price).toFixed(2).replace('.', ',')} €</p>
                                   </div>
-                                  <span>{(line.quantity * line.unit_price).toFixed(2)} €</span>
+                                  <div className="flex gap-2 mt-2">
+                                    <Badge 
+                                      variant={line.financiada ? "default" : "outline"} 
+                                      className={line.financiada ? "bg-gray-200 text-gray-800 hover:bg-gray-200" : ""}
+                                    >
+                                      {line.financiada ? '✓' : '✗'} Financiada
+                                    </Badge>
+                                    <Badge 
+                                      variant={line.transferencia ? "default" : "outline"}
+                                      className={line.transferencia ? "bg-green-100 text-green-800 hover:bg-green-100" : ""}
+                                    >
+                                      {line.transferencia ? '✓' : '✗'} Transferencia
+                                    </Badge>
+                                    <Badge 
+                                      variant={line.nulo ? "destructive" : "outline"}
+                                      className={!line.nulo ? "" : ""}
+                                    >
+                                      {line.nulo ? '✓' : '✗'} Nulo
+                                    </Badge>
+                                  </div>
                                 </div>
                               ))}
                             </div>

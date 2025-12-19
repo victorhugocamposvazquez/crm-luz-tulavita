@@ -39,7 +39,13 @@ export default function Dashboard() {
     const isDelivery = userRole?.role === 'delivery';
     
     if (isDelivery) {
-      return <DeliveryUserView />;
+      switch (currentView) {
+        case 'visits':
+          return <CommercialVisitsManager />;
+        case 'deliveries':
+        default:
+          return <DeliveryUserView />;
+      }
     }
     
     switch (currentView) {

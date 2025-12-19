@@ -46,6 +46,7 @@ export default function Layout({ children, currentView, onViewChange }: LayoutPr
     { name: 'Recordatorios', icon: Bell, view: 'reminders' },
   ] : isDelivery ? [
     { name: 'Mis Repartos', icon: Truck, view: 'deliveries' },
+    { name: 'Visitas', icon: MapPin, view: 'visits' },
   ] : [
     { name: 'Estadísticas', icon: TrendingUp, view: 'stats' },
     { name: 'Visitas', icon: MapPin, view: 'visits' },

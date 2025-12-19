@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from '@/hooks/use-toast';
-import { Truck, Trash2, UserPlus, Filter, X, Eye, UserCog } from 'lucide-react';
+import { Truck, Trash2, UserPlus, Filter, X, Eye, UserCog, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import DeliveryDetailDialog from './DeliveryDetailDialog';
@@ -95,6 +95,7 @@ export default function DeliveriesManagement() {
   const [selectedDeliveryForDetail, setSelectedDeliveryForDetail] = useState<Delivery | null>(null);
   const [changeDeliveryUserDialogOpen, setChangeDeliveryUserDialogOpen] = useState(false);
   const [newDeliveryUserId, setNewDeliveryUserId] = useState<string>('');
+  const [visitSearchTerm, setVisitSearchTerm] = useState('');
 
   const isAdmin = userRole?.role === 'admin';
 
@@ -213,27 +214,19 @@ export default function DeliveriesManagement() {
 
   const fetchAvailableVisits = async () => {
     try {
-      const { data: existingDeliveries } = await supabase
-        .from('deliveries')
-        .select('visit_id');
-
-      const assignedVisitIds = (existingDeliveries || []).map(d => d.visit_id);
-
       let query = supabase
         .from('visits')
         .select(`
           id, visit_date, status, notes, client_id, commercial_id,
           client:clients(id, nombre_apellidos, direccion, dni)
         `)
-        .in('status', ['in_progress', 'completed'])
-        .eq('approval_status', 'approved')
         .order('visit_date', { ascending: false });
 
       const { data, error } = await query;
 
       if (error) throw error;
 
-      const filteredVisits = (data || []).filter(v => !assignedVisitIds.includes(v.id));
+      const filteredVisits = data || [];
 
       const commercialIds = [...new Set(filteredVisits.map(v => v.commercial_id))];
       const commercialsMap = new Map();
@@ -334,8 +327,19 @@ export default function DeliveriesManagement() {
     fetchAvailableVisits();
     setSelectedVisits([]);
     setSelectedDeliveryUser('');
+    setVisitSearchTerm('');
     setAssignDialogOpen(true);
   };
+
+  const filteredAvailableVisits = availableVisits.filter(visit => {
+    if (!visitSearchTerm.trim()) return true;
+    const searchLower = visitSearchTerm.toLowerCase();
+    const clientName = visit.client?.nombre_apellidos?.toLowerCase() || '';
+    const clientDni = visit.client?.dni?.toLowerCase() || '';
+    const commercialName = visit.commercial ? 
+      `${visit.commercial.first_name || ''} ${visit.commercial.last_name || ''}`.toLowerCase() : '';
+    return clientName.includes(searchLower) || clientDni.includes(searchLower) || commercialName.includes(searchLower);
+  });
 
   const handleVisitSelection = (visitId: string, checked: boolean) => {
     setSelectedVisits(prev => 
@@ -771,12 +775,24 @@ export default function DeliveriesManagement() {
 
             <div>
               <label className="text-sm font-medium mb-2 block">
-                Visitas disponibles ({availableVisits.length})
+                Visitas disponibles ({filteredAvailableVisits.length} de {availableVisits.length})
               </label>
+              <div className="relative mb-2">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por cliente, DNI o comercial..."
+                  value={visitSearchTerm}
+                  onChange={(e) => setVisitSearchTerm(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
               <div className="border rounded-md max-h-60 overflow-y-auto">
-                {availableVisits.length === 0 ? (
+                {filteredAvailableVisits.length === 0 ? (
                   <p className="p-4 text-center text-muted-foreground">
-                    No hay visitas disponibles para asignar
+                    {availableVisits.length === 0 
+                      ? 'No hay visitas disponibles para asignar'
+                      : 'No se encontraron visitas con ese criterio de búsqueda'
+                    }
                   </p>
                 ) : (
                   <Table>
@@ -789,7 +805,7 @@ export default function DeliveriesManagement() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {availableVisits.map((visit) => (
+                      {filteredAvailableVisits.map((visit) => (
                         <TableRow key={visit.id}>
                           <TableCell>
                             <Checkbox

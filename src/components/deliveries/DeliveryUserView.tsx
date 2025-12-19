@@ -14,7 +14,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from '@/hooks/use-toast';
-import { Truck, User, MapPin, Calendar, FileText, DollarSign, Plus, Loader2, Eye, Play, CheckCircle, Filter, X } from 'lucide-react';
+import { Truck, User, MapPin, Calendar, FileText, DollarSign, Plus, Loader2, Eye, Play, CheckCircle, Filter, X, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
@@ -306,6 +306,43 @@ export default function DeliveryUserView() {
     }
   };
 
+  const handleReopenDelivery = async (delivery: Delivery) => {
+    if (!confirm('¿Estás seguro de que quieres reabrir este reparto?')) return;
+
+    try {
+      const { error: deliveryError } = await supabase
+        .from('deliveries')
+        .update({ status: 'in_progress' })
+        .eq('id', delivery.id);
+
+      if (deliveryError) throw deliveryError;
+
+      if (delivery.visit_id) {
+        await supabase
+          .from('visits')
+          .update({ status: 'in_progress' })
+          .eq('id', delivery.visit_id);
+      }
+
+      toast({
+        title: "Reparto reabierto",
+        description: "El reparto ha sido reabierto y está en progreso",
+      });
+
+      fetchDeliveries();
+      if (selectedDelivery?.id === delivery.id) {
+        setSelectedDelivery({ ...delivery, status: 'in_progress' });
+      }
+    } catch (error: any) {
+      console.error('Error reopening delivery:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo reabrir el reparto",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleOpenAddSale = () => {
     setSaleLines([{ products: [{ product_name: '' }], quantity: 1, unit_price: 0, financiada: false, transferencia: false, nulo: false }]);
     setAddSaleDialogOpen(true);
@@ -345,7 +382,7 @@ export default function DeliveryUserView() {
     const validLines = saleLines.filter(line => 
       line.products.some(p => p.product_name.trim()) && 
       line.quantity > 0 && 
-      line.unit_price > 0
+      line.unit_price >= 0
     );
 
     if (validLines.length === 0) {
@@ -688,6 +725,16 @@ export default function DeliveryUserView() {
                             <CheckCircle className="h-4 w-4" />
                           </Button>
                         )}
+                        {delivery.status === 'completed' && (
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            onClick={() => handleReopenDelivery(delivery)}
+                            title="Reabrir reparto"
+                          >
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -742,47 +789,27 @@ export default function DeliveryUserView() {
                   </CardContent>
                 </Card>
 
-                {selectedDelivery.visit?.notes && (
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-lg flex items-center justify-between">
-                        <span className="flex items-center gap-2">
-                          <FileText className="h-5 w-5" />
-                          Notas
-                        </span>
-                        {selectedDelivery.status !== 'completed' && (
-                          <Button size="sm" variant="outline" onClick={handleOpenAddNote}>
-                            <Plus className="h-4 w-4 mr-1" />
-                            Añadir Nota
-                          </Button>
-                        )}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center justify-between">
+                      <span className="flex items-center gap-2">
+                        <FileText className="h-5 w-5" />
+                        Notas
+                      </span>
+                      <Button size="sm" variant="outline" onClick={handleOpenAddNote}>
+                        <Plus className="h-4 w-4 mr-1" />
+                        Añadir Nota
+                      </Button>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {selectedDelivery.visit?.notes ? (
                       <p className="whitespace-pre-wrap text-sm">{selectedDelivery.visit.notes}</p>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {!selectedDelivery.visit?.notes && selectedDelivery.status !== 'completed' && (
-                  <Card>
-                    <CardHeader className="pb-3">
-                      <CardTitle className="text-lg flex items-center justify-between">
-                        <span className="flex items-center gap-2">
-                          <FileText className="h-5 w-5" />
-                          Notas
-                        </span>
-                        <Button size="sm" variant="outline" onClick={handleOpenAddNote}>
-                          <Plus className="h-4 w-4 mr-1" />
-                          Añadir Nota
-                        </Button>
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent>
+                    ) : (
                       <p className="text-muted-foreground text-sm">Sin notas</p>
-                    </CardContent>
-                  </Card>
-                )}
+                    )}
+                  </CardContent>
+                </Card>
 
                 {visitHistory.length > 0 && (
                   <Card>
@@ -824,12 +851,10 @@ export default function DeliveryUserView() {
                         <DollarSign className="h-5 w-5" />
                         Ventas ({sales.length})
                       </span>
-                      {selectedDelivery.status !== 'completed' && (
-                        <Button size="sm" onClick={handleOpenAddSale}>
-                          <Plus className="h-4 w-4 mr-1" />
-                          Añadir Venta
-                        </Button>
-                      )}
+                      <Button size="sm" onClick={handleOpenAddSale}>
+                        <Plus className="h-4 w-4 mr-1" />
+                        Añadir Venta
+                      </Button>
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -841,30 +866,58 @@ export default function DeliveryUserView() {
                       <p className="text-muted-foreground text-center py-4">No hay ventas registradas</p>
                     ) : (
                       <div className="space-y-4">
-                        {sales.map((sale) => (
+                        {sales.map((sale, saleIndex) => (
                           <div key={sale.id} className="border rounded-lg p-4">
-                            <div className="flex items-center justify-between mb-3">
-                              <p className="font-medium">
-                                {format(new Date(sale.sale_date), 'dd/MM/yyyy HH:mm', { locale: es })}
-                              </p>
-                              <p className="font-bold text-lg">{sale.amount.toFixed(2)} €</p>
+                            <div className="flex items-center justify-between mb-2">
+                              <div>
+                                <p className="font-bold text-lg">Venta #{saleIndex + 1}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {format(new Date(sale.sale_date), 'dd/MM/yyyy HH:mm', { locale: es })}
+                                </p>
+                              </div>
+                              <p className="font-bold text-lg text-green-600">{sale.amount.toFixed(2).replace('.', ',')} €</p>
                             </div>
                             
                             {sale.sale_lines && sale.sale_lines.length > 0 && (
                               <>
-                                <Separator className="my-3" />
-                                <div className="space-y-2">
+                                <p className="font-semibold mt-4 mb-2">Productos:</p>
+                                <div className="space-y-3">
                                   {sale.sale_lines.map((line, idx) => (
-                                    <div key={idx} className="flex items-center justify-between text-sm bg-muted/50 rounded p-2">
-                                      <div>
-                                        <span className="font-medium">
-                                          {line.products.map(p => p.product_name).join(', ') || 'Producto'}
-                                        </span>
-                                        <span className="text-muted-foreground ml-2">x{line.quantity}</span>
-                                        {line.financiada && <Badge variant="outline" className="ml-2">Financiada</Badge>}
-                                        {line.nulo && <Badge variant="destructive" className="ml-2">Nulo</Badge>}
+                                    <div key={idx} className="bg-muted/30 rounded-lg p-3">
+                                      <div className="flex items-start justify-between">
+                                        <div className="flex-1">
+                                          <p className="font-medium">
+                                            {line.quantity}x {line.products[0]?.product_name || 'Pack'} - {line.unit_price.toFixed(2).replace('.', ',')} €
+                                          </p>
+                                          {line.products.length > 1 && (
+                                            <div className="mt-1 ml-4 text-sm text-muted-foreground">
+                                              {line.products.slice(1).map((p, pIdx) => (
+                                                <p key={pIdx}>• {p.product_name}</p>
+                                              ))}
+                                            </div>
+                                          )}
+                                        </div>
+                                        <p className="font-medium">{(line.quantity * line.unit_price).toFixed(2).replace('.', ',')} €</p>
                                       </div>
-                                      <span>{(line.quantity * line.unit_price).toFixed(2)} €</span>
+                                      <div className="flex gap-2 mt-2">
+                                        <Badge 
+                                          variant={line.financiada ? "default" : "outline"} 
+                                          className={line.financiada ? "bg-gray-200 text-gray-800 hover:bg-gray-200" : ""}
+                                        >
+                                          {line.financiada ? '✓' : '✗'} Financiada
+                                        </Badge>
+                                        <Badge 
+                                          variant={line.transferencia ? "default" : "outline"}
+                                          className={line.transferencia ? "bg-green-100 text-green-800 hover:bg-green-100" : ""}
+                                        >
+                                          {line.transferencia ? '✓' : '✗'} Transferencia
+                                        </Badge>
+                                        <Badge 
+                                          variant={line.nulo ? "destructive" : "outline"}
+                                        >
+                                          {line.nulo ? '✓' : '✗'} Nulo
+                                        </Badge>
+                                      </div>
                                     </div>
                                   ))}
                                 </div>
@@ -885,6 +938,17 @@ export default function DeliveryUserView() {
                     >
                       <CheckCircle className="h-4 w-4 mr-2" />
                       Completar Reparto
+                    </Button>
+                  </div>
+                )}
+                {selectedDelivery.status === 'completed' && (
+                  <div className="flex justify-end">
+                    <Button 
+                      variant="outline"
+                      onClick={() => handleReopenDelivery(selectedDelivery)}
+                    >
+                      <RotateCcw className="h-4 w-4 mr-2" />
+                      Reabrir Reparto
                     </Button>
                   </div>
                 )}
@@ -929,8 +993,8 @@ export default function DeliveryUserView() {
                           type="number"
                           min="0"
                           step="0.01"
-                          value={line.unit_price}
-                          onChange={(e) => updateSaleLine(index, 'unit_price', parseFloat(e.target.value) || 0)}
+                          value={line.unit_price || ''}
+                          onChange={(e) => updateSaleLine(index, 'unit_price', e.target.value === '' ? 0 : parseFloat(e.target.value))}
                         />
                       </div>
                     </div>
