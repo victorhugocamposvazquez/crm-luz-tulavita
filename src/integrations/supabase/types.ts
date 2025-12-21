@@ -223,6 +223,61 @@ export type Database = {
           },
         ]
       }
+      deliveries: {
+        Row: {
+          id: string
+          visit_id: string
+          delivery_id: string
+          status: string
+          notes: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          visit_id: string
+          delivery_id: string
+          status?: string
+          notes?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          visit_id?: string
+          delivery_id?: string
+          status?: string
+          notes?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deliveries_visit_id_fkey"
+            columns: ["visit_id"]
+            isOneToOne: true
+            referencedRelation: "visits"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deliveries_repartidor_id_fkey"
+            columns: ["repartidor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deliveries_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       renewal_reminders: {
         Row: {
           client_id: string
@@ -644,7 +699,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "commercial"
+      app_role: "admin" | "commercial" | "delivery"
       visit_approval_status:
         | "pending"
         | "approved"
@@ -783,7 +838,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "commercial"],
+      app_role: ["admin", "commercial", "delivery"],
       visit_approval_status: [
         "pending",
         "approved",

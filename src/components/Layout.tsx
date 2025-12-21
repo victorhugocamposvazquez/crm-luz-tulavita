@@ -1,6 +1,6 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { Users, Building2, MapPin, TrendingUp, LogOut, Menu, User, ChevronDown, Key, Bell, Navigation } from 'lucide-react';
+import { Users, Building2, MapPin, TrendingUp, LogOut, Menu, User, ChevronDown, Key, Bell, Navigation, Truck } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import AdminPasswordDialog from '@/components/AdminPasswordDialog';
@@ -31,9 +31,9 @@ export default function Layout({ children, currentView, onViewChange }: LayoutPr
 
   const isAdmin = userRole?.role === 'admin';
   const isCommercial = userRole?.role === 'commercial';
+  const isDelivery = userRole?.role === 'delivery';
   const totalNotifications = pendingTasks.length + pendingApprovals.length;
   
-  // El botón GPS solo debe aparecer para comerciales cuando no hay geolocalización
   const showGpsButton = isCommercial && !location && !geoLoading;
 
   const navigation = isAdmin ? [
@@ -43,7 +43,11 @@ export default function Layout({ children, currentView, onViewChange }: LayoutPr
     { name: 'Clientes', icon: Users, view: 'clients' },
 /*     { name: 'Albaranes', icon: Users, view: 'albaranes' }, */
     { name: 'Visitas', icon: MapPin, view: 'visits' },
+    { name: 'Reparto', icon: Truck, view: 'deliveries' },
     { name: 'Recordatorios', icon: Bell, view: 'reminders' },
+  ] : isDelivery ? [
+    { name: 'Mis Repartos', icon: Truck, view: 'deliveries' },
+    { name: 'Visitas', icon: MapPin, view: 'visits' },
   ] : [
     { name: 'Estadísticas', icon: TrendingUp, view: 'stats' },
     { name: 'Visitas', icon: MapPin, view: 'visits' },
