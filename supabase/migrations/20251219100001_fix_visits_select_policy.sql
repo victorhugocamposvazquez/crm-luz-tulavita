@@ -10,3 +10,7 @@ USING (
     AND ur.role IN ('admin', 'commercial', 'delivery')
   )
 );
+
+
+
+
