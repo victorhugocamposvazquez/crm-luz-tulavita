@@ -611,8 +611,14 @@ export default function DeliveriesManagement() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Repartos ({deliveries.length})</span>
+          <CardTitle className="flex items-center justify-between flex-start">
+            <div className="reparto-head">
+              <span>Repartos ({deliveries.length})</span>
+              <Button onClick={handleOpenAssignDialog} className="flex items-center gap-2">
+                <Truck className="h-4 w-4" />
+                Asignar Reparto
+              </Button>
+            </div>
             {selectedDeliveries.length > 0 && (
               <div className="flex items-center gap-2">
                 <Button
