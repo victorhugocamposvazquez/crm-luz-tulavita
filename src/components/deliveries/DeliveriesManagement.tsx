@@ -611,7 +611,7 @@ export default function DeliveriesManagement() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
+          <CardTitle className="flex items-center justify-between flex-start">
             <div className="reparto-head">
               <span>Repartos ({deliveries.length})</span>
               <Button onClick={handleOpenAssignDialog} className="flex items-center gap-2">

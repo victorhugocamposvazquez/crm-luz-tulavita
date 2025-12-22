@@ -4,7 +4,12 @@
   padding: 2rem;
   text-align: center;
 }
-
+.reparto-head button {
+  margin-top: 19px;
+}
+.flex-start{
+  align-items: flex-start;
+}
 .logo {
   height: 6em;
   padding: 1.5em;
