@@ -616,7 +616,7 @@ export default function DeliveriesManagement() {
               <span>Repartos ({deliveries.length})</span>
               <Button onClick={handleOpenAssignDialog} className="flex items-center gap-2">
                 <Truck className="h-4 w-4" />
-                Asignar Reparto
+                Asignar Reparto 
               </Button>
             </div>
             {selectedDeliveries.length > 0 && (
