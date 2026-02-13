@@ -10,8 +10,6 @@ import CommercialVisitsManager from '@/components/dashboard/CommercialVisitsMana
 import CommercialStatistics from '@/components/dashboard/CommercialStatistics';
 import AdminVisitsView from '@/components/dashboard/AdminVisitsView';
 import RemindersManagement from '@/components/reminders/RemindersManagement';
-import DeliveriesManagement from '@/components/deliveries/DeliveriesManagement';
-import DeliveryUserView from '@/components/deliveries/DeliveryUserView';
 
 const ClientManagement = lazy(() => import('@/components/dashboard/ClientManagement'));
 
@@ -36,17 +34,6 @@ export default function Dashboard() {
 
   const renderView = () => {
     const isAdmin = userRole?.role === 'admin';
-    const isDelivery = userRole?.role === 'delivery';
-    
-    if (isDelivery) {
-      switch (currentView) {
-        case 'visits':
-          return <CommercialVisitsManager />;
-        case 'deliveries':
-        default:
-          return <DeliveryUserView />;
-      }
-    }
     
     switch (currentView) {
       case 'dashboard':
@@ -63,8 +50,6 @@ export default function Dashboard() {
         ) : <CommercialVisitsManager />;
       case 'visits':
         return isAdmin ? <AdminVisitsView /> : <CommercialVisitsManager />;
-      case 'deliveries':
-        return isAdmin ? <DeliveriesManagement /> : <CommercialVisitsManager />;
       case 'reminders':
         return isAdmin ? <RemindersManagement /> : <CommercialVisitsManager />;
       case 'stats':

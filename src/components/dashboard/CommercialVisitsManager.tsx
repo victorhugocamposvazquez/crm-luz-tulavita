@@ -217,56 +217,16 @@ export default function CommercialVisitsManager() {
       setLoading(true);
       console.log('[CVM] Fetching visits for user:', user?.id, 'role:', userRole?.role);
 
-      const isDelivery = userRole?.role === 'delivery';
       const today = new Date();
       const todayString = today.toISOString().split('T')[0];
 
       let data: any[] = [];
       let error: any = null;
 
-      if (isDelivery) {
-        const { data: deliveryVisits, error: deliveryError } = await supabase
-          .from('deliveries')
-          .select(`
-            visit_id,
-            visits!inner (
-              id,
-              visit_date,
-              created_at,
-              updated_at,
-              status,
-              approval_status,
-              notes,
-              approval_date,
-              permission,
-              client_id,
-              company_id,
-              second_commercial_id,
-              latitude,
-              longitude,
-              location_accuracy,
-              visit_state_code,
-              visit_states (
-                name,
-                description
-              ),
-              approved_by,
-              client:clients(nombre_apellidos, dni, localidad),
-              company:companies(name)
-            )
-          `)
-          .eq('delivery_id', user?.id)
-          .order('created_at', { ascending: false });
-
-        error = deliveryError;
-        data = (deliveryVisits || []).map(d => d.visits);
-      } else {
-        const {
-          data: debugData
-        } = await supabase.from('visits').select('id, status, approval_status, created_at').eq('commercial_id', user?.id);
-        console.log('[CVM] Debug - All visits for user:', debugData);
+      const { data: debugData } = await supabase.from('visits').select('id, status, approval_status, created_at').eq('commercial_id', user?.id);
+      console.log('[CVM] Debug - All visits for user:', debugData);
         
-        const result = await supabase.from('visits').select(`
+      const result = await supabase.from('visits').select(`
             id,
             visit_date,
             created_at,
@@ -291,15 +251,14 @@ export default function CommercialVisitsManager() {
             client:clients(nombre_apellidos, dni, localidad),
             company:companies(name)
           `).eq('commercial_id', user?.id)
-          .neq('status', 'completed')
-          .or(`approval_status.neq.rejected,and(approval_status.eq.rejected,visit_date.gte.${todayString})`)
-          .order('visit_date', {
+        .neq('status', 'completed')
+        .or(`approval_status.neq.rejected,and(approval_status.eq.rejected,visit_date.gte.${todayString})`)
+        .order('visit_date', {
           ascending: false
         });
         
-        data = result.data || [];
-        error = result.error;
-      }
+      data = result.data || [];
+      error = result.error;
       
       if (error) {
         console.error('Error fetching visits:', error);

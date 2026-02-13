@@ -18,7 +18,7 @@ interface User {
   last_name?: string;
   company_id?: string;
   company?: { name: string };
-  role?: 'admin' | 'commercial' | 'delivery';
+  role?: 'admin' | 'commercial';
 }
 
 interface Company {
@@ -100,7 +100,7 @@ export default function UserManagement() {
     const firstName = formData.get('firstName') as string;
     const lastName = formData.get('lastName') as string;
     const companyId = formData.get('companyId') as string;
-    const role = formData.get('role') as 'admin' | 'commercial' | 'delivery';
+    const role = formData.get('role') as 'admin' | 'commercial';
 
     try {
       // Use edge function to create user
@@ -143,7 +143,7 @@ export default function UserManagement() {
     const firstName = formData.get('firstName') as string;
     const lastName = formData.get('lastName') as string;
     const companyId = formData.get('companyId') as string;
-    const role = formData.get('role') as 'admin' | 'commercial' | 'delivery';
+    const role = formData.get('role') as 'admin' | 'commercial';
 
     try {
       // Update profile
@@ -299,14 +299,13 @@ export default function UserManagement() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="role">Rol</Label>
-                  <Select name="role" defaultValue={editingUser?.role || 'commercial'} required>
+                  <Select name="role" defaultValue={editingUser?.role === 'delivery' ? 'commercial' : (editingUser?.role || 'commercial')} required>
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar rol" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="admin">Administrador</SelectItem>
                       <SelectItem value="commercial">Comercial</SelectItem>
-                      <SelectItem value="delivery">Repartidor</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -354,11 +353,9 @@ export default function UserManagement() {
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                       user.role === 'admin' 
                         ? 'bg-blue-100 text-blue-800' 
-                        : user.role === 'delivery'
-                        ? 'bg-purple-100 text-purple-800'
                         : 'bg-green-100 text-green-800'
                     }`}>
-                      {user.role === 'admin' ? 'Administrador' : user.role === 'delivery' ? 'Repartidor' : 'Comercial'}
+                      {user.role === 'admin' ? 'Administrador' : 'Comercial'}
                     </span>
                   </TableCell>
                    <TableCell>
