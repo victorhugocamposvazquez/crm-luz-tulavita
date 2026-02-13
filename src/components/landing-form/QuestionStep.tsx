@@ -25,6 +25,8 @@ export interface QuestionStepProps {
   onBlur?: () => void;
   error?: string;
   disabled?: boolean;
+  /** Oculta el label (útil cuando el padre renderiza la pregunta) */
+  hideLabel?: boolean;
 }
 
 export function QuestionStep({
@@ -34,6 +36,7 @@ export function QuestionStep({
   onBlur,
   error,
   disabled,
+  hideLabel,
 }: QuestionStepProps) {
   const id = `q-${question.id}`;
   const isRequired = question.required !== false;
@@ -42,7 +45,7 @@ export function QuestionStep({
     onChange(v);
   };
 
-  const baseInput = (
+  const baseInput = !hideLabel ? (
     <div className="space-y-2">
       <Label htmlFor={id} className="text-lg font-medium">
         {question.label}
@@ -50,7 +53,7 @@ export function QuestionStep({
       </Label>
       {error && <p className="text-sm text-destructive">{error}</p>}
     </div>
-  );
+  ) : null;
 
   switch (question.type) {
     case 'text':
