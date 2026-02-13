@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Formulario de contacto - Leads</title>
+</head>
+<body>
+  <h1>Formulario de contacto</h1>
+  <form id="leadForm">
+    <label>Nombre <input type="text" name="name" /></label><br>
+    <label>Email <input type="email" name="email" required /></label><br>
+    <label>Teléfono <input type="tel" name="phone" /></label><br>
+    <input type="hidden" name="source" value="web_form" />
+    <input type="hidden" name="campaign" value="landing-principal" />
+    <button type="submit">Enviar</button>
+  </form>
+  <p id="message"></p>
+
+  <script>
+    const API_URL = 'https://TU_PROYECTO.vercel.app/api/leads';
+    // Alternativa Edge Function: 'https://TU_REF.supabase.co/functions/v1/create-lead'
+
+    document.getElementById('leadForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const msg = document.getElementById('message');
+      const data = {
+        name: form.name.value,
+        email: form.email.value,
+        phone: form.phone.value,
+        source: form.source.value,
+        campaign: form.campaign.value,
+      };
+
+      try {
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(data),
+        });
+        const json = await res.json();
+        if (json.success) {
+          msg.textContent = json.isNew ? '¡Gracias! Te contactaremos pronto.' : 'Ya teníamos tus datos. Te contactaremos.';
+          form.reset();
+        } else {
+          msg.textContent = 'Error: ' + (json.error || 'Inténtalo de nuevo');
+        }
+      } catch (err) {
+        msg.textContent = 'Error de conexión. Inténtalo más tarde.';
+      }
+    });
+  </script>
+</body>
+</html>
