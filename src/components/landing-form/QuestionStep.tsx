@@ -319,10 +319,13 @@ export function QuestionStep({
                 </button>
                 <Input
                   type="tel"
+                  inputMode="numeric"
+                  autoComplete="tel"
                   className="flex-1 h-11 border-0 rounded-none px-0 focus-visible:ring-0 bg-transparent placeholder:text-gray-400"
                   placeholder="612 34 56 78"
                   value={contactVal.phone ?? ''}
                   onChange={(e) => updateContact('phone', e.target.value)}
+                  onInput={(e) => updateContact('phone', e.currentTarget.value)}
                   disabled={disabled}
                 />
               </div>
@@ -391,7 +394,8 @@ export function validateQuestion(
 
   if (question.type === 'contact') {
     const v = value as Record<string, string> | undefined;
-    if (!v?.phone?.trim()) return 'El teléfono es obligatorio';
+    const phone = (v?.phone ?? v?.telefono ?? '').toString().replace(/\s/g, '');
+    if (!phone || phone.length < 8) return 'El teléfono es obligatorio';
     if (!v?.email?.trim()) return 'El email es obligatorio';
     if (v.email && !isValidEmail(v.email)) return 'Email no válido';
     return null;

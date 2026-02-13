@@ -1,10 +1,11 @@
 /**
- * Formulario Ahorro Luz/Gas - Pasos según capturas del usuario
+ * Formulario Ahorro Luz - Pasos según capturas del usuario
  * - Auto-avance al seleccionar opción (radio)
  * - Flechas para navegar atrás/adelante
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { flushSync } from 'react-dom';
 import { useFormState } from '@/components/landing-form';
 import { QuestionStep, validateQuestion } from '@/components/landing-form';
 import type { FormConfig } from '@/components/landing-form';
@@ -13,7 +14,7 @@ import { ChevronLeft, ChevronRight, Loader2, Zap } from 'lucide-react';
 
 const BUTTON_BLUE = '#2563eb';
 
-const AHORRO_LUZ_GAS_CONFIG: FormConfig = {
+const AHORRO_LUZ_CONFIG: FormConfig = {
   source: 'web_form',
   campaign: 'ahorro_luz_gas',
   questions: [
@@ -97,10 +98,11 @@ const AHORRO_LUZ_GAS_CONFIG: FormConfig = {
   ],
 };
 
-export default function AhorroLuzGas() {
+export default function AhorroLuz() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [direction, setDirection] = useState<'next' | 'prev'>('next');
   const autoAdvanceTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const contactValuesRef = useRef<Record<string, string>>({});
 
   const {
     currentQuestion,
@@ -119,15 +121,29 @@ export default function AhorroLuzGas() {
     submitStatus,
     submitError,
   } = useFormState({
-    questions: AHORRO_LUZ_GAS_CONFIG.questions,
-    source: AHORRO_LUZ_GAS_CONFIG.source,
-    campaign: AHORRO_LUZ_GAS_CONFIG.campaign,
+    questions: AHORRO_LUZ_CONFIG.questions,
+    source: AHORRO_LUZ_CONFIG.source,
+    campaign: AHORRO_LUZ_CONFIG.campaign,
   });
+
+  const scrollToTop = useCallback(() => {
+    const doScroll = () => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    };
+    requestAnimationFrame(() => requestAnimationFrame(doScroll));
+  }, []);
 
   const handleNext = useCallback(
     (valueOverride?: string) => {
       if (!currentQuestion) return;
-      const value = valueOverride ?? answers[currentQuestion.id];
+      // Para contacto: usar ref como fallback (evita estado desactualizado al clicar rápido)
+      const value =
+        valueOverride ??
+        (currentQuestion.type === 'contact'
+          ? (Object.keys(contactValuesRef.current).length ? contactValuesRef.current : answers[currentQuestion.id])
+          : answers[currentQuestion.id]);
       const err = validateQuestion(currentQuestion, value);
       if (err) {
         setValidationError(err);
@@ -135,17 +151,26 @@ export default function AhorroLuzGas() {
       }
       setValidationError(null);
       setDirection('next');
-      if (isLast) submit();
+      if (isLast) {
+        if (currentQuestion.type === 'contact' && Object.keys(contactValuesRef.current).length > 0) {
+          flushSync(() => setAnswer(currentQuestion.id, contactValuesRef.current));
+        }
+        submit();
+      }
       else goNext();
+      // Scroll explícito al hacer clic en botón (necesario en iOS mobile)
+      setTimeout(scrollToTop, 100);
     },
-    [currentQuestion, answers, isLast, submit, goNext]
+    [currentQuestion, answers, isLast, submit, goNext, scrollToTop]
   );
 
   const handlePrev = useCallback(() => {
     setValidationError(null);
     setDirection('prev');
     goPrev();
-  }, [goPrev]);
+    // Scroll explícito al hacer clic en botón (necesario en iOS mobile)
+    setTimeout(scrollToTop, 100);
+  }, [goPrev, scrollToTop]);
 
   const handleSelectAndAdvance = useCallback(
     (selectedValue: string) => {
@@ -301,7 +326,12 @@ export default function AhorroLuzGas() {
             <QuestionStep
               question={currentQuestion}
               value={answers[currentQuestion.id]}
-              onChange={(v) => setAnswer(currentQuestion.id, v)}
+              onChange={(v) => {
+                if (currentQuestion.type === 'contact' && typeof v === 'object' && v !== null) {
+                  contactValuesRef.current = v as Record<string, string>;
+                }
+                setAnswer(currentQuestion.id, v);
+              }}
               error={validationError ?? undefined}
               disabled={submitStatus === 'loading'}
               hideLabel
