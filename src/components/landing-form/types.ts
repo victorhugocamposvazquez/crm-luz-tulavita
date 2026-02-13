@@ -9,7 +9,9 @@ export type QuestionType =
   | 'phone'
   | 'select'
   | 'radio'
-  | 'checkbox';
+  | 'checkbox'
+  | 'file_upload'
+  | 'contact';
 
 export interface QuestionOption {
   value: string;
@@ -69,6 +71,23 @@ export interface CheckboxQuestion extends BaseQuestion {
   options: QuestionOption[];
 }
 
+export interface FileUploadQuestion extends BaseQuestion {
+  type: 'file_upload';
+  accept?: string;
+  maxSizeMb?: number;
+  description?: string;
+}
+
+export interface ContactQuestion extends BaseQuestion {
+  type: 'contact';
+  /** Texto de encabezado */
+  header?: string;
+  /** Puntos a revisar (con checkmark) */
+  reviewPoints?: string[];
+  /** Aviso de privacidad */
+  privacyNote?: string;
+}
+
 export type Question =
   | TextQuestion
   | NumberQuestion
@@ -76,7 +95,9 @@ export type Question =
   | PhoneQuestion
   | SelectQuestion
   | RadioQuestion
-  | CheckboxQuestion;
+  | CheckboxQuestion
+  | FileUploadQuestion
+  | ContactQuestion;
 
 export interface FormConfig {
   questions: Question[];
@@ -85,8 +106,14 @@ export interface FormConfig {
   adset?: string;
 }
 
+export interface ContactValue {
+  name?: string;
+  phone?: string;
+  email?: string;
+}
+
 export interface FormAnswers {
-  [questionId: string]: string | number | string[] | undefined;
+  [questionId: string]: string | number | string[] | ContactValue | undefined;
 }
 
 export interface LeadPayload {

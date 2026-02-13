@@ -1,15 +1,15 @@
 /**
- * Clon del formulario Selectra "Estudio de energía"
- * Estructura según API Typeform: https://api.typeform.com/forms/XpzfGYPD
- * Referencia: https://selectra.typeform.com/ahorro-luz-gas
+ * Formulario Ahorro Luz/Gas - Pasos según capturas del usuario
+ * - Auto-avance al seleccionar opción (radio)
+ * - Flechas para navegar atrás/adelante
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useFormState } from '@/components/landing-form';
 import { QuestionStep, validateQuestion } from '@/components/landing-form';
 import type { FormConfig } from '@/components/landing-form';
 import { cn } from '@/lib/utils';
-import { ChevronLeft, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
 const BUTTON_BLUE = '#2563eb';
 
@@ -31,181 +31,67 @@ const AHORRO_LUZ_GAS_CONFIG: FormConfig = {
       ],
     },
     {
-      id: 'tipo_tarifa',
+      id: 'compania',
       type: 'radio',
-      label: '¿Qué tipo de tarifa deseas comparar en este estudio?',
+      label: '¿Cuál es tu compañía actual?',
       required: true,
       optionLetters: true,
       options: [
-        { value: 'luz_gas', label: 'Tarifas de luz y gas' },
-        { value: 'luz', label: 'Tarifas de luz' },
-        { value: 'gas', label: 'Tarifas de gas' },
+        { value: 'endesa', label: 'Endesa' },
+        { value: 'naturgy', label: 'Naturgy' },
+        { value: 'repsol', label: 'Repsol' },
+        { value: 'iberdrola', label: 'Iberdrola' },
+        { value: 'octopus', label: 'Octopus' },
+        { value: 'plenitude', label: 'Plenitude' },
+        { value: 'otra', label: 'Otra' },
       ],
     },
     {
-      id: 'tipo_servicio',
+      id: 'potencia',
       type: 'radio',
-      label: '¿Este servicio lo necesitas para…?',
+      label: '¿Podrías decirnos qué potencia tienes contratada?',
       required: true,
       optionLetters: true,
       options: [
-        { value: 'hogar', label: '🏠 Un hogar' },
-        { value: 'empresa', label: '🏢 Un negocio o empresa' },
+        { value: 'menos_3', label: 'Menos de 3kW' },
+        { value: '3_5', label: 'Entre 3 y 5kW' },
+        { value: 'mas_5', label: 'Más de 5kW' },
+        { value: 'no_se', label: 'No lo sé' },
       ],
-    },
-    {
-      id: 'codigo_postal',
-      type: 'text',
-      label: 'Indica el código postal del suministro',
-      placeholder: 'Ej: 28001',
-      required: true,
     },
     {
       id: 'tiene_factura',
       type: 'radio',
-      label: 'Para ajustar la tarifa al consumo de tu vivienda, ¿tienes una factura a mano?',
+      label: '¿Tendrías una factura reciente a mano que puedas subir?',
       required: true,
       optionLetters: true,
       options: [
-        { value: 'subir', label: 'Sí. Quiero subir mi factura' },
-        { value: 'manual', label: 'Sí. Introducir datos manualmente' },
-        { value: 'calcular', label: 'No. Ayúdame a calcularlo' },
+        { value: 'subir', label: 'Sí, ¡la subo ahora!' },
+        { value: 'no', label: 'No la tengo, mejor en otro momento' },
       ],
     },
     {
-      id: 'superficie',
-      type: 'number',
-      label: 'Indica la superficie de la vivienda en m²',
-      placeholder: 'Ej: 85',
+      id: 'adjuntar_factura',
+      type: 'file_upload',
+      label: '¡Adjunta tu factura aquí! Puede ser una foto, captura, PDF...',
       required: false,
-      min: 20,
-      max: 500,
-      showWhen: { questionId: 'tiene_factura', value: 'calcular' },
+      maxSizeMb: 10,
+      description: 'Si al final no puedes subirla ahora, continúa y te enviaremos un mail para que puedas hacerlo más tarde.',
+      showWhen: { questionId: 'tiene_factura', value: 'subir' },
     },
     {
-      id: 'personas',
-      type: 'radio',
-      label: '¿Cuántas personas viven en la casa?',
-      required: false,
-      optionLetters: true,
-      options: [
-        { value: '1', label: '1' },
-        { value: '2', label: '2' },
-        { value: '3', label: '3' },
-        { value: '4', label: '4' },
-        { value: '5', label: '5' },
-        { value: '6_mas', label: '6 o más' },
-      ],
-      showWhen: { questionId: 'tiene_factura', value: 'calcular' },
-    },
-    {
-      id: 'calefaccion',
-      type: 'radio',
-      label: '¿Qué energía utilizas para la calefacción?',
-      required: false,
-      optionLetters: true,
-      options: [
-        { value: 'electricidad', label: 'Electricidad' },
-        { value: 'gas', label: 'Gas' },
-      ],
-      showWhen: { questionId: 'tiene_factura', value: 'calcular' },
-    },
-    {
-      id: 'agua_caliente',
-      type: 'radio',
-      label: '¿Y para el agua caliente?',
-      required: false,
-      optionLetters: true,
-      options: [
-        { value: 'electricidad', label: 'Electricidad' },
-        { value: 'gas', label: 'Gas' },
-      ],
-      showWhen: { questionId: 'tiene_factura', value: 'calcular' },
-    },
-    {
-      id: 'cocina',
-      type: 'radio',
-      label: '¿Y para la cocina?',
-      required: false,
-      optionLetters: true,
-      options: [
-        { value: 'electricidad', label: 'Electricidad' },
-        { value: 'gas', label: 'Gas' },
-      ],
-      showWhen: { questionId: 'tiene_factura', value: 'calcular' },
-    },
-    {
-      id: 'kwh_luz',
-      type: 'number',
-      label: '¿Cuántos kWh consumes al mes en luz?',
-      placeholder: 'Ej: 150',
+      id: 'contacto',
+      type: 'contact',
+      label: '',
       required: true,
-      min: 1,
-      max: 2000,
-      showWhen: { questionId: 'tiene_factura', value: 'manual' },
-    },
-    {
-      id: 'potencia_p1',
-      type: 'number',
-      label: '¿Cuánta potencia tienes contratada en P1 (punta)? (kW)',
-      placeholder: 'Ej: 2.3',
-      required: false,
-      min: 1,
-      max: 15,
-      showWhen: { questionId: 'tiene_factura', value: 'manual' },
-    },
-    {
-      id: 'potencia_p2',
-      type: 'number',
-      label: '¿Cuánta potencia tienes contratada en P2 (valle)? (kW)',
-      placeholder: 'Ej: 2.3',
-      required: false,
-      min: 1,
-      max: 15,
-      showWhen: { questionId: 'tiene_factura', value: 'manual' },
-    },
-    {
-      id: 'frecuencia_factura',
-      type: 'text',
-      label: '¿Con qué frecuencia de días te facturan la luz?',
-      placeholder: 'Ej: 30 o 60',
-      required: false,
-      showWhen: { questionId: 'tiene_factura', value: 'manual' },
-    },
-    {
-      id: 'placas_solares',
-      type: 'radio',
-      label: 'Para reducir aún más tu consumo, ¿te interesa un estudio sobre placas solares?',
-      required: false,
-      optionLetters: true,
-      options: [
-        { value: 'si', label: 'Sí, quiero información sobre placas solares' },
-        { value: 'no', label: 'No, solo quiero un estudio de tarifas estándar' },
+      header: 'Indícanos tus datos de contacto y revisaremos contigo:',
+      reviewPoints: [
+        'Sobrecostes actuales',
+        'Precio €/kWh de tu tarifa actual',
+        'Optimización de la potencia contratada*',
       ],
-    },
-    {
-      id: 'nombre',
-      type: 'text',
-      label: '¿Cómo te llamas?',
-      placeholder: 'Nombre y apellidos',
-      required: true,
-      mapTo: 'name',
-    },
-    {
-      id: 'telefono',
-      type: 'phone',
-      label: '¿Cuál es tu teléfono?',
-      placeholder: '612 345 678',
-      required: true,
-      mapTo: 'phone',
-    },
-    {
-      id: 'email',
-      type: 'email',
-      label: '¿Cuál es tu email?',
-      placeholder: 'tu@email.com',
-      required: true,
-      mapTo: 'email',
+      privacyNote:
+        'Trataremos tus datos para darte respuesta y enviarte ofertas e información promocional sobre nuestros servicios por diversos medios.',
     },
   ],
 };
@@ -213,6 +99,7 @@ const AHORRO_LUZ_GAS_CONFIG: FormConfig = {
 export default function AhorroLuzGas() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [direction, setDirection] = useState<'next' | 'prev'>('next');
+  const autoAdvanceTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const {
     currentQuestion,
@@ -256,6 +143,14 @@ export default function AhorroLuzGas() {
     goPrev();
   }, [goPrev]);
 
+  const handleSelectAndAdvance = useCallback(() => {
+    if (autoAdvanceTimeout.current) clearTimeout(autoAdvanceTimeout.current);
+    autoAdvanceTimeout.current = setTimeout(() => {
+      handleNext();
+      autoAdvanceTimeout.current = null;
+    }, 300);
+  }, [handleNext]);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -265,6 +160,9 @@ export default function AhorroLuzGas() {
     },
     [handleNext]
   );
+
+  const isRadioWithLetters =
+    currentQuestion?.type === 'radio' && (currentQuestion as { optionLetters?: boolean }).optionLetters;
 
   if (submitStatus === 'success') {
     return (
@@ -308,30 +206,40 @@ export default function AhorroLuzGas() {
       {/* Contenido */}
       <div className="flex-1 flex flex-col items-center px-4 sm:px-6 py-16 pt-20">
         <div
-          className="w-full max-w-xl"
           key={currentQuestion.id}
           onKeyDown={handleKeyDown}
           className={cn(
-            'animate-in duration-300',
+            'w-full max-w-xl animate-in duration-300',
             direction === 'next' && 'fade-in slide-in-from-right-4',
             direction === 'prev' && 'fade-in slide-in-from-left-4'
           )}
         >
-          {/* Instrucción numerada - estilo Selectra */}
-          <p className="text-base text-gray-700 mb-6">
-            <span className="font-semibold">{currentStep}</span>{' '}
-            Completa el formulario para recibir un{' '}
-            <span className="font-semibold">estudio de ahorro gratuito</span> y
-            conseguir un mejor precio.
-          </p>
-
-          {/* Pregunta */}
-          <h1 className="text-xl sm:text-2xl font-medium text-gray-900 mb-6 leading-tight">
-            {currentQuestion.label}
-            {currentQuestion.required !== false && (
-              <span className="text-red-500 ml-0.5">*</span>
+          {/* Indicador de paso - cuadrado negro con número */}
+          <div className="flex items-center gap-2 mb-6">
+            <span className="flex h-8 w-8 items-center justify-center rounded bg-gray-800 text-white text-sm font-medium">
+              {currentStep}
+            </span>
+            {currentQuestion.type !== 'contact' && (
+              <h1 className="text-xl sm:text-2xl font-medium text-gray-900 leading-tight">
+                {currentQuestion.label}
+                {currentQuestion.required !== false && currentQuestion.type !== 'contact' && (
+                  <span className="text-red-500 ml-0.5">*</span>
+                )}
+              </h1>
             )}
-          </h1>
+          </div>
+
+          {/* Descripción extra para paso 5 (tiene_factura) */}
+          {currentQuestion.id === 'tiene_factura' && (
+            <div className="mb-6 space-y-2">
+              <p className="text-base text-gray-700">
+                Es la forma más <strong>rápida</strong> y <strong>exacta</strong> de calcular tu ahorro.*
+              </p>
+              <p className="text-sm text-gray-600">
+                Si no puedes subirla ahora, no pasa nada. Te enviaremos un email para que puedas hacerlo cuando te venga mejor.
+              </p>
+            </div>
+          )}
 
           {/* Respuesta */}
           <div className="[&_input]:text-lg [&_input]:h-12 [&_input]:rounded-xl [&_input]:border-2">
@@ -342,6 +250,7 @@ export default function AhorroLuzGas() {
               error={validationError ?? undefined}
               disabled={submitStatus === 'loading'}
               hideLabel
+              onSelect={isRadioWithLetters ? handleSelectAndAdvance : undefined}
             />
           </div>
 
@@ -352,20 +261,23 @@ export default function AhorroLuzGas() {
             <p className="mt-3 text-sm text-red-500">{submitError}</p>
           )}
 
-          {/* Botón Aceptar - azul, estilo Selectra */}
+          {/* Navegación: flechas + botón Aceptar */}
           <div className="mt-10 flex items-center justify-between gap-4">
-            {!isFirst ? (
-              <button
-                onClick={handlePrev}
-                disabled={submitStatus === 'loading'}
-                className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm"
-              >
-                <ChevronLeft className="h-4 w-4" />
-                Atrás
-              </button>
-            ) : (
-              <div />
-            )}
+            <button
+              onClick={handlePrev}
+              disabled={isFirst || submitStatus === 'loading'}
+              className={cn(
+                'flex items-center gap-2 p-2 rounded-lg transition-colors',
+                isFirst || submitStatus === 'loading'
+                  ? 'text-gray-300 cursor-not-allowed'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              )}
+              title="Atrás"
+            >
+              <ChevronLeft className="h-6 w-6" />
+              <span className="text-sm font-medium">Atrás</span>
+            </button>
+
             <button
               onClick={handleNext}
               disabled={submitStatus === 'loading'}
@@ -385,6 +297,21 @@ export default function AhorroLuzGas() {
               ) : (
                 'Aceptar'
               )}
+            </button>
+
+            <button
+              onClick={handleNext}
+              disabled={isLast || submitStatus === 'loading'}
+              className={cn(
+                'flex items-center gap-2 p-2 rounded-lg transition-colors',
+                isLast || submitStatus === 'loading'
+                  ? 'text-gray-300 cursor-not-allowed'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              )}
+              title="Siguiente"
+            >
+              <span className="text-sm font-medium">Siguiente</span>
+              <ChevronRight className="h-6 w-6" />
             </button>
           </div>
         </div>

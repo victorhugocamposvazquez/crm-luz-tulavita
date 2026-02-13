@@ -20,13 +20,15 @@ import type { Question } from './types';
 
 export interface QuestionStepProps {
   question: Question;
-  value: string | number | string[] | undefined;
-  onChange: (value: string | number | string[]) => void;
+  value: string | number | string[] | Record<string, string> | undefined;
+  onChange: (value: string | number | string[] | Record<string, string>) => void;
   onBlur?: () => void;
   error?: string;
   disabled?: boolean;
   /** Oculta el label (útil cuando el padre renderiza la pregunta) */
   hideLabel?: boolean;
+  /** Llamado al seleccionar (para auto-avanzar en radio/select) */
+  onSelect?: () => void;
 }
 
 export function QuestionStep({
@@ -37,6 +39,7 @@ export function QuestionStep({
   error,
   disabled,
   hideLabel,
+  onSelect,
 }: QuestionStepProps) {
   const id = `q-${question.id}`;
   const isRequired = question.required !== false;
@@ -161,12 +164,16 @@ export function QuestionStep({
     case 'radio':
       const useLetters = question.optionLetters ?? false;
       const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+      const handleRadioChange = (v: string) => {
+        handleChange(v);
+        onSelect?.();
+      };
       return (
         <div className="space-y-4">
           {baseInput}
           <RadioGroup
             value={(value as string) ?? ''}
-            onValueChange={(v) => handleChange(v)}
+            onValueChange={handleRadioChange}
             disabled={disabled}
             className="flex flex-col gap-3"
           >
@@ -213,6 +220,101 @@ export function QuestionStep({
         </div>
       );
 
+    case 'file_upload':
+      const fileQ = question as import('./types').FileUploadQuestion;
+      const maxSize = (fileQ.maxSizeMb ?? 10) * 1024 * 1024;
+      return (
+        <div className="space-y-4">
+          {baseInput}
+          {fileQ.description && (
+            <p className="text-sm text-gray-600 mb-2">{fileQ.description}</p>
+          )}
+          <label className="flex flex-col items-center justify-center w-full min-h-[180px] border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-gray-400 transition-colors bg-gray-50/50">
+            <input
+              type="file"
+              className="hidden"
+              accept={fileQ.accept ?? '.pdf,image/*'}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file && file.size <= maxSize) {
+                  onChange(file.name);
+                }
+                e.target.value = '';
+              }}
+              disabled={disabled}
+            />
+            <div className="flex flex-col items-center gap-2 py-8 px-4">
+              <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+              <span className="text-sm text-gray-600">Elige el archivo o arrastra aquí</span>
+              <span className="text-xs text-gray-400">Límite de tamaño: {fileQ.maxSizeMb ?? 10}MB</span>
+            </div>
+          </label>
+        </div>
+      );
+
+    case 'contact':
+      const contactQ = question as import('./types').ContactQuestion;
+      const contactVal = (value as Record<string, string>) ?? {};
+      const updateContact = (field: string, v: string) => {
+        onChange({ ...contactVal, [field]: v });
+      };
+      return (
+        <div className="space-y-6">
+          {contactQ.header && (
+            <h2 className="text-lg font-medium text-gray-900">{contactQ.header}</h2>
+          )}
+          {contactQ.reviewPoints && contactQ.reviewPoints.length > 0 && (
+            <ul className="space-y-2">
+              {contactQ.reviewPoints.map((point, i) => (
+                <li key={i} className="flex items-center gap-2 text-gray-700">
+                  <span className="text-green-600">✓</span>
+                  <span dangerouslySetInnerHTML={{ __html: point }} />
+                </li>
+              ))}
+            </ul>
+          )}
+          {contactQ.privacyNote && (
+            <p className="text-sm text-gray-500">{contactQ.privacyNote}</p>
+          )}
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-medium">Nombre</Label>
+              <Input
+                className="mt-1 h-11 border-0 border-b-2 rounded-none px-0 focus-visible:ring-0"
+                placeholder="Carlos"
+                value={contactVal.name ?? ''}
+                onChange={(e) => updateContact('name', e.target.value)}
+                disabled={disabled}
+              />
+            </div>
+            <div>
+              <Label className="text-sm font-medium">Número de teléfono *</Label>
+              <Input
+                type="tel"
+                className="mt-1 h-11 border-0 border-b-2 rounded-none px-0 focus-visible:ring-0"
+                placeholder="612 34 56 78"
+                value={contactVal.phone ?? ''}
+                onChange={(e) => updateContact('phone', e.target.value)}
+                disabled={disabled}
+              />
+            </div>
+            <div>
+              <Label className="text-sm font-medium">Correo electrónico *</Label>
+              <Input
+                type="email"
+                className="mt-1 h-11 border-0 border-b-2 rounded-none px-0 focus-visible:ring-0"
+                placeholder="nombre@ejemplo.com"
+                value={contactVal.email ?? ''}
+                onChange={(e) => updateContact('email', e.target.value)}
+                disabled={disabled}
+              />
+            </div>
+          </div>
+        </div>
+      );
+
     case 'checkbox':
       return (
         <div className="space-y-4">
@@ -255,17 +357,25 @@ export function QuestionStep({
 
 export function validateQuestion(
   question: Question,
-  value: string | number | string[] | undefined
+  value: string | number | string[] | Record<string, string> | undefined
 ): string | null {
   const required = question.required !== false;
+
+  if (question.type === 'contact') {
+    const v = value as Record<string, string> | undefined;
+    if (!v?.phone?.trim()) return 'El teléfono es obligatorio';
+    if (!v?.email?.trim()) return 'El email es obligatorio';
+    if (v.email && !isValidEmail(v.email)) return 'Email no válido';
+    return null;
+  }
 
   if (required) {
     if (value === undefined || value === null || value === '') return 'Campo obligatorio';
     if (Array.isArray(value) && value.length === 0) return 'Selecciona al menos una opción';
   }
 
-  if (question.type === 'email' && value) {
-    if (!isValidEmail(String(value))) return 'Email no válido';
+  if (question.type === 'email' && value && typeof value === 'string') {
+    if (!isValidEmail(value)) return 'Email no válido';
   }
 
   return null;

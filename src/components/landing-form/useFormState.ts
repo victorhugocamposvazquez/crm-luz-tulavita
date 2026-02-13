@@ -3,7 +3,7 @@
  */
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import type { FormAnswers, Question, LeadPayload } from './types';
+import type { FormAnswers, Question, LeadPayload, ContactValue } from './types';
 import { getUrlParams } from './utils';
 
 export interface UseFormStateOptions {
@@ -56,7 +56,7 @@ export function useFormState({
   const isFirst = currentIndex === 0;
   const isLast = currentIndex === visibleQuestions.length - 1;
 
-  const setAnswer = useCallback((questionId: string, value: string | number | string[]) => {
+  const setAnswer = useCallback((questionId: string, value: string | number | string[] | ContactValue) => {
     setAnswers((prev) => ({ ...prev, [questionId]: value }));
   }, []);
 
@@ -78,7 +78,13 @@ export function useFormState({
       const val = answers[q.id];
       if (val === undefined || val === '') continue;
 
-      if (q.mapTo === 'name') name = String(val);
+      if (q.type === 'contact') {
+        const c = val as Record<string, string>;
+        if (c.name) name = c.name;
+        if (c.email) email = c.email;
+        if (c.phone) phone = c.phone;
+        custom_fields[q.id] = c;
+      } else if (q.mapTo === 'name') name = String(val);
       else if (q.mapTo === 'email') email = String(val);
       else if (q.mapTo === 'phone') phone = String(val);
       else custom_fields[q.id] = val;
