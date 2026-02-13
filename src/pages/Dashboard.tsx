@@ -10,6 +10,7 @@ import CommercialVisitsManager from '@/components/dashboard/CommercialVisitsMana
 import CommercialStatistics from '@/components/dashboard/CommercialStatistics';
 import AdminVisitsView from '@/components/dashboard/AdminVisitsView';
 import RemindersManagement from '@/components/reminders/RemindersManagement';
+import LeadsManagement from '@/components/dashboard/LeadsManagement';
 
 const ClientManagement = lazy(() => import('@/components/dashboard/ClientManagement'));
 
@@ -38,6 +39,8 @@ export default function Dashboard() {
     switch (currentView) {
       case 'dashboard':
         return isAdmin ? <AdminDashboard /> : <CommercialVisitsManager />;
+      case 'leads':
+        return <LeadsManagement />;
       case 'users':
         return isAdmin ? <UserManagement /> : <CommercialVisitsManager />;
       case 'companies':

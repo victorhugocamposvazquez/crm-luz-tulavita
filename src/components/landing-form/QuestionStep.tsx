@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { ChevronDown } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
@@ -260,51 +261,78 @@ export function QuestionStep({
       const updateContact = (field: string, v: string) => {
         onChange({ ...contactVal, [field]: v });
       };
+      // Render privacy note with optional highlighted (underlined) text
+      const renderPrivacyNote = () => {
+        if (!contactQ.privacyNote) return null;
+        const highlight = contactQ.privacyNoteHighlight;
+        if (!highlight || !contactQ.privacyNote.includes(highlight)) {
+          return <p className="text-sm text-gray-500">{contactQ.privacyNote}</p>;
+        }
+        const parts = contactQ.privacyNote.split(highlight);
+        return (
+          <p className="text-sm text-gray-500">
+            {parts[0]}
+            <span className="underline">{highlight}</span>
+            {parts[1]}
+          </p>
+        );
+      };
       return (
         <div className="space-y-6">
-          {contactQ.header && (
-            <h2 className="text-lg font-medium text-gray-900">{contactQ.header}</h2>
-          )}
           {contactQ.reviewPoints && contactQ.reviewPoints.length > 0 && (
             <ul className="space-y-2">
               {contactQ.reviewPoints.map((point, i) => (
                 <li key={i} className="flex items-center gap-2 text-gray-700">
-                  <span className="text-green-600">✓</span>
+                  <span className="text-green-600 text-lg">✓</span>
                   <span dangerouslySetInnerHTML={{ __html: point }} />
                 </li>
               ))}
             </ul>
           )}
           {contactQ.privacyNote && (
-            <p className="text-sm text-gray-500">{contactQ.privacyNote}</p>
+            <div className="mb-6">{renderPrivacyNote()}</div>
           )}
-          <div className="space-y-4">
-            <div>
-              <Label className="text-sm font-medium">Nombre</Label>
+          <div className="space-y-6">
+            {/* Nombre - Material style */}
+            <div className="flex flex-col">
+              <Label className="text-sm font-medium text-gray-900 mb-1">Nombre</Label>
               <Input
-                className="mt-1 h-11 border-0 border-b-2 rounded-none px-0 focus-visible:ring-0"
+                className="h-11 border-0 border-b-2 border-gray-300 rounded-none px-0 focus-visible:ring-0 focus-visible:border-blue-600 focus-visible:border-b-2 transition-colors bg-transparent placeholder:text-gray-400"
                 placeholder="Carlos"
                 value={contactVal.name ?? ''}
                 onChange={(e) => updateContact('name', e.target.value)}
                 disabled={disabled}
               />
             </div>
-            <div>
-              <Label className="text-sm font-medium">Número de teléfono *</Label>
-              <Input
-                type="tel"
-                className="mt-1 h-11 border-0 border-b-2 rounded-none px-0 focus-visible:ring-0"
-                placeholder="612 34 56 78"
-                value={contactVal.phone ?? ''}
-                onChange={(e) => updateContact('phone', e.target.value)}
-                disabled={disabled}
-              />
+            {/* Teléfono - Material style con bandera y selector */}
+            <div className="flex flex-col">
+              <Label className="text-sm font-medium text-gray-900 mb-1">Número de teléfono *</Label>
+              <div className="flex items-center border-b-2 border-gray-300 focus-within:border-blue-600 focus-within:border-b-2 transition-colors">
+                <button
+                  type="button"
+                  className="flex items-center gap-1 pl-0 pr-2 h-11 text-gray-700 hover:bg-gray-50 rounded transition-colors"
+                  tabIndex={-1}
+                >
+                  <span className="text-xl" aria-hidden>🇪🇸</span>
+                  <span className="text-sm font-medium">+34</span>
+                  <ChevronDown className="h-4 w-4 text-gray-500" />
+                </button>
+                <Input
+                  type="tel"
+                  className="flex-1 h-11 border-0 rounded-none px-0 focus-visible:ring-0 bg-transparent placeholder:text-gray-400"
+                  placeholder="612 34 56 78"
+                  value={contactVal.phone ?? ''}
+                  onChange={(e) => updateContact('phone', e.target.value)}
+                  disabled={disabled}
+                />
+              </div>
             </div>
-            <div>
-              <Label className="text-sm font-medium">Correo electrónico *</Label>
+            {/* Email - Material style */}
+            <div className="flex flex-col">
+              <Label className="text-sm font-medium text-gray-900 mb-1">Correo electrónico *</Label>
               <Input
                 type="email"
-                className="mt-1 h-11 border-0 border-b-2 rounded-none px-0 focus-visible:ring-0"
+                className="h-11 border-0 border-b-2 border-gray-300 rounded-none px-0 focus-visible:ring-0 focus-visible:border-blue-600 focus-visible:border-b-2 transition-colors bg-transparent placeholder:text-gray-400"
                 placeholder="nombre@ejemplo.com"
                 value={contactVal.email ?? ''}
                 onChange={(e) => updateContact('email', e.target.value)}

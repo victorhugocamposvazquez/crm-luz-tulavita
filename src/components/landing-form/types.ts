@@ -86,6 +86,8 @@ export interface ContactQuestion extends BaseQuestion {
   reviewPoints?: string[];
   /** Aviso de privacidad */
   privacyNote?: string;
+  /** Texto a subrayar dentro del aviso de privacidad */
+  privacyNoteHighlight?: string;
 }
 
 export type Question =

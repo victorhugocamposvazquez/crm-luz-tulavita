@@ -164,6 +164,57 @@ export type Database = {
         }
         Relationships: []
       }
+      leads: {
+        Row: {
+          id: string
+          name: string | null
+          phone: string | null
+          email: string | null
+          source: string
+          campaign: string | null
+          adset: string | null
+          ad: string | null
+          status: string
+          owner_id: string | null
+          tags: string[]
+          custom_fields: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          name?: string | null
+          phone?: string | null
+          email?: string | null
+          source?: string
+          campaign?: string | null
+          adset?: string | null
+          ad?: string | null
+          status?: string
+          owner_id?: string | null
+          tags?: string[]
+          custom_fields?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string | null
+          phone?: string | null
+          email?: string | null
+          source?: string
+          campaign?: string | null
+          adset?: string | null
+          ad?: string | null
+          status?: string
+          owner_id?: string | null
+          tags?: string[]
+          custom_fields?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       companies: {
         Row: {
           created_at: string

@@ -1,6 +1,6 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { Users, Building2, MapPin, TrendingUp, LogOut, Menu, User, ChevronDown, Key, Bell, Navigation } from 'lucide-react';
+import { Users, Building2, MapPin, TrendingUp, LogOut, Menu, User, ChevronDown, Key, Bell, Navigation, UserPlus } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import AdminPasswordDialog from '@/components/AdminPasswordDialog';
@@ -37,6 +37,7 @@ export default function Layout({ children, currentView, onViewChange }: LayoutPr
 
   const navigation = isAdmin ? [
     { name: 'Dashboard', icon: TrendingUp, view: 'dashboard' },
+    { name: 'Leads', icon: UserPlus, view: 'leads' },
     { name: 'Usuarios', icon: Users, view: 'users' },
     { name: 'Empresas', icon: Building2, view: 'companies' },
     { name: 'Clientes', icon: Users, view: 'clients' },
@@ -45,6 +46,7 @@ export default function Layout({ children, currentView, onViewChange }: LayoutPr
     { name: 'Recordatorios', icon: Bell, view: 'reminders' },
   ] : [
     { name: 'Estadísticas', icon: TrendingUp, view: 'stats' },
+    { name: 'Leads', icon: UserPlus, view: 'leads' },
     { name: 'Visitas', icon: MapPin, view: 'visits' },
   ];
 

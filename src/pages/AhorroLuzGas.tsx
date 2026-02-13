@@ -92,6 +92,7 @@ const AHORRO_LUZ_GAS_CONFIG: FormConfig = {
       ],
       privacyNote:
         'Trataremos tus datos para darte respuesta y enviarte ofertas e información promocional sobre nuestros servicios por diversos medios.',
+      privacyNoteHighlight: 'darte respuesta',
     },
   ],
 };
@@ -170,9 +171,17 @@ export default function AhorroLuzGas() {
   const isRadioWithLetters =
     currentQuestion?.type === 'radio' && (currentQuestion as { optionLetters?: boolean }).optionLetters;
 
-  // Scroll al tope al cambiar de pantalla o al mostrar éxito
+  // Scroll al tope al cambiar de pantalla o al mostrar éxito (robusto en mobile)
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    const scrollToTop = () => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      document.documentElement.scrollTop = 0;
+      document.body.scrollTop = 0;
+    };
+    // requestAnimationFrame x2: espera al paint del nuevo contenido (crítico en mobile)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(scrollToTop);
+    });
   }, [currentQuestion?.id, submitStatus]);
 
   if (submitStatus === 'success') {
@@ -255,18 +264,22 @@ export default function AhorroLuzGas() {
           )}
         >
           {/* Indicador de paso - cuadrado negro con número */}
-          <div className="flex items-center gap-2 mb-6">
-            <span className="flex h-8 w-8 items-center justify-center rounded bg-gray-800 text-white text-sm font-medium">
+          <div className="flex items-start gap-2 mb-6">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-gray-800 text-white text-sm font-medium">
               {currentStep}
             </span>
-            {currentQuestion.type !== 'contact' && (
+            {currentQuestion.type === 'contact' && 'header' in currentQuestion && currentQuestion.header ? (
+              <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 leading-tight pt-0.5">
+                {currentQuestion.header}
+              </h1>
+            ) : currentQuestion.type !== 'contact' ? (
               <h1 className="text-xl sm:text-2xl font-medium text-gray-900 leading-tight">
                 {currentQuestion.label}
-                {currentQuestion.required !== false && currentQuestion.type !== 'contact' && (
+                {currentQuestion.required !== false && (
                   <span className="text-red-500 ml-0.5">*</span>
                 )}
               </h1>
-            )}
+            ) : null}
           </div>
 
           {/* Descripción extra para paso 5 (tiene_factura) */}
@@ -282,7 +295,9 @@ export default function AhorroLuzGas() {
           )}
 
           {/* Respuesta */}
-          <div className="[&_input]:text-lg [&_input]:h-12 [&_input]:rounded-xl [&_input]:border-2">
+          <div className={cn(
+            currentQuestion.type !== 'contact' && '[&_input]:text-lg [&_input]:h-12 [&_input]:rounded-xl [&_input]:border-2'
+          )}>
             <QuestionStep
               question={currentQuestion}
               value={answers[currentQuestion.id]}
