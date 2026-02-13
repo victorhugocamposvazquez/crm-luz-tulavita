@@ -27,8 +27,8 @@ export interface QuestionStepProps {
   disabled?: boolean;
   /** Oculta el label (útil cuando el padre renderiza la pregunta) */
   hideLabel?: boolean;
-  /** Llamado al seleccionar (para auto-avanzar en radio/select) */
-  onSelect?: () => void;
+  /** Llamado al seleccionar (para auto-avanzar en radio/select). Recibe el valor seleccionado. */
+  onSelect?: (value: string) => void;
 }
 
 export function QuestionStep({
@@ -166,7 +166,7 @@ export function QuestionStep({
       const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
       const handleRadioChange = (v: string) => {
         handleChange(v);
-        onSelect?.();
+        onSelect?.(v);
       };
       return (
         <div className="space-y-4">

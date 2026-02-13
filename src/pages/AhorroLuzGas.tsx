@@ -123,19 +123,22 @@ export default function AhorroLuzGas() {
     campaign: AHORRO_LUZ_GAS_CONFIG.campaign,
   });
 
-  const handleNext = useCallback(() => {
-    if (!currentQuestion) return;
-    const value = answers[currentQuestion.id];
-    const err = validateQuestion(currentQuestion, value);
-    if (err) {
-      setValidationError(err);
-      return;
-    }
-    setValidationError(null);
-    setDirection('next');
-    if (isLast) submit();
-    else goNext();
-  }, [currentQuestion, answers, isLast, submit, goNext]);
+  const handleNext = useCallback(
+    (valueOverride?: string) => {
+      if (!currentQuestion) return;
+      const value = valueOverride ?? answers[currentQuestion.id];
+      const err = validateQuestion(currentQuestion, value);
+      if (err) {
+        setValidationError(err);
+        return;
+      }
+      setValidationError(null);
+      setDirection('next');
+      if (isLast) submit();
+      else goNext();
+    },
+    [currentQuestion, answers, isLast, submit, goNext]
+  );
 
   const handlePrev = useCallback(() => {
     setValidationError(null);
@@ -143,13 +146,16 @@ export default function AhorroLuzGas() {
     goPrev();
   }, [goPrev]);
 
-  const handleSelectAndAdvance = useCallback(() => {
-    if (autoAdvanceTimeout.current) clearTimeout(autoAdvanceTimeout.current);
-    autoAdvanceTimeout.current = setTimeout(() => {
-      handleNext();
-      autoAdvanceTimeout.current = null;
-    }, 300);
-  }, [handleNext]);
+  const handleSelectAndAdvance = useCallback(
+    (selectedValue: string) => {
+      if (autoAdvanceTimeout.current) clearTimeout(autoAdvanceTimeout.current);
+      autoAdvanceTimeout.current = setTimeout(() => {
+        handleNext(selectedValue);
+        autoAdvanceTimeout.current = null;
+      }, 300);
+    },
+    [handleNext]
+  );
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
