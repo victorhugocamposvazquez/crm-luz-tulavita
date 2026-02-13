@@ -25,7 +25,7 @@ const App = () => (
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/lead" element={<LeadLanding />} />
-            <Route path="/ahorro-luz-gas" element={<AhorroLuzGas />} />
+            <Route path="/ahorra-factura-luz" element={<AhorroLuzGas />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

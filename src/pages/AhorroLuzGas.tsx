@@ -4,12 +4,12 @@
  * - Flechas para navegar atrás/adelante
  */
 
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { useFormState } from '@/components/landing-form';
 import { QuestionStep, validateQuestion } from '@/components/landing-form';
 import type { FormConfig } from '@/components/landing-form';
 import { cn } from '@/lib/utils';
-import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Zap } from 'lucide-react';
 
 const BUTTON_BLUE = '#2563eb';
 
@@ -170,9 +170,27 @@ export default function AhorroLuzGas() {
   const isRadioWithLetters =
     currentQuestion?.type === 'radio' && (currentQuestion as { optionLetters?: boolean }).optionLetters;
 
+  // Scroll al tope al cambiar de pantalla o al mostrar éxito
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [currentQuestion?.id, submitStatus]);
+
   if (submitStatus === 'success') {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-white">
+        <header className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 py-3 bg-white/80 backdrop-blur-sm border-b border-gray-200/50"
+          style={{ height: 48 }}
+        >
+          <div className="flex items-center gap-2 min-w-[80px]">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-400/90 text-amber-900">
+              <Zap className="h-4 w-4" strokeWidth={2.5} />
+            </div>
+          </div>
+          <h1 className="absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-gray-800">
+            Ahorra en tu factura
+          </h1>
+          <div className="min-w-[80px]" aria-hidden />
+        </header>
         <div className="max-w-lg w-full text-center animate-in fade-in duration-500">
           <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 mb-4">
             ¡Gracias!
@@ -198,10 +216,26 @@ export default function AhorroLuzGas() {
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
+      {/* Cabecera con opacidad */}
+      <header
+        className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 py-3 bg-white/80 backdrop-blur-sm border-b border-gray-200/50"
+        style={{ height: 48 }}
+      >
+        <div className="flex items-center gap-2 min-w-[80px]">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-400/90 text-amber-900">
+            <Zap className="h-4 w-4" strokeWidth={2.5} />
+          </div>
+        </div>
+        <h1 className="absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-gray-800">
+          Ahorra en tu factura
+        </h1>
+        <div className="min-w-[80px]" aria-hidden />
+      </header>
+
       {/* Barra de progreso */}
       <div
         className="h-1 w-full bg-gray-200"
-        style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50 }}
+        style={{ position: 'fixed', top: 48, left: 0, right: 0, zIndex: 50 }}
       >
         <div
           className="h-full transition-all duration-300 ease-out bg-blue-600"
@@ -210,7 +244,7 @@ export default function AhorroLuzGas() {
       </div>
 
       {/* Contenido */}
-      <div className="flex-1 flex flex-col items-center px-4 sm:px-6 py-16 pt-20">
+      <div className="flex-1 flex flex-col items-center px-4 sm:px-6 py-16 pt-24">
         <div
           key={currentQuestion.id}
           onKeyDown={handleKeyDown}
