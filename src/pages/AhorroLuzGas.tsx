@@ -1,12 +1,7 @@
 /**
- * Clon del formulario Selectra "Ahorra en tu próxima factura"
- * Diseño según: https://selectra.typeform.com/ahorro-luz-gas
- *
- * - Instrucción numerada arriba
- * - Pregunta con emoji
- * - Opciones con letras A, B, C, D y borde negro al seleccionar
- * - Botón azul "Aceptar"
- * - Fondo blanco
+ * Clon del formulario Selectra "Estudio de energía"
+ * Estructura según API Typeform: https://api.typeform.com/forms/XpzfGYPD
+ * Referencia: https://selectra.typeform.com/ahorro-luz-gas
  */
 
 import { useState, useCallback } from 'react';
@@ -36,56 +31,173 @@ const AHORRO_LUZ_GAS_CONFIG: FormConfig = {
       ],
     },
     {
-      id: 'suministro',
+      id: 'tipo_tarifa',
       type: 'radio',
-      label: '¿Qué necesitas comparar?',
+      label: '¿Qué tipo de tarifa deseas comparar en este estudio?',
       required: true,
       optionLetters: true,
       options: [
-        { value: 'luz', label: 'Solo luz' },
-        { value: 'gas', label: 'Solo gas' },
-        { value: 'luz_gas', label: 'Luz y gas' },
+        { value: 'luz_gas', label: 'Tarifas de luz y gas' },
+        { value: 'luz', label: 'Tarifas de luz' },
+        { value: 'gas', label: 'Tarifas de gas' },
       ],
     },
     {
-      id: 'potencia',
-      type: 'number',
-      label: '¿Cuál es tu potencia contratada? (kW)',
-      placeholder: 'Ej: 4.6',
+      id: 'tipo_servicio',
+      type: 'radio',
+      label: '¿Este servicio lo necesitas para…?',
       required: true,
-      min: 1,
-      max: 15,
-      showWhen: { questionId: 'suministro', value: ['luz', 'luz_gas'] },
+      optionLetters: true,
+      options: [
+        { value: 'hogar', label: '🏠 Un hogar' },
+        { value: 'empresa', label: '🏢 Un negocio o empresa' },
+      ],
     },
     {
-      id: 'consumo',
+      id: 'codigo_postal',
+      type: 'text',
+      label: 'Indica el código postal del suministro',
+      placeholder: 'Ej: 28001',
+      required: true,
+    },
+    {
+      id: 'tiene_factura',
+      type: 'radio',
+      label: 'Para ajustar la tarifa al consumo de tu vivienda, ¿tienes una factura a mano?',
+      required: true,
+      optionLetters: true,
+      options: [
+        { value: 'subir', label: 'Sí. Quiero subir mi factura' },
+        { value: 'manual', label: 'Sí. Introducir datos manualmente' },
+        { value: 'calcular', label: 'No. Ayúdame a calcularlo' },
+      ],
+    },
+    {
+      id: 'superficie',
       type: 'number',
-      label: '¿Cuál es tu consumo medio mensual? (kWh)',
+      label: 'Indica la superficie de la vivienda en m²',
+      placeholder: 'Ej: 85',
+      required: false,
+      min: 20,
+      max: 500,
+      showWhen: { questionId: 'tiene_factura', value: 'calcular' },
+    },
+    {
+      id: 'personas',
+      type: 'radio',
+      label: '¿Cuántas personas viven en la casa?',
+      required: false,
+      optionLetters: true,
+      options: [
+        { value: '1', label: '1' },
+        { value: '2', label: '2' },
+        { value: '3', label: '3' },
+        { value: '4', label: '4' },
+        { value: '5', label: '5' },
+        { value: '6_mas', label: '6 o más' },
+      ],
+      showWhen: { questionId: 'tiene_factura', value: 'calcular' },
+    },
+    {
+      id: 'calefaccion',
+      type: 'radio',
+      label: '¿Qué energía utilizas para la calefacción?',
+      required: false,
+      optionLetters: true,
+      options: [
+        { value: 'electricidad', label: 'Electricidad' },
+        { value: 'gas', label: 'Gas' },
+      ],
+      showWhen: { questionId: 'tiene_factura', value: 'calcular' },
+    },
+    {
+      id: 'agua_caliente',
+      type: 'radio',
+      label: '¿Y para el agua caliente?',
+      required: false,
+      optionLetters: true,
+      options: [
+        { value: 'electricidad', label: 'Electricidad' },
+        { value: 'gas', label: 'Gas' },
+      ],
+      showWhen: { questionId: 'tiene_factura', value: 'calcular' },
+    },
+    {
+      id: 'cocina',
+      type: 'radio',
+      label: '¿Y para la cocina?',
+      required: false,
+      optionLetters: true,
+      options: [
+        { value: 'electricidad', label: 'Electricidad' },
+        { value: 'gas', label: 'Gas' },
+      ],
+      showWhen: { questionId: 'tiene_factura', value: 'calcular' },
+    },
+    {
+      id: 'kwh_luz',
+      type: 'number',
+      label: '¿Cuántos kWh consumes al mes en luz?',
       placeholder: 'Ej: 150',
       required: true,
       min: 1,
       max: 2000,
+      showWhen: { questionId: 'tiene_factura', value: 'manual' },
     },
     {
-      id: 'patron',
+      id: 'potencia_p1',
+      type: 'number',
+      label: '¿Cuánta potencia tienes contratada en P1 (punta)? (kW)',
+      placeholder: 'Ej: 2.3',
+      required: false,
+      min: 1,
+      max: 15,
+      showWhen: { questionId: 'tiene_factura', value: 'manual' },
+    },
+    {
+      id: 'potencia_p2',
+      type: 'number',
+      label: '¿Cuánta potencia tienes contratada en P2 (valle)? (kW)',
+      placeholder: 'Ej: 2.3',
+      required: false,
+      min: 1,
+      max: 15,
+      showWhen: { questionId: 'tiene_factura', value: 'manual' },
+    },
+    {
+      id: 'frecuencia_factura',
+      type: 'text',
+      label: '¿Con qué frecuencia de días te facturan la luz?',
+      placeholder: 'Ej: 30 o 60',
+      required: false,
+      showWhen: { questionId: 'tiene_factura', value: 'manual' },
+    },
+    {
+      id: 'placas_solares',
       type: 'radio',
-      label: '¿Cuál es tu patrón de consumo?',
-      required: true,
+      label: 'Para reducir aún más tu consumo, ¿te interesa un estudio sobre placas solares?',
+      required: false,
       optionLetters: true,
       options: [
-        { value: 'todo_dia', label: 'Todo el día' },
-        { value: 'noches_fines', label: 'Noches y fines de semana' },
-        { value: 'segunda_verano', label: 'Segunda residencia (verano)' },
-        { value: 'segunda_fin', label: 'Segunda residencia (fin de semana)' },
+        { value: 'si', label: 'Sí, quiero información sobre placas solares' },
+        { value: 'no', label: 'No, solo quiero un estudio de tarifas estándar' },
       ],
     },
     {
       id: 'nombre',
       type: 'text',
       label: '¿Cómo te llamas?',
-      placeholder: 'Tu nombre',
+      placeholder: 'Nombre y apellidos',
       required: true,
       mapTo: 'name',
+    },
+    {
+      id: 'telefono',
+      type: 'phone',
+      label: '¿Cuál es tu teléfono?',
+      placeholder: '612 345 678',
+      required: true,
+      mapTo: 'phone',
     },
     {
       id: 'email',
@@ -94,14 +206,6 @@ const AHORRO_LUZ_GAS_CONFIG: FormConfig = {
       placeholder: 'tu@email.com',
       required: true,
       mapTo: 'email',
-    },
-    {
-      id: 'telefono',
-      type: 'phone',
-      label: '¿Y tu teléfono?',
-      placeholder: '612 345 678',
-      required: true,
-      mapTo: 'phone',
     },
   ],
 };
