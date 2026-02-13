@@ -77,8 +77,21 @@ Todas las fuentes deben enviar datos a este endpoint:
 
 ### Vercel (api/leads)
 
-1. Variables de entorno: `VITE_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
-2. El rewrite en vercel.json excluye /api/* del SPA
+1. **Variables de entorno** (obligatorias en Vercel):
+   - `SUPABASE_URL` o `VITE_SUPABASE_URL` – URL del proyecto Supabase
+   - `SUPABASE_SERVICE_ROLE_KEY` – Clave service_role (no la anon; la anon no puede insertar por RLS)
+2. **Migraciones**: Ejecutar en el proyecto Supabase de producción:
+   ```bash
+   supabase db push
+   ```
+   O aplicar manualmente `supabase/migrations/20260213000001_create_leads_tables.sql`
+3. El rewrite en vercel.json excluye /api/* del SPA
+
+### Error 500 en POST /api/leads
+
+- **Tablas inexistentes**: Asegúrate de haber ejecutado las migraciones en Supabase.
+- **Variables de entorno**: Comprueba que `SUPABASE_SERVICE_ROLE_KEY` esté definida en Vercel (Settings → Environment Variables).
+- **Logs**: Revisa los logs de la función en Vercel (Deployments → Function Logs) para ver el mensaje de error exacto.
 
 ### Supabase Edge Functions
 
