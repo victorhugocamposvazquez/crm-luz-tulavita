@@ -64,6 +64,8 @@ export interface RadioQuestion extends BaseQuestion {
   options: QuestionOption[];
   /** Mostrar letras A, B, C... en las opciones */
   optionLetters?: boolean;
+  /** Opción "Otra" con input de texto libre */
+  otherOption?: { value: string; placeholder: string };
 }
 
 export interface CheckboxQuestion extends BaseQuestion {

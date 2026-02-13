@@ -30,6 +30,8 @@ export interface QuestionStepProps {
   hideLabel?: boolean;
   /** Llamado al seleccionar (para auto-avanzar en radio/select). Recibe el valor seleccionado. */
   onSelect?: (value: string) => void;
+  /** Ref para leer valores del DOM (fallback para contacto en validación) */
+  formContainerRef?: React.RefObject<HTMLDivElement | null>;
 }
 
 export function QuestionStep({
@@ -41,6 +43,7 @@ export function QuestionStep({
   disabled,
   hideLabel,
   onSelect,
+  formContainerRef,
 }: QuestionStepProps) {
   const id = `q-${question.id}`;
   const isRequired = question.required !== false;
@@ -163,29 +166,41 @@ export function QuestionStep({
       );
 
     case 'radio':
-      const useLetters = question.optionLetters ?? false;
+      const radioQ = question as import('./types').RadioQuestion;
+      const useLetters = radioQ.optionLetters ?? false;
       const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+      const otherOpt = radioQ.otherOption;
+      const isOtherSelected = otherOpt && (value === otherOpt.value || (typeof value === 'string' && value.startsWith(otherOpt.value + ':')));
+      const otherText = typeof value === 'string' && value.startsWith(otherOpt?.value + ':') ? value.slice(otherOpt!.value.length + 1) : '';
+      const radioValue = isOtherSelected ? otherOpt!.value : (value as string) ?? '';
       const handleRadioChange = (v: string) => {
         handleChange(v);
-        onSelect?.(v);
+        if (v !== otherOpt?.value) onSelect?.(v);
+      };
+      const handleLabelClick = (optValue: string) => {
+        if (value === optValue && onSelect) onSelect(optValue);
+      };
+      const handleOtherInputChange = (text: string) => {
+        handleChange(text.trim() ? `${otherOpt!.value}:${text.trim()}` : otherOpt!.value);
       };
       return (
         <div className="space-y-4">
           {baseInput}
           <RadioGroup
-            value={(value as string) ?? ''}
+            value={radioValue}
             onValueChange={handleRadioChange}
             disabled={disabled}
-            className="flex flex-col gap-3"
+            className="flex flex-col gap-2"
           >
-            {question.options.map((opt, idx) => {
+            {radioQ.options.map((opt, idx) => {
               const letter = useLetters ? letters[idx] : null;
-              const selected = value === opt.value;
+              const selected = radioValue === opt.value;
               return (
                 <label
                   key={opt.value}
+                  onClick={() => handleLabelClick(opt.value)}
                   className={cn(
-                    'flex items-center gap-4 rounded-xl border-2 p-4 cursor-pointer transition-all',
+                    'flex items-center gap-3 rounded-xl border-2 px-3 py-2.5 cursor-pointer transition-all',
                     'hover:border-gray-300',
                     selected
                       ? useLetters
@@ -198,7 +213,7 @@ export function QuestionStep({
                     <>
                       <span
                         className={cn(
-                          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold',
+                          'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
                           selected ? 'bg-black text-white' : 'border-2 border-gray-300 text-gray-600'
                         )}
                       >
@@ -213,11 +228,23 @@ export function QuestionStep({
                   ) : (
                     <RadioGroupItem value={opt.value} id={`${id}-${opt.value}`} />
                   )}
-                  <span className="text-base">{opt.label}</span>
+                  <span className="text-sm">{opt.label}</span>
                 </label>
               );
             })}
           </RadioGroup>
+          {otherOpt && isOtherSelected && (
+            <Input
+              type="text"
+              placeholder={otherOpt.placeholder}
+              value={otherText}
+              onChange={(e) => handleOtherInputChange(e.target.value)}
+              disabled={disabled}
+              className="mt-2 h-10 text-sm border-gray-300"
+              onFocus={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
+            />
+          )}
         </div>
       );
 
@@ -278,7 +305,7 @@ export function QuestionStep({
         );
       };
       return (
-        <div className="space-y-6">
+        <div className="space-y-6" ref={formContainerRef}>
           {contactQ.reviewPoints && contactQ.reviewPoints.length > 0 && (
             <ul className="space-y-2">
               {contactQ.reviewPoints.map((point, i) => (
@@ -297,7 +324,8 @@ export function QuestionStep({
             <div className="flex flex-col">
               <Label className="text-sm font-medium text-gray-900 mb-1">Nombre</Label>
               <Input
-                className="h-11 border-0 border-b-2 border-gray-300 rounded-none px-0 focus-visible:ring-0 focus-visible:border-blue-600 focus-visible:border-b-2 transition-colors bg-transparent placeholder:text-gray-400"
+                data-contact-field="name"
+                className="h-11 border-0 border-b-2 border-gray-300 rounded-none px-0 focus-visible:ring-0 focus-visible:border-[#26606b] focus-visible:border-b-2 transition-colors bg-transparent placeholder:text-gray-400"
                 placeholder="Carlos"
                 value={contactVal.name ?? ''}
                 onChange={(e) => updateContact('name', e.target.value)}
@@ -307,7 +335,7 @@ export function QuestionStep({
             {/* Teléfono - Material style con bandera y selector */}
             <div className="flex flex-col">
               <Label className="text-sm font-medium text-gray-900 mb-1">Número de teléfono *</Label>
-              <div className="flex items-center border-b-2 border-gray-300 focus-within:border-blue-600 focus-within:border-b-2 transition-colors">
+              <div className="flex items-center border-b-2 border-gray-300 focus-within:border-[#26606b] focus-within:border-b-2 transition-colors">
                 <button
                   type="button"
                   className="flex items-center gap-1 pl-0 pr-2 h-11 text-gray-700 hover:bg-gray-50 rounded transition-colors"
@@ -321,6 +349,7 @@ export function QuestionStep({
                   type="tel"
                   inputMode="numeric"
                   autoComplete="tel"
+                  data-contact-field="phone"
                   className="flex-1 h-11 border-0 rounded-none px-0 focus-visible:ring-0 bg-transparent placeholder:text-gray-400"
                   placeholder="612 34 56 78"
                   value={contactVal.phone ?? ''}
@@ -335,7 +364,8 @@ export function QuestionStep({
               <Label className="text-sm font-medium text-gray-900 mb-1">Correo electrónico *</Label>
               <Input
                 type="email"
-                className="h-11 border-0 border-b-2 border-gray-300 rounded-none px-0 focus-visible:ring-0 focus-visible:border-blue-600 focus-visible:border-b-2 transition-colors bg-transparent placeholder:text-gray-400"
+                data-contact-field="email"
+                className="h-11 border-0 border-b-2 border-gray-300 rounded-none px-0 focus-visible:ring-0 focus-visible:border-[#26606b] focus-visible:border-b-2 transition-colors bg-transparent placeholder:text-gray-400"
                 placeholder="nombre@ejemplo.com"
                 value={contactVal.email ?? ''}
                 onChange={(e) => updateContact('email', e.target.value)}
@@ -394,8 +424,8 @@ export function validateQuestion(
 
   if (question.type === 'contact') {
     const v = value as Record<string, string> | undefined;
-    const phone = (v?.phone ?? v?.telefono ?? '').toString().replace(/\s/g, '');
-    if (!phone || phone.length < 8) return 'El teléfono es obligatorio';
+    const phone = (v?.phone ?? v?.telefono ?? '').toString().replace(/\s/g, '').replace(/\D/g, '');
+    if (!phone || phone.length < 6) return 'El teléfono es obligatorio';
     if (!v?.email?.trim()) return 'El email es obligatorio';
     if (v.email && !isValidEmail(v.email)) return 'Email no válido';
     return null;

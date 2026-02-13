@@ -12,7 +12,7 @@ import type { FormConfig } from '@/components/landing-form';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Loader2, Zap } from 'lucide-react';
 
-const BUTTON_BLUE = '#2563eb';
+const BRAND_COLOR = '#26606b';
 
 const AHORRO_LUZ_CONFIG: FormConfig = {
   source: 'web_form',
@@ -37,6 +37,7 @@ const AHORRO_LUZ_CONFIG: FormConfig = {
       label: '¿Cuál es tu compañía actual?',
       required: true,
       optionLetters: true,
+      otherOption: { value: 'otra', placeholder: 'Escribe cual' },
       options: [
         { value: 'endesa', label: 'Endesa' },
         { value: 'naturgy', label: 'Naturgy' },
@@ -103,6 +104,7 @@ export default function AhorroLuz() {
   const [direction, setDirection] = useState<'next' | 'prev'>('next');
   const autoAdvanceTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const contactValuesRef = useRef<Record<string, string>>({});
+  const formContainerRef = useRef<HTMLDivElement | null>(null);
 
   const {
     currentQuestion,
@@ -138,12 +140,23 @@ export default function AhorroLuz() {
   const handleNext = useCallback(
     (valueOverride?: string) => {
       if (!currentQuestion) return;
-      // Para contacto: usar ref como fallback (evita estado desactualizado al clicar rápido)
-      const value =
+      let value: unknown =
         valueOverride ??
         (currentQuestion.type === 'contact'
           ? (Object.keys(contactValuesRef.current).length ? contactValuesRef.current : answers[currentQuestion.id])
           : answers[currentQuestion.id]);
+      // Fallback: leer del DOM para contacto (evita desincronización estado/DOM)
+      if (currentQuestion.type === 'contact' && formContainerRef.current) {
+        const base = (value as Record<string, string>) ?? {};
+        const phoneEl = formContainerRef.current.querySelector<HTMLInputElement>('[data-contact-field="phone"]');
+        const emailEl = formContainerRef.current.querySelector<HTMLInputElement>('[data-contact-field="email"]');
+        const nameEl = formContainerRef.current.querySelector<HTMLInputElement>('[data-contact-field="name"]');
+        const merged: Record<string, string> = { ...base };
+        if (phoneEl?.value?.trim()) merged.phone = phoneEl.value.trim();
+        if (emailEl?.value?.trim()) merged.email = emailEl.value.trim();
+        if (nameEl?.value?.trim()) merged.name = nameEl.value.trim();
+        if (Object.keys(merged).length > 0) value = merged;
+      }
       const err = validateQuestion(currentQuestion, value);
       if (err) {
         setValidationError(err);
@@ -152,8 +165,11 @@ export default function AhorroLuz() {
       setValidationError(null);
       setDirection('next');
       if (isLast) {
-        if (currentQuestion.type === 'contact' && Object.keys(contactValuesRef.current).length > 0) {
-          flushSync(() => setAnswer(currentQuestion.id, contactValuesRef.current));
+        if (currentQuestion.type === 'contact') {
+          const toSave = (value as Record<string, string>) ?? contactValuesRef.current;
+          if (toSave && Object.keys(toSave).length > 0) {
+            flushSync(() => setAnswer(currentQuestion.id, toSave));
+          }
         }
         submit();
       }
@@ -235,7 +251,8 @@ export default function AhorroLuz() {
           </p>
           <button
             onClick={reset}
-            className="text-lg font-medium text-blue-600 hover:underline"
+            className="text-lg font-medium hover:underline"
+            style={{ color: BRAND_COLOR }}
           >
             Enviar otra solicitud
           </button>
@@ -271,10 +288,10 @@ export default function AhorroLuz() {
         className="h-1 w-full bg-gray-200"
         style={{ position: 'fixed', top: 48, left: 0, right: 0, zIndex: 50 }}
       >
-        <div
-          className="h-full transition-all duration-300 ease-out bg-blue-600"
-          style={{ width: `${progress}%` }}
-        />
+          <div
+            className="h-full transition-all duration-300 ease-out"
+            style={{ backgroundColor: BRAND_COLOR, width: `${progress}%` }}
+          />
       </div>
 
       {/* Contenido */}
@@ -336,6 +353,7 @@ export default function AhorroLuz() {
               disabled={submitStatus === 'loading'}
               hideLabel
               onSelect={isRadioWithLetters ? handleSelectAndAdvance : undefined}
+              formContainerRef={currentQuestion.type === 'contact' ? formContainerRef : undefined}
             />
           </div>
 
@@ -370,7 +388,7 @@ export default function AhorroLuz() {
                 'flex items-center justify-center gap-2 px-8 py-3 rounded-xl font-medium text-white transition-all',
                 'hover:opacity-90 disabled:opacity-70 disabled:cursor-not-allowed'
               )}
-              style={{ backgroundColor: BUTTON_BLUE }}
+              style={{ backgroundColor: BRAND_COLOR }}
             >
               {submitStatus === 'loading' ? (
                 <>
