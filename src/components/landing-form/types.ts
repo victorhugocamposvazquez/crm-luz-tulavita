@@ -60,6 +60,8 @@ export interface SelectQuestion extends BaseQuestion {
 export interface RadioQuestion extends BaseQuestion {
   type: 'radio';
   options: QuestionOption[];
+  /** Mostrar letras A, B, C... en las opciones */
+  optionLetters?: boolean;
 }
 
 export interface CheckboxQuestion extends BaseQuestion {

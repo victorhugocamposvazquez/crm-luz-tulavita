@@ -1,8 +1,12 @@
 /**
  * Clon del formulario Selectra "Ahorra en tu próxima factura"
- * Inspirado en: https://selectra.typeform.com/ahorro-luz-gas
+ * Diseño según: https://selectra.typeform.com/ahorro-luz-gas
  *
- * Diseño Typeform: fondo claro, pregunta centrada, opciones grandes
+ * - Instrucción numerada arriba
+ * - Pregunta con emoji
+ * - Opciones con letras A, B, C, D y borde negro al seleccionar
+ * - Botón azul "Aceptar"
+ * - Fondo blanco
  */
 
 import { useState, useCallback } from 'react';
@@ -12,17 +16,31 @@ import type { FormConfig } from '@/components/landing-form';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, Loader2 } from 'lucide-react';
 
-const SELECTRA_GREEN = '#00a86b';
+const BUTTON_BLUE = '#2563eb';
 
 const AHORRO_LUZ_GAS_CONFIG: FormConfig = {
   source: 'web_form',
   campaign: 'ahorro_luz_gas',
   questions: [
     {
+      id: 'factura_mensual',
+      type: 'radio',
+      label: '💰 Para poder ayudarte, ¿sabes cuánto pagas al mes en tu factura?',
+      required: true,
+      optionLetters: true,
+      options: [
+        { value: 'menos_100', label: 'Menos de 100€' },
+        { value: '100_200', label: 'Entre 100 y 200€' },
+        { value: 'mas_200', label: 'Más de 200€' },
+        { value: 'no_se', label: 'No lo sé' },
+      ],
+    },
+    {
       id: 'suministro',
       type: 'radio',
       label: '¿Qué necesitas comparar?',
       required: true,
+      optionLetters: true,
       options: [
         { value: 'luz', label: 'Solo luz' },
         { value: 'gas', label: 'Solo gas' },
@@ -53,6 +71,7 @@ const AHORRO_LUZ_GAS_CONFIG: FormConfig = {
       type: 'radio',
       label: '¿Cuál es tu patrón de consumo?',
       required: true,
+      optionLetters: true,
       options: [
         { value: 'todo_dia', label: 'Todo el día' },
         { value: 'noches_fines', label: 'Noches y fines de semana' },
@@ -145,7 +164,7 @@ export default function AhorroLuzGas() {
 
   if (submitStatus === 'success') {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[#f7f7f7]">
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-white">
         <div className="max-w-lg w-full text-center animate-in fade-in duration-500">
           <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 mb-4">
             ¡Gracias!
@@ -156,8 +175,7 @@ export default function AhorroLuzGas() {
           </p>
           <button
             onClick={reset}
-            className="text-lg font-medium hover:underline"
-            style={{ color: SELECTRA_GREEN }}
+            className="text-lg font-medium text-blue-600 hover:underline"
           >
             Enviar otra solicitud
           </button>
@@ -171,42 +189,48 @@ export default function AhorroLuzGas() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f7f7f7] flex flex-col">
-      {/* Barra de progreso - estilo Typeform/Selectra */}
+    <div className="min-h-screen bg-white flex flex-col">
+      {/* Barra de progreso */}
       <div
         className="h-1 w-full bg-gray-200"
         style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 50 }}
       >
         <div
-          className="h-full transition-all duration-300 ease-out"
-          style={{
-            width: `${progress}%`,
-            backgroundColor: SELECTRA_GREEN,
-          }}
+          className="h-full transition-all duration-300 ease-out bg-blue-600"
+          style={{ width: `${progress}%` }}
         />
       </div>
 
-      {/* Contenido centrado */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-16 pt-20">
+      {/* Contenido */}
+      <div className="flex-1 flex flex-col items-center px-4 sm:px-6 py-16 pt-20">
         <div
+          className="w-full max-w-xl"
           key={currentQuestion.id}
           onKeyDown={handleKeyDown}
           className={cn(
-            'w-full max-w-2xl animate-in duration-300',
+            'animate-in duration-300',
             direction === 'next' && 'fade-in slide-in-from-right-4',
             direction === 'prev' && 'fade-in slide-in-from-left-4'
           )}
         >
-          {/* Pregunta - tipografía grande estilo Typeform */}
-          <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold text-gray-900 mb-8 leading-tight">
+          {/* Instrucción numerada - estilo Selectra */}
+          <p className="text-base text-gray-700 mb-6">
+            <span className="font-semibold">{currentStep}</span>{' '}
+            Completa el formulario para recibir un{' '}
+            <span className="font-semibold">estudio de ahorro gratuito</span> y
+            conseguir un mejor precio.
+          </p>
+
+          {/* Pregunta */}
+          <h1 className="text-xl sm:text-2xl font-medium text-gray-900 mb-6 leading-tight">
             {currentQuestion.label}
             {currentQuestion.required !== false && (
-              <span className="text-red-500 ml-1">*</span>
+              <span className="text-red-500 ml-0.5">*</span>
             )}
           </h1>
 
-          {/* Componente de respuesta con estilo Selectra/Typeform */}
-          <div className="selectra-form [&_input]:text-lg [&_input]:h-14 [&_input]:rounded-xl [&_.border]:border-2 [&_label]:rounded-xl [&_label]:p-5 [&_label]:text-base">
+          {/* Respuesta */}
+          <div className="[&_input]:text-lg [&_input]:h-12 [&_input]:rounded-xl [&_input]:border-2">
             <QuestionStep
               question={currentQuestion}
               value={answers[currentQuestion.id]}
@@ -224,28 +248,28 @@ export default function AhorroLuzGas() {
             <p className="mt-3 text-sm text-red-500">{submitError}</p>
           )}
 
-          {/* Navegación - minimalista tipo Typeform */}
-          <div className="flex items-center justify-between mt-10 gap-4">
-            <button
-              onClick={handlePrev}
-              disabled={isFirst || submitStatus === 'loading'}
-              className={cn(
-                'flex items-center gap-1 text-gray-500 hover:text-gray-700 transition-colors',
-                (isFirst || submitStatus === 'loading') && 'opacity-50 cursor-not-allowed'
-              )}
-            >
-              <ChevronLeft className="h-5 w-5" />
-              <span className="text-base">Atrás</span>
-            </button>
-
+          {/* Botón Aceptar - azul, estilo Selectra */}
+          <div className="mt-10 flex items-center justify-between gap-4">
+            {!isFirst ? (
+              <button
+                onClick={handlePrev}
+                disabled={submitStatus === 'loading'}
+                className="flex items-center gap-1 text-gray-500 hover:text-gray-700 text-sm"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                Atrás
+              </button>
+            ) : (
+              <div />
+            )}
             <button
               onClick={handleNext}
               disabled={submitStatus === 'loading'}
               className={cn(
-                'flex items-center gap-2 px-6 py-3 rounded-full font-medium text-white transition-all',
+                'flex items-center justify-center gap-2 px-8 py-3 rounded-xl font-medium text-white transition-all',
                 'hover:opacity-90 disabled:opacity-70 disabled:cursor-not-allowed'
               )}
-              style={{ backgroundColor: SELECTRA_GREEN }}
+              style={{ backgroundColor: BUTTON_BLUE }}
             >
               {submitStatus === 'loading' ? (
                 <>
@@ -255,16 +279,11 @@ export default function AhorroLuzGas() {
               ) : isLast ? (
                 'Enviar'
               ) : (
-                'Siguiente'
+                'Aceptar'
               )}
             </button>
           </div>
         </div>
-      </div>
-
-      {/* Footer sutil - paso X de Y */}
-      <div className="py-4 text-center text-sm text-gray-400">
-        Paso {currentStep} de {totalSteps}
       </div>
     </div>
   );

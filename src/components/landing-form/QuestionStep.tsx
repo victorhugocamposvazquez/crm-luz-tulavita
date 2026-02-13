@@ -159,6 +159,8 @@ export function QuestionStep({
       );
 
     case 'radio':
+      const useLetters = question.optionLetters ?? false;
+      const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
       return (
         <div className="space-y-4">
           {baseInput}
@@ -168,19 +170,45 @@ export function QuestionStep({
             disabled={disabled}
             className="flex flex-col gap-3"
           >
-            {question.options.map((opt) => (
-              <label
-                key={opt.value}
-                className={cn(
-                  'flex items-center gap-3 rounded-lg border p-4 cursor-pointer transition-colors',
-                  'hover:bg-accent/50',
-                  value === opt.value && 'border-primary bg-accent/30'
-                )}
-              >
-                <RadioGroupItem value={opt.value} id={`${id}-${opt.value}`} />
-                <span className="text-base">{opt.label}</span>
-              </label>
-            ))}
+            {question.options.map((opt, idx) => {
+              const letter = useLetters ? letters[idx] : null;
+              const selected = value === opt.value;
+              return (
+                <label
+                  key={opt.value}
+                  className={cn(
+                    'flex items-center gap-4 rounded-xl border-2 p-4 cursor-pointer transition-all',
+                    'hover:border-gray-300',
+                    selected
+                      ? useLetters
+                        ? 'border-black bg-white'
+                        : 'border-primary bg-accent/30'
+                      : 'border-gray-200'
+                  )}
+                >
+                  {useLetters ? (
+                    <>
+                      <span
+                        className={cn(
+                          'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-semibold',
+                          selected ? 'bg-black text-white' : 'border-2 border-gray-300 text-gray-600'
+                        )}
+                      >
+                        {letter}
+                      </span>
+                      <RadioGroupItem
+                        value={opt.value}
+                        id={`${id}-${opt.value}`}
+                        className="sr-only"
+                      />
+                    </>
+                  ) : (
+                    <RadioGroupItem value={opt.value} id={`${id}-${opt.value}`} />
+                  )}
+                  <span className="text-base">{opt.label}</span>
+                </label>
+              );
+            })}
           </RadioGroup>
         </div>
       );
