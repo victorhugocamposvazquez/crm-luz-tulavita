@@ -65,15 +65,22 @@ function LeadAttachmentPreview({ path, name }: { path: string; name: string }) {
     let cancelled = false;
     (async () => {
       try {
-        const { data, error: err } = await supabase.storage
+        const opts = isImage ? { transform: PREVIEW_TRANSFORM } : undefined;
+        let result = await supabase.storage
           .from(LEAD_ATTACHMENTS_BUCKET)
-          .createSignedUrl(path, 3600, isImage ? { transform: PREVIEW_TRANSFORM } : undefined);
+          .createSignedUrl(path, 3600, opts);
         if (cancelled) return;
-        if (err) {
-          setError(err.message);
+        if (result.error && isImage) {
+          result = await supabase.storage
+            .from(LEAD_ATTACHMENTS_BUCKET)
+            .createSignedUrl(path, 3600);
+        }
+        if (cancelled) return;
+        if (result.error) {
+          setError(result.error.message);
           return;
         }
-        setSignedUrl(data?.signedUrl ?? null);
+        setSignedUrl(result.data?.signedUrl ?? null);
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Error al cargar');
       }
@@ -245,7 +252,20 @@ export default function LeadDetailSheet({
     }
   };
 
-  const customFields = (lead?.custom_fields as Record<string, unknown> | null) ?? {};
+  const rawCustom = lead?.custom_fields;
+  const customFields = ((): Record<string, unknown> => {
+    if (rawCustom == null) return {};
+    if (typeof rawCustom === 'object' && !Array.isArray(rawCustom)) return rawCustom as Record<string, unknown>;
+    if (typeof rawCustom === 'string') {
+      try {
+        const parsed = JSON.parse(rawCustom) as Record<string, unknown>;
+        return parsed && typeof parsed === 'object' ? parsed : {};
+      } catch {
+        return {};
+      }
+    }
+    return {};
+  })();
   const hasCustomFields = Object.keys(customFields).length > 0;
 
   if (!lead) return null;
@@ -339,16 +359,34 @@ export default function LeadDetailSheet({
                   {Object.entries(customFields).map(([key, value]) => {
                     const label = getLeadFieldLabel(lead.source, key);
                     let display: React.ReactNode = String(value ?? '—');
-                    if (value && typeof value === 'object' && !Array.isArray(value)) {
-                      const obj = value as Record<string, unknown>;
-                      if (key === 'adjuntar_factura' && typeof obj.path === 'string') {
+                    if (key === 'adjuntar_factura') {
+                      const path = value && typeof value === 'object' && !Array.isArray(value)
+                        ? (value as Record<string, unknown>).path
+                        : null;
+                      const pathStr = typeof path === 'string' && path.trim() ? path : null;
+                      const nameStr = value && typeof value === 'object' && !Array.isArray(value)
+                        ? String((value as Record<string, unknown>).name ?? '')
+                        : typeof value === 'string' ? value : '';
+                      if (pathStr) {
                         display = (
                           <div>
-                            <p className="font-medium text-sm">{String(obj.name || 'Factura adjunta')}</p>
-                            <LeadAttachmentPreview path={obj.path} name={String(obj.name || '')} />
+                            <p className="font-medium text-sm">{nameStr || 'Factura adjunta'}</p>
+                            <LeadAttachmentPreview path={pathStr} name={nameStr} />
                           </div>
                         );
-                      } else if (obj.name || obj.email || obj.phone) {
+                      } else {
+                        display = (
+                          <div>
+                            <p className="font-medium text-sm">{nameStr || '—'}</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Previsualización no disponible (archivo sin ruta en la nube o registro anterior).
+                            </p>
+                          </div>
+                        );
+                      }
+                    } else if (value && typeof value === 'object' && !Array.isArray(value)) {
+                      const obj = value as Record<string, unknown>;
+                      if (obj.name || obj.email || obj.phone) {
                         display = (
                           <span className="text-sm">
                             {[obj.name, obj.email, obj.phone].filter(Boolean).join(' · ')}
