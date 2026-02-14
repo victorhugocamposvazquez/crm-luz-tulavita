@@ -204,7 +204,7 @@ export function QuestionStep({
                     'hover:border-gray-300',
                     selected
                       ? useLetters
-                        ? 'border-black bg-white'
+                        ? 'border-[#26606b] bg-white'
                         : 'border-primary bg-accent/30'
                       : 'border-gray-200'
                   )}
@@ -214,7 +214,7 @@ export function QuestionStep({
                       <span
                         className={cn(
                           'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
-                          selected ? 'bg-black text-white' : 'border-2 border-gray-300 text-gray-600'
+                          selected ? 'bg-[#26606b] text-white' : 'border-2 border-gray-300 text-gray-600'
                         )}
                       >
                         {letter}
@@ -322,7 +322,7 @@ export function QuestionStep({
           <div className="space-y-6">
             {/* Nombre - Material style */}
             <div className="flex flex-col">
-              <Label className="text-sm font-medium text-gray-900 mb-1">Nombre</Label>
+              <Label className="text-sm font-medium mb-1" style={{ color: '#26606b' }}>Nombre</Label>
               <Input
                 data-contact-field="name"
                 autoComplete="name"
@@ -335,7 +335,7 @@ export function QuestionStep({
             </div>
             {/* Teléfono - Material style con bandera y selector */}
             <div className="flex flex-col">
-              <Label className="text-sm font-medium text-gray-900 mb-1">Número de teléfono *</Label>
+              <Label className="text-sm font-medium mb-1" style={{ color: '#26606b' }}>Número de teléfono *</Label>
               <div className="flex items-center border-b-2 border-gray-300 focus-within:border-[#26606b] focus-within:border-b-2 transition-colors">
                 <button
                   type="button"
@@ -362,7 +362,7 @@ export function QuestionStep({
             </div>
             {/* Email - Material style */}
             <div className="flex flex-col">
-              <Label className="text-sm font-medium text-gray-900 mb-1">Correo electrónico *</Label>
+              <Label className="text-sm font-medium mb-1" style={{ color: '#26606b' }}>Correo electrónico *</Label>
               <Input
                 type="email"
                 data-contact-field="email"

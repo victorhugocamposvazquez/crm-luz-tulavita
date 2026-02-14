@@ -228,19 +228,17 @@ export default function AhorroLuz() {
   if (submitStatus === 'success') {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-white">
-        <header className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 py-3 bg-white/80 backdrop-blur-sm border-b border-gray-200/50"
-          style={{ height: 48 }}
-        >
-          <div className="flex items-center gap-2 min-w-[80px]">
-            <img src="/logo-tulavita.png" alt="Tulavita" className="h-8 w-8 object-contain" />
+        <header className="fixed top-0 left-0 right-0 z-40 h-14 sm:h-16 flex items-center justify-between px-4 py-3 bg-white/80 backdrop-blur-sm border-b border-gray-200/50">
+          <div className="flex items-center justify-center min-w-[3rem] sm:min-w-[3.5rem]">
+            <img src="/logo-tulavita.png" alt="Tulavita" className="h-12 w-12 sm:h-14 sm:w-14 object-contain" />
           </div>
-          <h1 className="absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-gray-800">
+          <h1 className="absolute left-1/2 -translate-x-1/2 text-sm sm:text-base font-semibold" style={{ color: BRAND_COLOR }}>
             Ahorra en tu factura
           </h1>
-          <div className="min-w-[80px]" aria-hidden />
+          <div className="min-w-[3rem] sm:min-w-[3.5rem]" aria-hidden />
         </header>
         <div className="max-w-lg w-full text-center animate-in fade-in duration-500">
-          <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 mb-4">
+          <h2 className="text-2xl sm:text-3xl font-semibold mb-4" style={{ color: BRAND_COLOR }}>
             ¡Gracias!
           </h2>
           <p className="text-lg text-gray-600 mb-8">
@@ -266,24 +264,18 @@ export default function AhorroLuz() {
   return (
     <div className="min-h-screen bg-white flex flex-col">
       {/* Cabecera con opacidad */}
-      <header
-        className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 py-3 bg-white/80 backdrop-blur-sm border-b border-gray-200/50"
-        style={{ height: 48 }}
-      >
-        <div className="flex items-center gap-2 min-w-[80px]">
-          <img src="/logo-tulavita.png" alt="Tulavita" className="h-8 w-8 object-contain" />
+      <header className="fixed top-0 left-0 right-0 z-40 h-14 sm:h-16 flex items-center justify-between px-4 py-3 bg-white/80 backdrop-blur-sm border-b border-gray-200/50">
+        <div className="flex items-center justify-center min-w-[3rem] sm:min-w-[3.5rem]">
+          <img src="/logo-tulavita.png" alt="Tulavita" className="h-12 w-12 sm:h-14 sm:w-14 object-contain" />
         </div>
-        <h1 className="absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-gray-800">
+        <h1 className="absolute left-1/2 -translate-x-1/2 text-sm sm:text-base font-semibold" style={{ color: BRAND_COLOR }}>
           Ahorra en tu factura
         </h1>
-        <div className="min-w-[80px]" aria-hidden />
+        <div className="min-w-[3rem] sm:min-w-[3.5rem]" aria-hidden />
       </header>
 
       {/* Barra de progreso */}
-      <div
-        className="h-1 w-full bg-gray-200"
-        style={{ position: 'fixed', top: 48, left: 0, right: 0, zIndex: 50 }}
-      >
+      <div className="fixed top-14 sm:top-16 left-0 right-0 z-50 h-1 w-full bg-gray-200">
           <div
             className="h-full transition-all duration-300 ease-out"
             style={{ backgroundColor: BRAND_COLOR, width: `${progress}%` }}
@@ -291,7 +283,7 @@ export default function AhorroLuz() {
       </div>
 
       {/* Contenido */}
-      <div className="flex-1 flex flex-col items-center px-4 sm:px-6 py-16 pt-24">
+      <div className="flex-1 flex flex-col items-center px-4 sm:px-6 py-16 pt-28">
         <div
           key={currentQuestion.id}
           onKeyDown={handleKeyDown}
@@ -303,15 +295,15 @@ export default function AhorroLuz() {
         >
           {/* Indicador de paso - cuadrado negro con número */}
           <div className="flex items-start gap-2 mb-6">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-gray-800 text-white text-sm font-medium">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-white text-sm font-medium" style={{ backgroundColor: BRAND_COLOR }}>
               {currentStep}
             </span>
             {currentQuestion.type === 'contact' && 'header' in currentQuestion && currentQuestion.header ? (
-              <h1 className="text-xl sm:text-2xl font-semibold text-gray-900 leading-tight pt-0.5">
+              <h1 className="text-xl sm:text-2xl font-semibold leading-tight pt-0.5" style={{ color: BRAND_COLOR }}>
                 {currentQuestion.header}
               </h1>
             ) : currentQuestion.type !== 'contact' ? (
-              <h1 className="text-xl sm:text-2xl font-medium text-gray-900 leading-tight">
+              <h1 className="text-xl sm:text-2xl font-medium leading-tight" style={{ color: BRAND_COLOR }}>
                 {currentQuestion.label}
                 {currentQuestion.required !== false && (
                   <span className="text-red-500 ml-0.5">*</span>
@@ -369,7 +361,7 @@ export default function AhorroLuz() {
                 'flex items-center gap-2 p-2 rounded-lg transition-colors',
                 isFirst || submitStatus === 'loading'
                   ? 'text-gray-300 cursor-not-allowed'
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-[#26606b]'
               )}
               title="Atrás"
             >
@@ -405,7 +397,7 @@ export default function AhorroLuz() {
                 'flex items-center gap-2 p-2 rounded-lg transition-colors',
                 isLast || submitStatus === 'loading'
                   ? 'text-gray-300 cursor-not-allowed'
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-[#26606b]'
               )}
               title="Siguiente"
             >
