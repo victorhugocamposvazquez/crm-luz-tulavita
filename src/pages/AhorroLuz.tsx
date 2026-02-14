@@ -275,7 +275,7 @@ export default function AhorroLuz() {
       </header>
 
       {/* Barra de progreso */}
-      <div className="fixed top-14 sm:top-16 left-0 right-0 z-50 h-1 w-full bg-gray-200">
+      <div className="fixed top-[4rem] sm:top-[4.5rem] left-0 right-0 z-50 h-0.5 w-full bg-gray-200">
           <div
             className="h-full transition-all duration-300 ease-out"
             style={{ backgroundColor: BRAND_COLOR, width: `${progress}%` }}
