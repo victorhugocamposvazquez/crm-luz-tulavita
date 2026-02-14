@@ -358,8 +358,9 @@ export default function LeadDetailSheet({
                 <div className="space-y-3 rounded-lg border bg-muted/30 p-4">
                   {Object.entries(customFields).map(([key, value]) => {
                     const label = getLeadFieldLabel(lead.source, key);
+                    const isFacturaField = key === 'adjuntar_factura' || label === 'Factura adjunta';
                     let display: React.ReactNode = String(value ?? '—');
-                    if (key === 'adjuntar_factura') {
+                    if (isFacturaField) {
                       const path = value && typeof value === 'object' && !Array.isArray(value)
                         ? (value as Record<string, unknown>).path
                         : null;
@@ -376,10 +377,10 @@ export default function LeadDetailSheet({
                         );
                       } else {
                         display = (
-                          <div>
+                          <div className="space-y-1.5">
                             <p className="font-medium text-sm">{nameStr || '—'}</p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Previsualización no disponible (archivo sin ruta en la nube o registro anterior).
+                            <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+                              Previsualización no disponible. El archivo se registró solo por nombre (sin subida a la nube). Para ver la imagen, los nuevos envíos del formulario guardan la factura y permiten previsualizarla aquí.
                             </p>
                           </div>
                         );
