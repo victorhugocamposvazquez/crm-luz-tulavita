@@ -105,6 +105,7 @@ export default function AhorroLuz() {
   const autoAdvanceTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const contactValuesRef = useRef<Record<string, string>>({});
   const formContainerRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const {
     currentQuestion,
@@ -133,7 +134,7 @@ export default function AhorroLuz() {
     if (!currentQuestion) return false;
     const val = answers[currentQuestion.id];
     if (currentQuestion.type === 'contact') return true;
-    if (currentQuestion.type === 'file_upload') return true;
+    if (currentQuestion.type === 'file_upload') return !!val;
     if (currentQuestion.type === 'checkbox') return Array.isArray(val) && val.length > 0;
     return val !== undefined && val !== null && val !== '';
   }, [currentQuestion, answers]);
@@ -257,7 +258,7 @@ export default function AhorroLuz() {
           </p>
           {sinFactura && (
             <>
-              <p className="text-base sm:text-lg font-medium mb-6" style={{ color: BRAND_COLOR }}>
+              <p className="text-xl sm:text-2xl font-bold mb-6" style={{ color: BRAND_COLOR }}>
                 ¿Sabías que cerca del 99% de las facturas que recibimos les mejoramos el precio? Seguro que la tuya también! 💪
               </p>
               <p className="text-lg text-gray-600 mb-8">
@@ -364,6 +365,7 @@ export default function AhorroLuz() {
               hideLabel
               onSelect={isRadioWithLetters ? handleSelectAndAdvance : undefined}
               formContainerRef={currentQuestion.type === 'contact' ? formContainerRef : undefined}
+              fileInputRef={currentQuestion.type === 'file_upload' ? fileInputRef : undefined}
             />
           </div>
 
@@ -392,8 +394,17 @@ export default function AhorroLuz() {
             </button>
 
             <button
-              onClick={handleNext}
-              disabled={submitStatus === 'loading' || !hasSelection}
+              onClick={() => {
+                if (currentQuestion?.type === 'file_upload' && !answers[currentQuestion.id]) {
+                  fileInputRef.current?.click();
+                } else {
+                  handleNext();
+                }
+              }}
+              disabled={
+                submitStatus === 'loading' ||
+                (currentQuestion?.type !== 'file_upload' && !hasSelection)
+              }
               className={cn(
                 'flex items-center justify-center gap-2 px-8 py-3 rounded-xl font-medium text-white transition-all',
                 'hover:opacity-90 disabled:opacity-70 disabled:cursor-not-allowed'
@@ -407,6 +418,8 @@ export default function AhorroLuz() {
                 </>
               ) : isLast ? (
                 'Enviar'
+              ) : currentQuestion?.type === 'file_upload' && !answers[currentQuestion.id] ? (
+                'Elegir archivo'
               ) : (
                 'Aceptar'
               )}

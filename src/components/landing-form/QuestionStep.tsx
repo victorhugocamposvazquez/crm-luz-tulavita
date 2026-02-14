@@ -32,6 +32,8 @@ export interface QuestionStepProps {
   onSelect?: (value: string) => void;
   /** Ref para leer valores del DOM (fallback para contacto en validación) */
   formContainerRef?: React.RefObject<HTMLDivElement | null>;
+  /** Ref del input file (para que el padre pueda abrir el selector o limpiar) */
+  fileInputRef?: React.RefObject<HTMLInputElement | null>;
 }
 
 export function QuestionStep({
@@ -44,6 +46,7 @@ export function QuestionStep({
   hideLabel,
   onSelect,
   formContainerRef,
+  fileInputRef,
 }: QuestionStepProps) {
   const id = `q-${question.id}`;
   const isRequired = question.required !== false;
@@ -248,17 +251,20 @@ export function QuestionStep({
         </div>
       );
 
-    case 'file_upload':
+    case 'file_upload': {
       const fileQ = question as import('./types').FileUploadQuestion;
       const maxSize = (fileQ.maxSizeMb ?? 10) * 1024 * 1024;
+      const fileName = (value as string) ?? '';
+      const hasFile = !!fileName.trim();
       return (
         <div className="space-y-4">
           {baseInput}
           {fileQ.description && (
             <p className="text-sm text-gray-600 mb-2">{fileQ.description}</p>
           )}
-          <label className="flex flex-col items-center justify-center w-full min-h-[180px] border-2 border-dashed border-gray-300 rounded-xl cursor-pointer hover:border-gray-400 transition-colors bg-gray-50/50">
+          <label className="flex flex-col items-center justify-center w-full min-h-[180px] border-2 border-dashed rounded-xl cursor-pointer transition-colors bg-gray-50/50 border-gray-300 hover:border-gray-400 focus-within:ring-2 focus-within:ring-[#26606b] focus-within:border-[#26606b] has-[:focus]:ring-2 has-[:focus]:ring-[#26606b] has-[:focus]:border-[#26606b]">
             <input
+              ref={fileInputRef}
               type="file"
               className="hidden"
               accept={fileQ.accept ?? '.pdf,image/*'}
@@ -271,16 +277,44 @@ export function QuestionStep({
               }}
               disabled={disabled}
             />
-            <div className="flex flex-col items-center gap-2 py-8 px-4">
-              <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-              <span className="text-sm text-gray-600">Elige el archivo o arrastra aquí</span>
-              <span className="text-xs text-gray-400">Límite de tamaño: {fileQ.maxSizeMb ?? 10}MB</span>
-            </div>
+            {hasFile ? (
+              <div className="flex flex-col items-center gap-3 py-8 px-4">
+                <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#26606b]/10 text-[#26606b]" aria-hidden>
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </span>
+                <p className="text-sm font-medium text-gray-800 text-center break-all px-2">
+                  {fileName}
+                </p>
+                <p className="text-xs text-gray-500">Archivo listo. Puedes cambiarlo si lo necesitas.</p>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onChange('');
+                    if (fileInputRef?.current) fileInputRef.current.value = '';
+                  }}
+                  className="text-sm font-medium hover:underline"
+                  style={{ color: '#26606b' }}
+                >
+                  Elegir otro archivo
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center gap-2 py-8 px-4">
+                <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <span className="text-sm text-gray-600">Elige el archivo o arrastra aquí</span>
+                <span className="text-xs text-gray-400">Límite de tamaño: {fileQ.maxSizeMb ?? 10}MB</span>
+              </div>
+            )}
           </label>
         </div>
       );
+    }
 
     case 'contact':
       const contactQ = question as import('./types').ContactQuestion;
