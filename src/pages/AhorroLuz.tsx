@@ -78,7 +78,7 @@ const AHORRO_LUZ_CONFIG: FormConfig = {
       label: '¡Adjunta tu factura aquí! Puede ser una foto, captura, PDF...',
       required: false,
       maxSizeMb: 10,
-      description: 'Si al final no puedes subirla ahora, continúa y te enviaremos un mail para que puedas hacerlo más tarde.',
+      description: '',
       showWhen: { questionId: 'tiene_factura', value: 'subir' },
     },
     {
@@ -236,13 +236,14 @@ export default function AhorroLuz() {
   }, [currentQuestion?.id, submitStatus]);
 
   if (submitStatus === 'success') {
+    const sinFactura = answers.tiene_factura === 'no';
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-white">
         <header className="fixed top-0 left-0 right-0 z-40 h-14 sm:h-16 flex items-center justify-between px-4 py-3 bg-white/80 backdrop-blur-sm border-b border-gray-200/50">
           <div className="flex items-center justify-center min-w-[3rem] sm:min-w-[3.5rem]">
             <img src="/logo-tulavita.png" alt="Tulavita" className="h-14 w-14 sm:h-16 sm:w-16 object-contain" />
           </div>
-          <h1 className="absolute left-1/2 -translate-x-1/2 text-base sm:text-lg font-semibold" style={{ color: BRAND_COLOR }}>
+          <h1 className="absolute left-1/2 -translate-x-1/2 text-lg sm:text-xl font-semibold" style={{ color: BRAND_COLOR }}>
             Ahorra en tu factura
           </h1>
           <div className="min-w-[3rem] sm:min-w-[3.5rem]" aria-hidden />
@@ -251,10 +252,24 @@ export default function AhorroLuz() {
           <h2 className="text-2xl sm:text-3xl font-semibold mb-4" style={{ color: BRAND_COLOR }}>
             ¡Gracias!
           </h2>
-          <p className="text-lg text-gray-600 mb-8">
-            Hemos recibido tu información. Un asesor te contactará en las
-            próximas horas para ayudarte a ahorrar en tu factura.
+          <p className="text-lg text-gray-600 mb-6">
+            Hemos recibido tu información
           </p>
+          {sinFactura && (
+            <>
+              <p className="text-base sm:text-lg font-medium mb-6" style={{ color: BRAND_COLOR }}>
+                ¿Sabías que cerca del 99% de las facturas que recibimos les mejoramos el precio? Seguro que la tuya también! 💪
+              </p>
+              <p className="text-lg text-gray-600 mb-8">
+                Un asesor te contactará pronto para ponernos manos a la obra
+              </p>
+            </>
+          )}
+          {!sinFactura && (
+            <p className="text-lg text-gray-600 mb-8">
+              Un asesor te contactará en las próximas horas para ayudarte a ahorrar en tu factura.
+            </p>
+          )}
           <button
             onClick={reset}
             className="text-lg font-medium hover:underline"
@@ -279,7 +294,7 @@ export default function AhorroLuz() {
           <div className="flex items-center justify-center min-w-[3rem] sm:min-w-[3.5rem]">
             <img src="/logo-tulavita.png" alt="Tulavita" className="h-14 w-14 sm:h-16 sm:w-16 object-contain" />
           </div>
-          <h1 className="absolute left-1/2 -translate-x-1/2 text-base sm:text-lg font-semibold" style={{ color: BRAND_COLOR }}>
+          <h1 className="absolute left-1/2 -translate-x-1/2 text-lg sm:text-xl font-semibold" style={{ color: BRAND_COLOR }}>
             Ahorra en tu factura
           </h1>
           <div className="min-w-[3rem] sm:min-w-[3.5rem]" aria-hidden />
@@ -293,7 +308,7 @@ export default function AhorroLuz() {
       </header>
 
       {/* Contenido */}
-      <div className="flex-1 flex flex-col items-center px-4 sm:px-6 py-16 pt-24">
+      <div className="flex-1 flex flex-col items-center px-4 sm:px-6 py-16 pt-28">
         <div
           key={currentQuestion.id}
           onKeyDown={handleKeyDown}
@@ -324,12 +339,9 @@ export default function AhorroLuz() {
 
           {/* Descripción extra para paso 5 (tiene_factura) */}
           {currentQuestion.id === 'tiene_factura' && (
-            <div className="mb-6 space-y-2">
+            <div className="mb-6">
               <p className="text-base text-gray-700">
                 Es la forma más <strong>rápida</strong> y <strong>exacta</strong> de calcular tu ahorro.*
-              </p>
-              <p className="text-sm text-gray-600">
-                Si no puedes subirla ahora, no pasa nada. Te enviaremos un email para que puedas hacerlo cuando te venga mejor.
               </p>
             </div>
           )}
