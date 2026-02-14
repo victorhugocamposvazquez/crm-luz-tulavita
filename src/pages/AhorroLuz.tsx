@@ -263,27 +263,27 @@ export default function AhorroLuz() {
 
   return (
     <div className="min-h-screen bg-white flex flex-col">
-      {/* Cabecera con opacidad */}
-      <header className="fixed top-0 left-0 right-0 z-40 h-14 sm:h-16 flex items-center justify-between px-4 py-3 bg-white/80 backdrop-blur-sm border-b border-gray-200/50">
-        <div className="flex items-center justify-center min-w-[3rem] sm:min-w-[3.5rem]">
-          <img src="/logo-tulavita.png" alt="Tulavita" className="h-12 w-12 sm:h-14 sm:w-14 object-contain" />
+      {/* Cabecera: logo/título + barra de progreso en un solo bloque */}
+      <header className="fixed top-0 left-0 right-0 z-40 flex flex-col bg-white/80 backdrop-blur-sm border-b border-gray-200/50">
+        <div className="flex items-center justify-between px-4 py-3 pb-2 min-h-14 sm:min-h-16">
+          <div className="flex items-center justify-center min-w-[3rem] sm:min-w-[3.5rem]">
+            <img src="/logo-tulavita.png" alt="Tulavita" className="h-12 w-12 sm:h-14 sm:w-14 object-contain" />
+          </div>
+          <h1 className="absolute left-1/2 -translate-x-1/2 text-sm sm:text-base font-semibold" style={{ color: BRAND_COLOR }}>
+            Ahorra en tu factura
+          </h1>
+          <div className="min-w-[3rem] sm:min-w-[3.5rem]" aria-hidden />
         </div>
-        <h1 className="absolute left-1/2 -translate-x-1/2 text-sm sm:text-base font-semibold" style={{ color: BRAND_COLOR }}>
-          Ahorra en tu factura
-        </h1>
-        <div className="min-w-[3rem] sm:min-w-[3.5rem]" aria-hidden />
-      </header>
-
-      {/* Barra de progreso */}
-      <div className="fixed top-[4rem] sm:top-[4.5rem] left-0 right-0 z-50 h-0.5 w-full bg-gray-200">
+        <div className="h-0.5 w-full bg-gray-200">
           <div
             className="h-full transition-all duration-300 ease-out"
             style={{ backgroundColor: BRAND_COLOR, width: `${progress}%` }}
           />
-      </div>
+        </div>
+      </header>
 
       {/* Contenido */}
-      <div className="flex-1 flex flex-col items-center px-4 sm:px-6 py-16 pt-28">
+      <div className="flex-1 flex flex-col items-center px-4 sm:px-6 py-16 pt-24">
         <div
           key={currentQuestion.id}
           onKeyDown={handleKeyDown}
