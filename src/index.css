@@ -103,3 +103,11 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+/* Evitar fondo azul/amarillo del autocompletado del navegador en inputs de contacto */
+input.no-autofill-bg:-webkit-autofill,
+input.no-autofill-bg:-webkit-autofill:hover,
+input.no-autofill-bg:-webkit-autofill:focus {
+  -webkit-box-shadow: 0 0 0 30px white inset;
+  -webkit-text-fill-color: inherit;
+}

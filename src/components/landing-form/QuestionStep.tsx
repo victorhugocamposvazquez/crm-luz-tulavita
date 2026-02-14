@@ -325,7 +325,8 @@ export function QuestionStep({
               <Label className="text-sm font-medium text-gray-900 mb-1">Nombre</Label>
               <Input
                 data-contact-field="name"
-                className="h-11 border-0 border-b-2 border-gray-300 rounded-none px-0 focus-visible:ring-0 focus-visible:border-[#26606b] focus-visible:border-b-2 transition-colors bg-transparent placeholder:text-gray-400"
+                autoComplete="name"
+                className="h-11 border-0 border-b-2 border-gray-300 rounded-none px-0 focus-visible:ring-0 focus-visible:border-[#26606b] focus-visible:border-b-2 transition-colors bg-transparent placeholder:text-gray-400 no-autofill-bg"
                 placeholder="Carlos"
                 value={contactVal.name ?? ''}
                 onChange={(e) => updateContact('name', e.target.value)}
@@ -350,7 +351,7 @@ export function QuestionStep({
                   inputMode="numeric"
                   autoComplete="tel"
                   data-contact-field="phone"
-                  className="flex-1 h-11 border-0 rounded-none px-0 focus-visible:ring-0 bg-transparent placeholder:text-gray-400"
+                  className="flex-1 h-11 border-0 rounded-none px-0 focus-visible:ring-0 bg-transparent placeholder:text-gray-400 no-autofill-bg"
                   placeholder="612 34 56 78"
                   value={contactVal.phone ?? ''}
                   onChange={(e) => updateContact('phone', e.target.value)}
@@ -365,7 +366,8 @@ export function QuestionStep({
               <Input
                 type="email"
                 data-contact-field="email"
-                className="h-11 border-0 border-b-2 border-gray-300 rounded-none px-0 focus-visible:ring-0 focus-visible:border-[#26606b] focus-visible:border-b-2 transition-colors bg-transparent placeholder:text-gray-400"
+                autoComplete="email"
+                className="h-11 border-0 border-b-2 border-gray-300 rounded-none px-0 focus-visible:ring-0 focus-visible:border-[#26606b] focus-visible:border-b-2 transition-colors bg-transparent placeholder:text-gray-400 no-autofill-bg"
                 placeholder="nombre@ejemplo.com"
                 value={contactVal.email ?? ''}
                 onChange={(e) => updateContact('email', e.target.value)}

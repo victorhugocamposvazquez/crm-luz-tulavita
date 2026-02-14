@@ -168,7 +168,7 @@ export default function LeadDetailSheet({
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-xl flex flex-col p-0"
+        className="w-full sm:max-w-3xl flex flex-col p-0"
       >
         <SheetHeader className="px-6 pt-6 pb-4 border-b">
           <SheetTitle className="text-left">

@@ -10,7 +10,7 @@ import { useFormState } from '@/components/landing-form';
 import { QuestionStep, validateQuestion } from '@/components/landing-form';
 import type { FormConfig } from '@/components/landing-form';
 import { cn } from '@/lib/utils';
-import { ChevronLeft, ChevronRight, Loader2, Zap } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 
 const BRAND_COLOR = '#26606b';
 
@@ -232,9 +232,7 @@ export default function AhorroLuz() {
           style={{ height: 48 }}
         >
           <div className="flex items-center gap-2 min-w-[80px]">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-400/90 text-amber-900">
-              <Zap className="h-4 w-4" strokeWidth={2.5} />
-            </div>
+            <img src="/logo-tulavita.png" alt="Tulavita" className="h-8 w-8 object-contain" />
           </div>
           <h1 className="absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-gray-800">
             Ahorra en tu factura
@@ -273,9 +271,7 @@ export default function AhorroLuz() {
         style={{ height: 48 }}
       >
         <div className="flex items-center gap-2 min-w-[80px]">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-400/90 text-amber-900">
-            <Zap className="h-4 w-4" strokeWidth={2.5} />
-          </div>
+          <img src="/logo-tulavita.png" alt="Tulavita" className="h-8 w-8 object-contain" />
         </div>
         <h1 className="absolute left-1/2 -translate-x-1/2 text-sm font-semibold text-gray-800">
           Ahorra en tu factura
