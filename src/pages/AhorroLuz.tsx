@@ -11,11 +11,18 @@ import { QuestionStep, validateQuestion } from '@/components/landing-form';
 import type { FormConfig } from '@/components/landing-form';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import imageCompression from 'browser-image-compression';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
 const BRAND_COLOR = '#26606b';
 const LEAD_ATTACHMENTS_BUCKET = 'lead-attachments';
+
+const IMAGE_COMPRESSION_OPTIONS = {
+  maxSizeMB: 1.5,
+  maxWidthOrHeight: 1920,
+  useWebWorker: true,
+};
 
 const AHORRO_LUZ_CONFIG: FormConfig = {
   source: 'web_form',
@@ -133,8 +140,16 @@ export default function AhorroLuz() {
   });
 
   const uploadLeadAttachment = useCallback(async (file: File): Promise<{ name: string; path: string }> => {
-    const path = `${crypto.randomUUID()}/${file.name}`;
-    const { error } = await supabase.storage.from(LEAD_ATTACHMENTS_BUCKET).upload(path, file, { upsert: false });
+    let fileToUpload = file;
+    if (file.type.startsWith('image/')) {
+      try {
+        fileToUpload = await imageCompression(file, IMAGE_COMPRESSION_OPTIONS);
+      } catch (e) {
+        console.warn('Compresión de imagen fallida, se sube original:', e);
+      }
+    }
+    const path = `${crypto.randomUUID()}/${fileToUpload.name}`;
+    const { error } = await supabase.storage.from(LEAD_ATTACHMENTS_BUCKET).upload(path, fileToUpload, { upsert: false });
     if (error) {
       toast({ title: 'Error al subir el archivo', description: error.message, variant: 'destructive' });
       throw error;
@@ -253,7 +268,7 @@ export default function AhorroLuz() {
     const sinFactura = answers.tiene_factura === 'no';
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-white">
-        <header className="fixed top-0 left-0 right-0 z-40 h-14 sm:h-16 flex items-center justify-between px-4 py-3 bg-white/80 backdrop-blur-sm border-b border-gray-200/50">
+        <header className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 pt-6 pb-4 sm:pt-7 sm:pb-5 bg-white/80 backdrop-blur-sm border-b border-gray-200/50">
           <div className="flex items-center justify-center min-w-[3rem] sm:min-w-[3.5rem]">
             <img src="/logo-tulavita.png" alt="Tulavita" className="h-14 w-14 sm:h-16 sm:w-16 object-contain" />
           </div>

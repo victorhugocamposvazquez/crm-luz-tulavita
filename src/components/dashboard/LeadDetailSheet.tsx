@@ -54,9 +54,12 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
 const LEAD_ATTACHMENTS_BUCKET = 'lead-attachments';
 const IMAGE_EXT = /\.(jpe?g|png|webp|gif)$/i;
 
+const PREVIEW_TRANSFORM = { width: 600, height: 400, quality: 80, resize: 'contain' as const };
+
 function LeadAttachmentPreview({ path, name }: { path: string; name: string }) {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const isImage = IMAGE_EXT.test(name);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,7 +67,7 @@ function LeadAttachmentPreview({ path, name }: { path: string; name: string }) {
       try {
         const { data, error: err } = await supabase.storage
           .from(LEAD_ATTACHMENTS_BUCKET)
-          .createSignedUrl(path, 3600);
+          .createSignedUrl(path, 3600, isImage ? { transform: PREVIEW_TRANSFORM } : undefined);
         if (cancelled) return;
         if (err) {
           setError(err.message);
@@ -76,9 +79,7 @@ function LeadAttachmentPreview({ path, name }: { path: string; name: string }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [path]);
-
-  const isImage = IMAGE_EXT.test(name);
+  }, [path, isImage]);
 
   if (error) {
     return (
