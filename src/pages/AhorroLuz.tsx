@@ -4,7 +4,7 @@
  * - Flechas para navegar atrás/adelante
  */
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { flushSync } from 'react-dom';
 import { useFormState } from '@/components/landing-form';
 import { QuestionStep, validateQuestion } from '@/components/landing-form';
@@ -128,6 +128,16 @@ export default function AhorroLuz() {
     campaign: AHORRO_LUZ_CONFIG.campaign,
   });
 
+  /** El botón Siguiente/Aceptar solo está activo si hay una opción (o respuesta) seleccionada */
+  const hasSelection = useMemo(() => {
+    if (!currentQuestion) return false;
+    const val = answers[currentQuestion.id];
+    if (currentQuestion.type === 'contact') return true;
+    if (currentQuestion.type === 'file_upload') return true;
+    if (currentQuestion.type === 'checkbox') return Array.isArray(val) && val.length > 0;
+    return val !== undefined && val !== null && val !== '';
+  }, [currentQuestion, answers]);
+
   const scrollToTop = useCallback(() => {
     const doScroll = () => {
       window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
@@ -230,9 +240,9 @@ export default function AhorroLuz() {
       <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-white">
         <header className="fixed top-0 left-0 right-0 z-40 h-14 sm:h-16 flex items-center justify-between px-4 py-3 bg-white/80 backdrop-blur-sm border-b border-gray-200/50">
           <div className="flex items-center justify-center min-w-[3rem] sm:min-w-[3.5rem]">
-            <img src="/logo-tulavita.png" alt="Tulavita" className="h-12 w-12 sm:h-14 sm:w-14 object-contain" />
+            <img src="/logo-tulavita.png" alt="Tulavita" className="h-14 w-14 sm:h-16 sm:w-16 object-contain" />
           </div>
-          <h1 className="absolute left-1/2 -translate-x-1/2 text-sm sm:text-base font-semibold" style={{ color: BRAND_COLOR }}>
+          <h1 className="absolute left-1/2 -translate-x-1/2 text-base sm:text-lg font-semibold" style={{ color: BRAND_COLOR }}>
             Ahorra en tu factura
           </h1>
           <div className="min-w-[3rem] sm:min-w-[3.5rem]" aria-hidden />
@@ -267,9 +277,9 @@ export default function AhorroLuz() {
       <header className="fixed top-0 left-0 right-0 z-40 flex flex-col bg-white/80 backdrop-blur-sm border-b border-gray-200/50">
         <div className="flex items-center justify-between px-4 py-3 pb-2 min-h-14 sm:min-h-16">
           <div className="flex items-center justify-center min-w-[3rem] sm:min-w-[3.5rem]">
-            <img src="/logo-tulavita.png" alt="Tulavita" className="h-12 w-12 sm:h-14 sm:w-14 object-contain" />
+            <img src="/logo-tulavita.png" alt="Tulavita" className="h-14 w-14 sm:h-16 sm:w-16 object-contain" />
           </div>
-          <h1 className="absolute left-1/2 -translate-x-1/2 text-sm sm:text-base font-semibold" style={{ color: BRAND_COLOR }}>
+          <h1 className="absolute left-1/2 -translate-x-1/2 text-base sm:text-lg font-semibold" style={{ color: BRAND_COLOR }}>
             Ahorra en tu factura
           </h1>
           <div className="min-w-[3rem] sm:min-w-[3.5rem]" aria-hidden />
@@ -371,7 +381,7 @@ export default function AhorroLuz() {
 
             <button
               onClick={handleNext}
-              disabled={submitStatus === 'loading'}
+              disabled={submitStatus === 'loading' || !hasSelection}
               className={cn(
                 'flex items-center justify-center gap-2 px-8 py-3 rounded-xl font-medium text-white transition-all',
                 'hover:opacity-90 disabled:opacity-70 disabled:cursor-not-allowed'
@@ -392,10 +402,10 @@ export default function AhorroLuz() {
 
             <button
               onClick={handleNext}
-              disabled={isLast || submitStatus === 'loading'}
+              disabled={isLast || submitStatus === 'loading' || !hasSelection}
               className={cn(
                 'flex items-center gap-2 p-2 rounded-lg transition-colors',
-                isLast || submitStatus === 'loading'
+                isLast || submitStatus === 'loading' || !hasSelection
                   ? 'text-gray-300 cursor-not-allowed'
                   : 'text-gray-600 hover:bg-gray-100 hover:text-[#26606b]'
               )}
