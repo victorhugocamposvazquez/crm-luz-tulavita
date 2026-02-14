@@ -34,6 +34,8 @@ export interface QuestionStepProps {
   formContainerRef?: React.RefObject<HTMLDivElement | null>;
   /** Ref del input file (para que el padre pueda abrir el selector o limpiar) */
   fileInputRef?: React.RefObject<HTMLInputElement | null>;
+  /** Si se proporciona, al elegir archivo se sube y se guarda { name, path }; si no, solo se guarda el nombre (string) */
+  onUploadFile?: (file: File) => Promise<{ name: string; path: string }>;
 }
 
 export function QuestionStep({
@@ -47,8 +49,10 @@ export function QuestionStep({
   onSelect,
   formContainerRef,
   fileInputRef,
+  onUploadFile,
 }: QuestionStepProps) {
   const id = `q-${question.id}`;
+  const [uploadLoading, setUploadLoading] = React.useState(false);
   const isRequired = question.required !== false;
 
   const handleChange = (v: string | number | string[]) => {
@@ -254,8 +258,27 @@ export function QuestionStep({
     case 'file_upload': {
       const fileQ = question as import('./types').FileUploadQuestion;
       const maxSize = (fileQ.maxSizeMb ?? 10) * 1024 * 1024;
-      const fileName = (value as string) ?? '';
-      const hasFile = !!fileName.trim();
+      const fileValue = value as string | { name: string; path: string } | undefined;
+      const fileName = typeof fileValue === 'object' && fileValue && 'name' in fileValue ? fileValue.name : (fileValue ?? '');
+      const hasFile = !!fileValue && (typeof fileValue === 'object' ? !!fileValue.name : String(fileValue).trim() !== '');
+      const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        e.target.value = '';
+        if (!file || file.size > maxSize) return;
+        if (onUploadFile) {
+          setUploadLoading(true);
+          try {
+            const result = await onUploadFile(file);
+            onChange(result);
+          } catch {
+            // Error: el padre puede mostrar toast; no actualizamos valor
+          } finally {
+            setUploadLoading(false);
+          }
+        } else {
+          onChange(file.name);
+        }
+      };
       return (
         <div className="space-y-4">
           {baseInput}
@@ -268,16 +291,15 @@ export function QuestionStep({
               type="file"
               className="hidden"
               accept={fileQ.accept ?? '.pdf,image/*'}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file && file.size <= maxSize) {
-                  onChange(file.name);
-                }
-                e.target.value = '';
-              }}
-              disabled={disabled}
+              onChange={handleFileChange}
+              disabled={disabled || uploadLoading}
             />
-            {hasFile ? (
+            {uploadLoading ? (
+              <div className="flex flex-col items-center gap-3 py-8 px-4">
+                <div className="h-12 w-12 rounded-full border-2 border-[#26606b] border-t-transparent animate-spin" />
+                <span className="text-sm text-gray-600">Subiendo archivo...</span>
+              </div>
+            ) : hasFile ? (
               <div className="flex flex-col items-center gap-3 py-8 px-4">
                 <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#26606b]/10 text-[#26606b]" aria-hidden>
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

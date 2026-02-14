@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, MessageSquarePlus, User, Mail, Phone, FileText, History } from 'lucide-react';
+import { Loader2, MessageSquarePlus, User, Mail, Phone, FileText, History, ExternalLink } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
@@ -50,6 +50,91 @@ const EVENT_TYPE_LABELS: Record<string, string> = {
   lead_updated: 'Lead actualizado',
   note: 'Nota',
 };
+
+const LEAD_ATTACHMENTS_BUCKET = 'lead-attachments';
+const IMAGE_EXT = /\.(jpe?g|png|webp|gif)$/i;
+
+function LeadAttachmentPreview({ path, name }: { path: string; name: string }) {
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error: err } = await supabase.storage
+          .from(LEAD_ATTACHMENTS_BUCKET)
+          .createSignedUrl(path, 3600);
+        if (cancelled) return;
+        if (err) {
+          setError(err.message);
+          return;
+        }
+        setSignedUrl(data?.signedUrl ?? null);
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Error al cargar');
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [path]);
+
+  const isImage = IMAGE_EXT.test(name);
+
+  if (error) {
+    return (
+      <p className="text-sm text-destructive mt-1">
+        No se pudo cargar la factura: {error}
+      </p>
+    );
+  }
+
+  if (!signedUrl) {
+    return (
+      <div className="flex items-center gap-2 mt-1 text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        <span className="text-sm">Cargando previsualización...</span>
+      </div>
+    );
+  }
+
+  if (isImage) {
+    return (
+      <div className="mt-2">
+        <img
+          src={signedUrl}
+          alt={name}
+          loading="lazy"
+          decoding="async"
+          className="max-w-full max-h-48 rounded border object-contain bg-muted/50"
+        />
+        <a
+          href={signedUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-xs mt-1 text-primary hover:underline"
+        >
+          <ExternalLink className="h-3 w-3" />
+          Abrir en nueva pestaña
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-2">
+      <a
+        href={signedUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+      >
+        <ExternalLink className="h-4 w-4" />
+        Ver factura (PDF)
+      </a>
+      <p className="text-xs text-muted-foreground mt-0.5">{name}</p>
+    </div>
+  );
+}
 
 function formatEventContent(type: string, content: Record<string, unknown> | null): string {
   if (!content || typeof content !== 'object') return '';
@@ -255,7 +340,14 @@ export default function LeadDetailSheet({
                     let display: React.ReactNode = String(value ?? '—');
                     if (value && typeof value === 'object' && !Array.isArray(value)) {
                       const obj = value as Record<string, unknown>;
-                      if (obj.name || obj.email || obj.phone) {
+                      if (key === 'adjuntar_factura' && typeof obj.path === 'string') {
+                        display = (
+                          <div>
+                            <p className="font-medium text-sm">{String(obj.name || 'Factura adjunta')}</p>
+                            <LeadAttachmentPreview path={obj.path} name={String(obj.name || '')} />
+                          </div>
+                        );
+                      } else if (obj.name || obj.email || obj.phone) {
                         display = (
                           <span className="text-sm">
                             {[obj.name, obj.email, obj.phone].filter(Boolean).join(' · ')}
@@ -270,7 +362,7 @@ export default function LeadDetailSheet({
                     return (
                       <div key={key}>
                         <span className="text-xs text-muted-foreground block">{label}</span>
-                        <p className="font-medium text-sm mt-0.5">{display}</p>
+                        <div className="font-medium text-sm mt-0.5">{display}</div>
                       </div>
                     );
                   })}

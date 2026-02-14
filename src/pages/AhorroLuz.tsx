@@ -11,8 +11,11 @@ import { QuestionStep, validateQuestion } from '@/components/landing-form';
 import type { FormConfig } from '@/components/landing-form';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 const BRAND_COLOR = '#26606b';
+const LEAD_ATTACHMENTS_BUCKET = 'lead-attachments';
 
 const AHORRO_LUZ_CONFIG: FormConfig = {
   source: 'web_form',
@@ -129,12 +132,22 @@ export default function AhorroLuz() {
     campaign: AHORRO_LUZ_CONFIG.campaign,
   });
 
+  const uploadLeadAttachment = useCallback(async (file: File): Promise<{ name: string; path: string }> => {
+    const path = `${crypto.randomUUID()}/${file.name}`;
+    const { error } = await supabase.storage.from(LEAD_ATTACHMENTS_BUCKET).upload(path, file, { upsert: false });
+    if (error) {
+      toast({ title: 'Error al subir el archivo', description: error.message, variant: 'destructive' });
+      throw error;
+    }
+    return { name: file.name, path };
+  }, []);
+
   /** El botón Siguiente/Aceptar solo está activo si hay una opción (o respuesta) seleccionada */
   const hasSelection = useMemo(() => {
     if (!currentQuestion) return false;
     const val = answers[currentQuestion.id];
     if (currentQuestion.type === 'contact') return true;
-    if (currentQuestion.type === 'file_upload') return !!val;
+    if (currentQuestion.type === 'file_upload') return !!val && (typeof val === 'object' ? !!(val as { path?: string }).path || !!(val as { name?: string }).name : true);
     if (currentQuestion.type === 'checkbox') return Array.isArray(val) && val.length > 0;
     return val !== undefined && val !== null && val !== '';
   }, [currentQuestion, answers]);
@@ -366,6 +379,7 @@ export default function AhorroLuz() {
               onSelect={isRadioWithLetters ? handleSelectAndAdvance : undefined}
               formContainerRef={currentQuestion.type === 'contact' ? formContainerRef : undefined}
               fileInputRef={currentQuestion.type === 'file_upload' ? fileInputRef : undefined}
+              onUploadFile={currentQuestion.type === 'file_upload' ? uploadLeadAttachment : undefined}
             />
           </div>
 
