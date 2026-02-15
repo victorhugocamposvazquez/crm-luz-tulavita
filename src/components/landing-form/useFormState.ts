@@ -3,7 +3,7 @@
  */
 
 import { useState, useCallback, useMemo, useEffect } from 'react';
-import type { FormAnswers, Question, LeadPayload, ContactValue } from './types';
+import type { FormAnswers, Question, LeadPayload, ContactValue, MetaAttribution } from './types';
 import { getUrlParams } from './utils';
 
 export interface UseFormStateOptions {
@@ -11,6 +11,13 @@ export interface UseFormStateOptions {
   source?: string;
   campaign?: string;
   adset?: string;
+  ad?: string;
+  /** Atribución Meta (URL/localStorage). Tiene prioridad sobre source/campaign/adset/ad del config. */
+  attribution?: MetaAttribution | null;
+  /** Llamar tras envío exitoso para limpiar atribución persistida. */
+  clearAttribution?: () => void;
+  /** Si está definido, tras crear lead se crea lead_entry + conversación (CRM). */
+  leadEntryApiUrl?: string;
 }
 
 export function useFormState({
@@ -18,6 +25,10 @@ export function useFormState({
   source: defaultSource,
   campaign: defaultCampaign,
   adset: defaultAdset,
+  ad: defaultAd,
+  attribution,
+  clearAttribution,
+  leadEntryApiUrl,
 }: UseFormStateOptions) {
   const [answers, setAnswers] = useState<FormAnswers>({});
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -26,9 +37,11 @@ export function useFormState({
 
   const urlParams = useMemo(getUrlParams, []);
 
-  const source = defaultSource ?? urlParams.source ?? 'web_form';
-  const campaign = defaultCampaign ?? urlParams.campaign;
-  const adset = defaultAdset ?? urlParams.adset;
+  // Prioridad: 1) atribución (URL/Meta), 2) defaults del config, 3) urlParams
+  const source = attribution?.source ?? defaultSource ?? urlParams.source ?? 'web_form';
+  const campaign = attribution?.campaign ?? defaultCampaign ?? urlParams.campaign;
+  const adset = attribution?.adset ?? defaultAdset ?? urlParams.adset;
+  const ad = attribution?.ad ?? defaultAd;
 
   const visibleQuestions = useMemo(() => {
     return questions.filter((q) => {
@@ -97,9 +110,10 @@ export function useFormState({
       source,
       campaign: campaign ?? undefined,
       adset: adset ?? undefined,
+      ad: ad ?? undefined,
       custom_fields,
     };
-  }, [answers, questions, source, campaign, adset]);
+  }, [answers, questions, source, campaign, adset, ad]);
 
   const submit = useCallback(async () => {
     const payload = buildPayload();
@@ -130,12 +144,33 @@ export function useFormState({
         throw new Error(data.error ?? 'Error al enviar');
       }
 
+      const leadId = data.lead?.id;
+      if (leadEntryApiUrl && leadId && typeof leadId === 'string') {
+        try {
+          await fetch(leadEntryApiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              lead_id: leadId,
+              source: payload.source,
+              campaign: payload.campaign ?? null,
+              adset: payload.adset ?? null,
+              ad: payload.ad ?? null,
+              custom_fields: payload.custom_fields ?? {},
+            }),
+          });
+        } catch {
+          // No bloquear éxito del lead si falla la entrada CRM
+        }
+      }
+
       setSubmitStatus('success');
+      clearAttribution?.();
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : 'Error de conexión');
       setSubmitStatus('error');
     }
-  }, [buildPayload]);
+  }, [buildPayload, clearAttribution, leadEntryApiUrl]);
 
   const reset = useCallback(() => {
     setAnswers({});

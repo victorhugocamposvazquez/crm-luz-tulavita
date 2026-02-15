@@ -103,11 +103,26 @@ export type Question =
   | FileUploadQuestion
   | ContactQuestion;
 
+/** Atribución Meta (utm_* / fbclid). Usado por useMetaAttribution. */
+export interface MetaAttribution {
+  source?: string;
+  campaign?: string;
+  adset?: string;
+  ad?: string;
+}
+
 export interface FormConfig {
   questions: Question[];
   source?: string;
   campaign?: string;
   adset?: string;
+  ad?: string;
+  /** Prioridad sobre source/campaign/adset/ad del config cuando está presente. */
+  attribution?: MetaAttribution;
+  /** Llamar tras envío exitoso para limpiar atribución persistida. */
+  clearAttribution?: () => void;
+  /** URL para crear lead_entry + conversación tras crear lead (CRM). */
+  leadEntryApiUrl?: string;
 }
 
 export interface ContactValue {
@@ -127,5 +142,6 @@ export interface LeadPayload {
   source: string;
   campaign?: string;
   adset?: string;
+  ad?: string;
   custom_fields: Record<string, unknown>;
 }

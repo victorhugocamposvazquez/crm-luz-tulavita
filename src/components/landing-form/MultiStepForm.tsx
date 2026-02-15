@@ -52,6 +52,10 @@ export function MultiStepForm({
     source: config.source,
     campaign: config.campaign,
     adset: config.adset,
+    ad: config.ad,
+    attribution: config.attribution,
+    clearAttribution: config.clearAttribution,
+    leadEntryApiUrl: config.leadEntryApiUrl,
   });
 
   const handleNext = () => {

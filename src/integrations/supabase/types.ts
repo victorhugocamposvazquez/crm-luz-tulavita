@@ -215,6 +215,120 @@ export type Database = {
         }
         Relationships: []
       }
+      lead_entries: {
+        Row: {
+          id: string
+          lead_id: string
+          source: string
+          campaign: string | null
+          adset: string | null
+          ad: string | null
+          custom_fields: Json
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          lead_id: string
+          source?: string
+          campaign?: string | null
+          adset?: string | null
+          ad?: string | null
+          custom_fields?: Json
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          lead_id?: string
+          source?: string
+          campaign?: string | null
+          adset?: string | null
+          ad?: string | null
+          custom_fields?: Json
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_entries_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_conversations: {
+        Row: {
+          id: string
+          lead_id: string
+          channel: string
+          status: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          lead_id: string
+          channel: string
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          lead_id?: string
+          channel?: string
+          status?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_conversations_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lead_messages: {
+        Row: {
+          id: string
+          conversation_id: string
+          direction: string
+          content: string | null
+          status: string
+          created_at: string
+          user_id: string | null
+        }
+        Insert: {
+          id?: string
+          conversation_id: string
+          direction: string
+          content?: string | null
+          status?: string
+          created_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          id?: string
+          conversation_id?: string
+          direction?: string
+          content?: string | null
+          status?: string
+          created_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "lead_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           created_at: string

@@ -9,6 +9,7 @@ import { flushSync } from 'react-dom';
 import { useFormState } from '@/components/landing-form';
 import { QuestionStep, validateQuestion } from '@/components/landing-form';
 import type { FormConfig } from '@/components/landing-form';
+import { useMetaAttribution } from '@/hooks/useMetaAttribution';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
@@ -117,6 +118,8 @@ export default function AhorroLuz() {
   const formContainerRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const { attribution, clearAttribution } = useMetaAttribution();
+
   const {
     currentQuestion,
     visibleQuestions,
@@ -137,6 +140,9 @@ export default function AhorroLuz() {
     questions: AHORRO_LUZ_CONFIG.questions,
     source: AHORRO_LUZ_CONFIG.source,
     campaign: AHORRO_LUZ_CONFIG.campaign,
+    attribution,
+    clearAttribution,
+    leadEntryApiUrl: import.meta.env.VITE_LEAD_ENTRIES_API_URL ?? '/api/lead-entries',
   });
 
   const uploadLeadAttachment = useCallback(async (file: File): Promise<{ name: string; path: string }> => {
