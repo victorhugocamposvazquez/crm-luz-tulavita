@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, MessageSquarePlus, User, Mail, Phone, FileText, History, ExternalLink, MessageCircle, Expand } from 'lucide-react';
+import { Loader2, MessageSquarePlus, User, Mail, Phone, FileText, History, ExternalLink, MessageCircle, Expand, Tag } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -23,6 +23,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { getLeadFieldLabel } from './lead-field-labels';
+import { LeadTagSelector } from './LeadTagSelector';
 import type { Database } from '@/integrations/supabase/types';
 
 type LeadRow = Database['public']['Tables']['leads']['Row'];
@@ -205,6 +206,7 @@ export default function LeadDetailSheet({
   onLeadUpdated,
 }: LeadDetailSheetProps) {
   const [statusLoading, setStatusLoading] = useState(false);
+  const [tagsLoading, setTagsLoading] = useState(false);
   const [note, setNote] = useState('');
   const [noteSending, setNoteSending] = useState(false);
 
@@ -314,6 +316,29 @@ export default function LeadDetailSheet({
     if (convId) await sendOutboundMessage(convId, 'Email enviado');
     markContactedIfNew();
     window.open(`mailto:${lead.email}`, '_blank');
+  };
+
+  const handleTagsChange = async (newTags: string[]) => {
+    if (!lead?.id) return;
+    setTagsLoading(true);
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .update({ tags: newTags, updated_at: new Date().toISOString() })
+        .eq('id', lead.id);
+      if (error) throw error;
+      onLeadUpdated?.();
+      toast({ title: 'Etiquetas actualizadas' });
+    } catch (e) {
+      console.error(e);
+      toast({
+        title: 'Error',
+        description: 'No se pudieron guardar las etiquetas',
+        variant: 'destructive',
+      });
+    } finally {
+      setTagsLoading(false);
+    }
   };
 
   const rawCustom = lead?.custom_fields;
@@ -442,6 +467,25 @@ export default function LeadDetailSheet({
                   ))}
                 </SelectContent>
               </Select>
+            </section>
+
+            {/* Etiquetas */}
+            <section>
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-muted-foreground mb-2">
+                <Tag className="h-4 w-4" />
+                Etiquetas
+              </h3>
+              <LeadTagSelector
+                value={Array.isArray(lead.tags) ? lead.tags : []}
+                onChange={handleTagsChange}
+                disabled={tagsLoading}
+              />
+              {tagsLoading && (
+                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Guardando...
+                </p>
+              )}
             </section>
 
             {/* Respuestas del formulario (custom_fields) */}

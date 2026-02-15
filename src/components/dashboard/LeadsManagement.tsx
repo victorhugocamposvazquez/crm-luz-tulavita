@@ -11,6 +11,8 @@ import { Search, RefreshCw, ExternalLink, Loader2, Plus, Eye } from 'lucide-reac
 import type { Database } from '@/integrations/supabase/types';
 import LeadDetailSheet from './LeadDetailSheet';
 import NewLeadDialog from './NewLeadDialog';
+import { LeadTagBadges } from './LeadTagBadges';
+import { LEAD_TAGS } from '@/data/lead-tags';
 
 type LeadRow = Database['public']['Tables']['leads']['Row'];
 
@@ -47,6 +49,7 @@ export default function LeadsManagement() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
+  const [tagFilter, setTagFilter] = useState<string>('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [selectedLead, setSelectedLead] = useState<LeadRow | null>(null);
@@ -67,6 +70,9 @@ export default function LeadsManagement() {
         }
         if (sourceFilter !== 'all') {
           query = query.eq('source', sourceFilter);
+        }
+        if (tagFilter !== 'all') {
+          query = query.contains('tags', [tagFilter]);
         }
         if (dateFrom) {
           query = query.gte('created_at', `${dateFrom}T00:00:00.000Z`);
@@ -95,7 +101,7 @@ export default function LeadsManagement() {
         setLoading(false);
       }
     },
-    [statusFilter, sourceFilter, dateFrom, dateTo]
+    [statusFilter, sourceFilter, tagFilter, dateFrom, dateTo]
   );
 
   useEffect(() => {
@@ -103,13 +109,17 @@ export default function LeadsManagement() {
   }, [fetchLeads]);
 
   const filteredLeads = leads.filter((lead) => {
-    if (!search.trim()) return true;
-    const q = search.toLowerCase();
-    return (
-      (lead.name?.toLowerCase().includes(q)) ||
-      (lead.email?.toLowerCase().includes(q)) ||
-      (lead.phone?.includes(search))
-    );
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      if (
+        !lead.name?.toLowerCase().includes(q) &&
+        !lead.email?.toLowerCase().includes(q) &&
+        !lead.phone?.includes(search)
+      ) {
+        return false;
+      }
+    }
+    return true;
   });
 
   const openDetail = (lead: LeadRow) => {
@@ -188,6 +198,19 @@ export default function LeadsManagement() {
                   ))}
                 </SelectContent>
               </Select>
+              <Select value={tagFilter} onValueChange={setTagFilter}>
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="Etiqueta" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las etiquetas</SelectItem>
+                  {LEAD_TAGS.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Input
                 type="date"
                 value={dateFrom}
@@ -227,12 +250,13 @@ export default function LeadsManagement() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead></TableHead>
+                    <TableHead className="w-10"></TableHead>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Teléfono</TableHead>
                     <TableHead>Email</TableHead>
                     <TableHead>Fuente</TableHead>
                     <TableHead>Estado</TableHead>
+                    <TableHead>Etiquetas</TableHead>
                     <TableHead>Fecha</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -268,6 +292,9 @@ export default function LeadsManagement() {
                         >
                           {STATUS_LABELS[lead.status] ?? lead.status}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="max-w-[180px]">
+                        <LeadTagBadges tagIds={lead.tags} max={3} />
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {formatDate(lead.created_at)}

@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { LeadTagSelector } from './LeadTagSelector';
 
 const API_URL = import.meta.env.VITE_LEADS_API_URL ?? '/api/leads';
 
@@ -30,6 +31,7 @@ export default function NewLeadDialog({
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
   const [notes, setNotes] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
   const [sending, setSending] = useState(false);
 
   const reset = () => {
@@ -37,6 +39,7 @@ export default function NewLeadDialog({
     setPhone('');
     setEmail('');
     setNotes('');
+    setTags([]);
   };
 
   const handleClose = () => {
@@ -67,6 +70,9 @@ export default function NewLeadDialog({
       };
       if (notes.trim()) {
         body.custom_fields = { nota_creacion: notes.trim() };
+      }
+      if (tags.length > 0) {
+        body.tags = tags;
       }
 
       const res = await fetch(API_URL, {
@@ -141,6 +147,15 @@ export default function NewLeadDialog({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Nota o contexto del lead"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Etiquetas (opcional)</Label>
+            <LeadTagSelector
+              value={tags}
+              onChange={setTags}
+              disabled={sending}
+              placeholder="Añadir etiquetas"
             />
           </div>
           <DialogFooter>
