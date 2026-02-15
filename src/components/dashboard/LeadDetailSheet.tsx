@@ -12,7 +12,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, MessageSquarePlus, User, Mail, Phone, FileText, History, ExternalLink, MessageCircle } from 'lucide-react';
+import { Loader2, MessageSquarePlus, User, Mail, Phone, FileText, History, ExternalLink, MessageCircle, Expand } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useConversation } from '@/hooks/useConversation';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -66,6 +71,7 @@ const PREVIEW_TRANSFORM = { width: 600, height: 400, quality: 80, resize: 'conta
 function LeadAttachmentPreview({ path, name }: { path: string; name: string }) {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [popupOpen, setPopupOpen] = useState(false);
   const isImage = IMAGE_EXT.test(name);
 
   useEffect(() => {
@@ -115,22 +121,49 @@ function LeadAttachmentPreview({ path, name }: { path: string; name: string }) {
   if (isImage) {
     return (
       <div className="mt-2">
-        <img
-          src={signedUrl}
-          alt={name}
-          loading="lazy"
-          decoding="async"
-          className="max-w-full max-h-48 rounded border object-contain bg-muted/50"
-        />
-        <a
-          href={signedUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-xs mt-1 text-primary hover:underline"
+        <button
+          type="button"
+          onClick={() => setPopupOpen(true)}
+          className="block w-full text-left rounded border overflow-hidden bg-muted/50 hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
         >
-          <ExternalLink className="h-3 w-3" />
-          Abrir en nueva pestaña
-        </a>
+          <img
+            src={signedUrl}
+            alt={name}
+            loading="lazy"
+            decoding="async"
+            className="max-w-full max-h-48 w-full object-contain cursor-pointer"
+          />
+        </button>
+        <div className="flex items-center gap-3 mt-1.5">
+          <button
+            type="button"
+            onClick={() => setPopupOpen(true)}
+            className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+          >
+            <Expand className="h-3 w-3" />
+            Ver en pantalla completa
+          </button>
+          <a
+            href={signedUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline"
+          >
+            <ExternalLink className="h-3 w-3" />
+            Abrir en nueva pestaña
+          </a>
+        </div>
+        <Dialog open={popupOpen} onOpenChange={setPopupOpen}>
+          <DialogContent className="max-w-[95vw] max-h-[95vh] w-auto p-2 border-0 bg-black/95">
+            <DialogTitle className="sr-only">{name}</DialogTitle>
+            <img
+              src={signedUrl}
+              alt={name}
+              className="max-h-[90vh] w-auto object-contain mx-auto"
+              onClick={(e) => e.stopPropagation()}
+            />
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }

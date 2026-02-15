@@ -1,0 +1,144 @@
+{
+  "tags": [
+    {
+      "id": "nuevo",
+      "name": "Nuevo",
+      "category": "estado",
+      "color": "#3b82f6"
+    },
+    {
+      "id": "contactado",
+      "name": "Contactado",
+      "category": "estado",
+      "color": "#8b5cf6"
+    },
+    {
+      "id": "en_seguimiento",
+      "name": "En seguimiento",
+      "category": "estado",
+      "color": "#f59e0b"
+    },
+    {
+      "id": "no_responde_llamada",
+      "name": "No responde llamada",
+      "category": "estado",
+      "color": "#ef4444"
+    },
+    {
+      "id": "no_responde_whatsapp",
+      "name": "No responde WhatsApp",
+      "category": "estado",
+      "color": "#ef4444"
+    },
+    {
+      "id": "cerrado_perdido",
+      "name": "Cerrado / Perdido",
+      "category": "estado",
+      "color": "#6b7280"
+    },
+    {
+      "id": "convertido",
+      "name": "Convertido",
+      "category": "estado",
+      "color": "#22c55e"
+    },
+    {
+      "id": "muy_interesado",
+      "name": "Muy interesado",
+      "category": "interes",
+      "color": "#22c55e"
+    },
+    {
+      "id": "interesado",
+      "name": "Interesado",
+      "category": "interes",
+      "color": "#84cc16"
+    },
+    {
+      "id": "poco_interesado",
+      "name": "Poco interesado",
+      "category": "interes",
+      "color": "#eab308"
+    },
+    {
+      "id": "solo_info",
+      "name": "Solo información",
+      "category": "interes",
+      "color": "#94a3b8"
+    },
+    {
+      "id": "lead_caliente",
+      "name": "Lead caliente",
+      "category": "interes",
+      "color": "#dc2626"
+    },
+    {
+      "id": "solicita_presupuesto",
+      "name": "Solicita presupuesto",
+      "category": "accion",
+      "color": "#0ea5e9"
+    },
+    {
+      "id": "factura_recibida",
+      "name": "Factura recibida",
+      "category": "accion",
+      "color": "#22c55e"
+    },
+    {
+      "id": "pendiente_documentacion",
+      "name": "Pendiente documentación",
+      "category": "accion",
+      "color": "#f59e0b"
+    },
+    {
+      "id": "documentacion_completa",
+      "name": "Documentación completa",
+      "category": "accion",
+      "color": "#22c55e"
+    },
+    {
+      "id": "llamar_mañana",
+      "name": "Llamar mañana",
+      "category": "accion",
+      "color": "#8b5cf6"
+    },
+    {
+      "id": "revisar_factura",
+      "name": "Revisar factura",
+      "category": "accion",
+      "color": "#0ea5e9"
+    },
+    {
+      "id": "urgente",
+      "name": "Urgente",
+      "category": "prioridad",
+      "color": "#dc2626"
+    },
+    {
+      "id": "alta",
+      "name": "Alta",
+      "category": "prioridad",
+      "color": "#ea580c"
+    },
+    {
+      "id": "media",
+      "name": "Media",
+      "category": "prioridad",
+      "color": "#eab308"
+    },
+    {
+      "id": "baja",
+      "name": "Baja",
+      "category": "prioridad",
+      "color": "#6b7280"
+    }
+  ],
+  "example_lead": {
+    "lead_id": "uuid123",
+    "tags": [
+      "no_responde_llamada",
+      "muy_interesado",
+      "lead_caliente"
+    ]
+  }
+}
