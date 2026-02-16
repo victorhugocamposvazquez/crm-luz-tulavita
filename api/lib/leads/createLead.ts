@@ -3,14 +3,14 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { LeadInput, Lead, CreateLeadResult, CreateLeadError } from './types';
+import type { LeadInput, Lead, CreateLeadResult, CreateLeadError } from './types.js';
 import {
   normalizePhone,
   normalizeEmail,
   normalizeName,
   normalizeSource,
-} from './normalizer';
-import { findExistingLead } from './deduplicator';
+} from './normalizer.js';
+import { findExistingLead } from './deduplicator.js';
 
 function hasMinRequiredField(input: LeadInput): boolean {
   const phone = normalizePhone(input.phone);

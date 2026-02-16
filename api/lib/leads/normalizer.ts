@@ -2,7 +2,7 @@
  * Normalizador de datos de leads (copia para API Vercel)
  */
 
-import type { LeadSource } from './types';
+import type { LeadSource } from './types.js';
 
 const LEAD_SOURCES_SET = new Set<string>([
   'web_form',
