@@ -7,9 +7,9 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
-import { extractInvoiceFromBuffer } from './lib/invoice/pipeline';
-import { getActiveOffers, runComparison } from './lib/energy/calculation';
-import { validateAttachmentPath } from './lib/invoice/validate-path';
+import { extractInvoiceFromBuffer } from './lib/invoice/pipeline.js';
+import { getActiveOffers, runComparison } from './lib/energy/calculation.js';
+import { validateAttachmentPath } from './lib/invoice/validate-path.js';
 
 const BUCKET = 'lead-attachments';
 const TIMEOUT_MS = 10000;
