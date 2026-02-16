@@ -218,19 +218,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
 
     const input = {
-      name: body.name,
-      phone: body.phone,
-      email: body.email,
-      source: body.source ?? 'web_form',
-      campaign: body.campaign,
-      adset: body.adset,
-      ad: body.ad,
-      status: body.status,
-      owner_id: body.owner_id,
-      tags: Array.isArray(body.tags) ? body.tags : undefined,
+      name: typeof body.name === 'string' ? body.name : undefined,
+      phone: typeof body.phone === 'string' ? body.phone : undefined,
+      email: typeof body.email === 'string' ? body.email : undefined,
+      source: typeof body.source === 'string' ? body.source : 'web_form',
+      campaign: typeof body.campaign === 'string' ? body.campaign : undefined,
+      adset: typeof body.adset === 'string' ? body.adset : undefined,
+      ad: typeof body.ad === 'string' ? body.ad : undefined,
+      status: typeof body.status === 'string' ? body.status : undefined,
+      owner_id: typeof body.owner_id === 'string' ? body.owner_id : undefined,
+      tags: Array.isArray(body.tags)
+        ? (body.tags as unknown[]).filter((t): t is string => typeof t === 'string')
+        : undefined,
       custom_fields:
         body.custom_fields && typeof body.custom_fields === 'object' && !Array.isArray(body.custom_fields)
-          ? body.custom_fields
+          ? (body.custom_fields as Record<string, unknown>)
           : undefined,
     };
 
