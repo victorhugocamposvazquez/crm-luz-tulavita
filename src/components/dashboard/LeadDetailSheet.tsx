@@ -7,12 +7,13 @@ import {
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, MessageSquarePlus, User, Mail, Phone, FileText, History, ExternalLink, MessageCircle, Expand, Tag } from 'lucide-react';
+import { Loader2, MessageSquarePlus, User, Mail, Phone, FileText, History, ExternalLink, MessageCircle, Expand, Tag, Pencil } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -209,6 +210,11 @@ export default function LeadDetailSheet({
   const [tagsLoading, setTagsLoading] = useState(false);
   const [note, setNote] = useState('');
   const [noteSending, setNoteSending] = useState(false);
+  const [isEditingContact, setIsEditingContact] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [contactSaving, setContactSaving] = useState(false);
 
   const {
     timeline,
@@ -318,6 +324,59 @@ export default function LeadDetailSheet({
     window.open(`mailto:${lead.email}`, '_blank');
   };
 
+  useEffect(() => {
+    if (!open || !lead) return;
+    setIsEditingContact(false);
+    setEditName(lead.name ?? '');
+    setEditPhone(lead.phone ?? '');
+    setEditEmail(lead.email ?? '');
+  }, [open, lead?.id]);
+
+  const handleSaveContact = async () => {
+    if (!lead?.id) return;
+    const name = editName.trim() || null;
+    const phone = editPhone.trim() || null;
+    const email = editEmail.trim() || null;
+    if (!phone && !email) {
+      toast({
+        title: 'Datos requeridos',
+        description: 'El lead debe tener al menos teléfono o email',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setContactSaving(true);
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .update({
+          name: name ?? undefined,
+          phone: phone ?? undefined,
+          email: email ?? undefined,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', lead.id);
+      if (error) throw error;
+      await supabase.from('lead_events').insert({
+        lead_id: lead.id,
+        type: 'lead_updated',
+        content: { editedContact: true, name, phone, email },
+      });
+      setIsEditingContact(false);
+      onLeadUpdated?.();
+      toast({ title: 'Datos actualizados' });
+    } catch (e) {
+      console.error(e);
+      toast({
+        title: 'Error',
+        description: 'No se pudieron guardar los datos',
+        variant: 'destructive',
+      });
+    } finally {
+      setContactSaving(false);
+    }
+  };
+
   const handleTagsChange = async (newTags: string[]) => {
     if (!lead?.id) return;
     setTagsLoading(true);
@@ -363,7 +422,7 @@ export default function LeadDetailSheet({
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-3xl flex flex-col p-0"
+        className="w-full sm:w-[80vw] sm:max-w-[80vw] flex flex-col p-0"
       >
         <SheetHeader className="px-6 pt-6 pb-4 border-b">
           <SheetTitle className="text-left">
@@ -374,75 +433,144 @@ export default function LeadDetailSheet({
           <div className="space-y-6 py-6">
             {/* Contacto */}
             <section>
-              <h3 className="flex items-center gap-2 text-sm font-semibold text-muted-foreground mb-3">
-                <User className="h-4 w-4" />
-                Contacto
-              </h3>
-              <div className="space-y-2 rounded-lg border bg-muted/30 p-4">
-                {lead.name && (
-                  <div>
-                    <span className="text-xs text-muted-foreground">Nombre</span>
-                    <p className="font-medium">{lead.name}</p>
-                  </div>
-                )}
-                {lead.phone && (
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    <a href={`tel:${lead.phone}`} className="text-primary hover:underline">
-                      {lead.phone}
-                    </a>
-                  </div>
-                )}
-                {lead.email && (
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <a href={`mailto:${lead.email}`} className="text-primary hover:underline break-all">
-                      {lead.email}
-                    </a>
-                  </div>
-                )}
-                {!lead.name && !lead.phone && !lead.email && (
-                  <p className="text-sm text-muted-foreground">Sin datos de contacto</p>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+                  <User className="h-4 w-4" />
+                  Contacto
+                </h3>
+                {!isEditingContact && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="gap-1.5 h-8"
+                    onClick={() => {
+                      setEditName(lead.name ?? '');
+                      setEditPhone(lead.phone ?? '');
+                      setEditEmail(lead.email ?? '');
+                      setIsEditingContact(true);
+                    }}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                    Editar datos
+                  </Button>
                 )}
               </div>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Badge variant="outline">{SOURCE_LABELS[lead.source] ?? lead.source}</Badge>
-                <Badge variant="secondary">
-                  {format(new Date(lead.created_at), "d MMM yyyy, HH:mm", { locale: es })}
-                </Badge>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                  disabled={!lead.phone || actionSending}
-                  onClick={handleWhatsApp}
-                >
-                  <MessageCircle className="h-4 w-4" />
-                  WhatsApp
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                  disabled={!lead.phone || actionSending}
-                  onClick={handleCall}
-                >
-                  <Phone className="h-4 w-4" />
-                  Llamar
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                  disabled={!lead.email || actionSending}
-                  onClick={handleEmail}
-                >
-                  <Mail className="h-4 w-4" />
-                  Email
-                </Button>
-              </div>
+              {isEditingContact ? (
+                <div className="space-y-3 rounded-lg border bg-muted/30 p-4">
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Nombre</Label>
+                    <Input
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      placeholder="Nombre del contacto"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Teléfono</Label>
+                    <Input
+                      value={editPhone}
+                      onChange={(e) => setEditPhone(e.target.value)}
+                      type="tel"
+                      placeholder="+34 612 345 678"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs text-muted-foreground">Email</Label>
+                    <Input
+                      value={editEmail}
+                      onChange={(e) => setEditEmail(e.target.value)}
+                      type="email"
+                      placeholder="email@ejemplo.com"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">Al menos teléfono o email es obligatorio.</p>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      disabled={contactSaving}
+                      onClick={handleSaveContact}
+                    >
+                      {contactSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Guardar'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={contactSaving}
+                      onClick={() => setIsEditingContact(false)}
+                    >
+                      Cancelar
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2 rounded-lg border bg-muted/30 p-4">
+                    {lead.name && (
+                      <div>
+                        <span className="text-xs text-muted-foreground">Nombre</span>
+                        <p className="font-medium">{lead.name}</p>
+                      </div>
+                    )}
+                    {lead.phone && (
+                      <div className="flex items-center gap-2">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        <a href={`tel:${lead.phone}`} className="text-primary hover:underline">
+                          {lead.phone}
+                        </a>
+                      </div>
+                    )}
+                    {lead.email && (
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-4 w-4 text-muted-foreground" />
+                        <a href={`mailto:${lead.email}`} className="text-primary hover:underline break-all">
+                          {lead.email}
+                        </a>
+                      </div>
+                    )}
+                    {!lead.name && !lead.phone && !lead.email && (
+                      <p className="text-sm text-muted-foreground">Sin datos de contacto</p>
+                    )}
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Badge variant="outline">{SOURCE_LABELS[lead.source] ?? lead.source}</Badge>
+                    <Badge variant="secondary">
+                      {format(new Date(lead.created_at), "d MMM yyyy, HH:mm", { locale: es })}
+                    </Badge>
+                  </div>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      disabled={!lead.phone || actionSending}
+                      onClick={handleWhatsApp}
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      WhatsApp
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      disabled={!lead.phone || actionSending}
+                      onClick={handleCall}
+                    >
+                      <Phone className="h-4 w-4" />
+                      Llamar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="gap-2"
+                      disabled={!lead.email || actionSending}
+                      onClick={handleEmail}
+                    >
+                      <Mail className="h-4 w-4" />
+                      Email
+                    </Button>
+                  </div>
+                </>
+              )}
             </section>
 
             {/* Estado */}
