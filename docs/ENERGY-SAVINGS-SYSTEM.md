@@ -19,8 +19,9 @@ Sistema completo de extracción de facturas (PDF/imagen), cálculo de ahorro est
 
 - **energy_offers**: `company_name`, `price_per_kwh`, `monthly_fixed_cost`, `active`. Seed: Iberdrola, Endesa, Naturgy, Repsol.
 - **energy_comparisons**: `lead_id`, `current_company`, `current_monthly_cost`, `best_offer_company`, `estimated_savings_amount`, `estimated_savings_percentage`, `status` (processing | completed | failed), `prudent_mode`, `ocr_confidence`, `raw_extraction`, etc.
+- **process_invoice_rate_log**: `ip`, `created_at` — para rate limit por IP (se purgan filas antiguas en cada request).
 
-Migración: `supabase/migrations/20260216000001_energy_offers_and_comparisons.sql`.
+Migraciones: `20260216000001_energy_offers_and_comparisons.sql`, `20260217000001_process_invoice_rate_limit.sql`.
 
 ---
 
@@ -56,13 +57,14 @@ Variables de entorno:
 
 ---
 
-## 6. Mejoras recomendadas (seguridad y coste)
+## 6. Seguridad y rate limit (aplicado)
 
-- **Límite de tamaño** en storage (ya 10MB en bucket).
-- **Rate limit** por lead o IP en `POST /api/process-invoice` para evitar abuso y coste de Document AI.
-- **Validar** en backend que `attachment_path` pertenezca al lead o al bucket permitido.
-- **Cache** por hash del archivo para no re-procesar el mismo fichero (opcional).
-- **Cola asíncrona**: para timeouts largos, crear la fila en `processing` y procesar en job/Edge Function, y que el frontend solo haga polling.
+- **Validación de `attachment_path`**: solo rutas relativas, sin `..` ni `/` inicial, extensión permitida (pdf, jpg, png, webp, gif), longitud máxima 500. Ver `api/lib/invoice/validate-path.ts`.
+- **Rate limit por lead**: máximo **3** solicitudes por `lead_id` por hora (contando filas en `energy_comparisons`).
+- **Rate limit por IP**: máximo **20** solicitudes por IP por hora. Se usa la tabla `process_invoice_rate_log` (se purgan filas de más de 2 horas en cada request).
+- Respuesta **429** con `code: RATE_LIMIT_LEAD` o `RATE_LIMIT_IP`; el frontend muestra mensaje amigable.
+- **Límite de tamaño** en storage: bucket `lead-attachments` ya limitado a 10MB.
+- **Cola asíncrona** (opcional): para timeouts largos, se puede crear la fila en `processing` y procesar con un job o Edge Function; el frontend ya hace polling.
 
 ---
 

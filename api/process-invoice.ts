@@ -2,15 +2,28 @@
  * POST /api/process-invoice
  * Procesa factura (PDF/imagen), extrae datos, calcula ahorro y guarda en energy_comparisons.
  * Body: { lead_id, attachment_path } — path en bucket lead-attachments.
+ * Mejoras: validación de path, rate limit por lead_id y por IP.
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import { extractInvoiceFromBuffer } from './lib/invoice/pipeline';
 import { getActiveOffers, runComparison } from './lib/energy/calculation';
+import { validateAttachmentPath } from './lib/invoice/validate-path';
 
 const BUCKET = 'lead-attachments';
 const TIMEOUT_MS = 10000;
+const RATE_LIMIT_LEAD_PER_HOUR = 3;
+const RATE_LIMIT_IP_PER_HOUR = 20;
+const RATE_LIMIT_WINDOW_HOURS = 1;
+
+function getClientIp(req: VercelRequest): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string') return forwarded.split(',')[0].trim();
+  const real = req.headers['x-real-ip'];
+  if (typeof real === 'string') return real.trim();
+  return 'unknown';
+}
 
 export const config = {
   api: { bodyParser: { sizeLimit: '1mb' } },
@@ -61,6 +74,52 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     res.status(400).json({ error: 'lead_id y attachment_path son obligatorios', code: 'VALIDATION_ERROR' });
     return;
   }
+
+  const pathValidation = validateAttachmentPath(attachment_path);
+  if (!pathValidation.valid) {
+    cors();
+    res.status(400).json({ error: pathValidation.error || 'Ruta no válida', code: 'INVALID_PATH' });
+    return;
+  }
+
+  const clientIp = getClientIp(req);
+  const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_HOURS * 60 * 60 * 1000).toISOString();
+
+  const { count: leadCount } = await supabase
+    .from('energy_comparisons')
+    .select('*', { count: 'exact', head: true })
+    .eq('lead_id', lead_id)
+    .gte('created_at', windowStart);
+
+  if ((leadCount ?? 0) >= RATE_LIMIT_LEAD_PER_HOUR) {
+    cors();
+    res.status(429).json({
+      error: 'Demasiadas solicitudes para este lead. Intenta de nuevo más tarde.',
+      code: 'RATE_LIMIT_LEAD',
+    });
+    return;
+  }
+
+  const { count: ipCount } = await supabase
+    .from('process_invoice_rate_log')
+    .select('*', { count: 'exact', head: true })
+    .eq('ip', clientIp)
+    .gte('created_at', windowStart);
+
+  if ((ipCount ?? 0) >= RATE_LIMIT_IP_PER_HOUR) {
+    cors();
+    res.status(429).json({
+      error: 'Demasiadas solicitudes. Intenta de nuevo más tarde.',
+      code: 'RATE_LIMIT_IP',
+    });
+    return;
+  }
+
+  await supabase.from('process_invoice_rate_log').insert({ ip: clientIp });
+  await supabase
+    .from('process_invoice_rate_log')
+    .delete()
+    .lt('created_at', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString());
 
   const runWithTimeout = async () => {
     const timeoutPromise = new Promise<never>((_, reject) =>

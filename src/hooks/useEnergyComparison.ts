@@ -44,7 +44,11 @@ export function useEnergyComparison() {
       const processData = await processRes.json().catch(() => ({}));
 
       if (!processRes.ok) {
-        setError(processData.error || 'Error al procesar la factura');
+        if (processRes.status === 429) {
+          setError('Demasiadas solicitudes. Por favor, espera un poco e inténtalo de nuevo.');
+        } else {
+          setError(processData.error || 'Error al procesar la factura');
+        }
         setStatus('failed');
         return;
       }

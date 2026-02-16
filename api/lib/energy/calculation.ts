@@ -3,8 +3,8 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { InvoiceExtraction } from '../invoice/types';
-import { normalizeCompanyName } from '../invoice/extract-fields';
+import type { InvoiceExtraction } from '../invoice/types.js';
+import { normalizeCompanyName } from '../invoice/extract-fields.js';
 
 export interface EnergyOffer {
   id: string;

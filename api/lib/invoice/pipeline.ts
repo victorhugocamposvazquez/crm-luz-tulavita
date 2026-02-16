@@ -2,10 +2,10 @@
  * Pipeline: obtener archivo → extraer texto (PDF o OCR) → extraer campos.
  */
 
-import type { InvoiceExtraction } from './types';
-import { extractTextFromPdf } from './pdf-text';
-import { runDocumentAiOcr } from './document-ai';
-import { extractFieldsFromText } from './extract-fields';
+import type { InvoiceExtraction } from './types.js';
+import { extractTextFromPdf } from './pdf-text.js';
+import { runDocumentAiOcr } from './document-ai.js';
+import { extractFieldsFromText } from './extract-fields.js';
 
 const MIN_TEXT_LENGTH = 80;
 const IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);

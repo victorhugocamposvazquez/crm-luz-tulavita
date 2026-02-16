@@ -3,7 +3,7 @@
  * Heurísticas y regex para compañías españolas y formatos habituales.
  */
 
-import type { InvoiceExtraction } from './types';
+import type { InvoiceExtraction } from './types.js';
 
 const COMPANY_PATTERNS = [
   /\b(iberdrola|endesa|naturgy|repsol|edp|total energies|viesgo|holaluz|luz en casa)\b/gi,
