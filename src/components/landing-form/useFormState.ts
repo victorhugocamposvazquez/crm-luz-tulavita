@@ -18,6 +18,8 @@ export interface UseFormStateOptions {
   clearAttribution?: () => void;
   /** Si está definido, tras crear lead se crea lead_entry + conversación (CRM). */
   leadEntryApiUrl?: string;
+  /** Llamar tras envío exitoso con el lead creado y el payload (ej. para procesar factura). */
+  onSuccess?: (lead: { id: string }, payload: LeadPayload) => void;
 }
 
 export function useFormState({
@@ -29,6 +31,7 @@ export function useFormState({
   attribution,
   clearAttribution,
   leadEntryApiUrl,
+  onSuccess,
 }: UseFormStateOptions) {
   const [answers, setAnswers] = useState<FormAnswers>({});
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -166,11 +169,14 @@ export function useFormState({
 
       setSubmitStatus('success');
       clearAttribution?.();
+      if (data.lead?.id && typeof data.lead.id === 'string') {
+        onSuccess?.({ id: data.lead.id }, payload);
+      }
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : 'Error de conexión');
       setSubmitStatus('error');
     }
-  }, [buildPayload, clearAttribution, leadEntryApiUrl]);
+  }, [buildPayload, clearAttribution, leadEntryApiUrl, onSuccess]);
 
   const reset = useCallback(() => {
     setAnswers({});

@@ -10,6 +10,7 @@ import { useFormState } from '@/components/landing-form';
 import { QuestionStep, validateQuestion } from '@/components/landing-form';
 import type { FormConfig } from '@/components/landing-form';
 import { useMetaAttribution } from '@/hooks/useMetaAttribution';
+import { EnergySavingsFlow } from '@/components/energy-savings/EnergySavingsFlow';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
@@ -113,6 +114,8 @@ const AHORRO_LUZ_CONFIG: FormConfig = {
 export default function AhorroLuz() {
   const [validationError, setValidationError] = useState<string | null>(null);
   const [direction, setDirection] = useState<'next' | 'prev'>('next');
+  const [lastLeadId, setLastLeadId] = useState<string | null>(null);
+  const [lastFacturaPath, setLastFacturaPath] = useState<string | null>(null);
   const autoAdvanceTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const contactValuesRef = useRef<Record<string, string>>({});
   const formContainerRef = useRef<HTMLDivElement | null>(null);
@@ -143,6 +146,15 @@ export default function AhorroLuz() {
     attribution,
     clearAttribution,
     leadEntryApiUrl: import.meta.env.VITE_LEAD_ENTRIES_API_URL ?? '/api/lead-entries',
+    onSuccess: (lead, payload) => {
+      setLastLeadId(lead.id);
+      const adj = payload.custom_fields?.adjuntar_factura;
+      const path =
+        adj && typeof adj === 'object' && adj !== null && 'path' in adj && typeof (adj as { path: unknown }).path === 'string'
+          ? (adj as { path: string }).path
+          : null;
+      setLastFacturaPath(path);
+    },
   });
 
   const uploadLeadAttachment = useCallback(async (file: File): Promise<{ name: string; path: string }> => {
@@ -270,8 +282,15 @@ export default function AhorroLuz() {
     });
   }, [currentQuestion?.id, submitStatus]);
 
+  const handleReset = useCallback(() => {
+    setLastLeadId(null);
+    setLastFacturaPath(null);
+    reset();
+  }, [reset]);
+
   if (submitStatus === 'success') {
     const sinFactura = answers.tiene_factura === 'no';
+    const showEnergyFlow = !sinFactura && lastLeadId && lastFacturaPath;
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-white">
         <header className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 pt-6 pb-4 sm:pt-7 sm:pb-5 bg-white/80 backdrop-blur-sm border-b border-gray-200/50">
@@ -290,7 +309,13 @@ export default function AhorroLuz() {
           <p className="text-lg text-gray-600 mb-6">
             Hemos recibido tu información
           </p>
-          {sinFactura && (
+          {showEnergyFlow ? (
+            <EnergySavingsFlow
+              leadId={lastLeadId}
+              attachmentPath={lastFacturaPath}
+              onReset={handleReset}
+            />
+          ) : sinFactura ? (
             <>
               <p className="text-xl sm:text-2xl font-bold mb-6" style={{ color: BRAND_COLOR }}>
                 ¿Sabías que cerca del 99% de las facturas que recibimos les mejoramos el precio? Seguro que la tuya también! 💪
@@ -298,20 +323,20 @@ export default function AhorroLuz() {
               <p className="text-lg text-gray-600 mb-8">
                 Un asesor te contactará pronto para ponernos manos a la obra
               </p>
+              <button onClick={handleReset} className="text-lg font-medium hover:underline" style={{ color: BRAND_COLOR }}>
+                Enviar otra solicitud
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="text-lg text-gray-600 mb-8">
+                Un asesor te contactará en las próximas horas para ayudarte a ahorrar en tu factura.
+              </p>
+              <button onClick={handleReset} className="text-lg font-medium hover:underline" style={{ color: BRAND_COLOR }}>
+                Enviar otra solicitud
+              </button>
             </>
           )}
-          {!sinFactura && (
-            <p className="text-lg text-gray-600 mb-8">
-              Un asesor te contactará en las próximas horas para ayudarte a ahorrar en tu factura.
-            </p>
-          )}
-          <button
-            onClick={reset}
-            className="text-lg font-medium hover:underline"
-            style={{ color: BRAND_COLOR }}
-          >
-            Enviar otra solicitud
-          </button>
         </div>
       </div>
     );
