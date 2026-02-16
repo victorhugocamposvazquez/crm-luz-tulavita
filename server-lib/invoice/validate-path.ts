@@ -5,7 +5,8 @@
 
 const MAX_PATH_LENGTH = 500;
 const ALLOWED_EXT = /\.(pdf|jpe?g|png|webp|gif)$/i;
-const SAFE_PATH = /^[a-zA-Z0-9_\-\/. ]+$/;
+// Permite UUID/nombre.ext con caracteres habituales (paréntesis, espacios, tildes/ñ)
+const SAFE_PATH = /^[a-zA-Z0-9_\-\/. ()áéíóúñüÁÉÍÓÚÑÜ]+$/;
 
 export function validateAttachmentPath(path: string): { valid: boolean; error?: string } {
   if (typeof path !== 'string') {
