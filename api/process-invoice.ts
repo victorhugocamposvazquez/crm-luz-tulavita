@@ -8,7 +8,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import { extractInvoiceFromBuffer } from '../server-lib/invoice/pipeline.js';
-import { getActiveOffers, runComparison } from '../server-lib/energy/calculation.js';
+import { getActiveOffers, runComparison, getComparisonFailureReason } from '../server-lib/energy/calculation.js';
 import { validateAttachmentPath } from '../server-lib/invoice/validate-path.js';
 
 const BUCKET = 'lead-attachments';
@@ -157,13 +157,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           total_factura: extraction.total_factura,
           period_months: extraction.period_months,
         },
-        error_message: result ? null : 'No se pudo extraer consumo/total o no hay ofertas comparables',
+        error_message: result ? null : getComparisonFailureReason(extraction, offers),
       };
 
       const { data: inserted, error: insertError } = await supabase
         .from('energy_comparisons')
         .insert(row)
-        .select('id, status, estimated_savings_amount, estimated_savings_percentage, best_offer_company')
+        .select('id, status, estimated_savings_amount, estimated_savings_percentage, best_offer_company, error_message')
         .single();
 
       if (insertError) throw insertError;

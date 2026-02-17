@@ -70,6 +70,34 @@ export function monthlyCost(consumptionKwh: number, offer: EnergyOffer): number 
 }
 
 /**
+ * Mensaje de error cuando la comparación no puede realizarse (para mostrar al usuario).
+ */
+export function getComparisonFailureReason(
+  extraction: InvoiceExtraction,
+  offers: EnergyOffer[]
+): string {
+  const consumption = extraction.consumption_kwh;
+  const totalFactura = extraction.total_factura;
+  const currentCompany = extraction.company_name ? normalizeCompanyName(extraction.company_name) : null;
+
+  if (consumption == null || consumption <= 0 || totalFactura == null || totalFactura <= 0) {
+    return 'No se pudieron extraer el consumo o el total de la factura. Comprueba que la factura sea legible.';
+  }
+  if (offers.length === 0) {
+    return 'No hay ofertas configuradas para comparar.';
+  }
+  const comparable = offers.filter((o) => {
+    const name = o.company_name.trim().toLowerCase();
+    const current = (currentCompany || '').trim().toLowerCase();
+    return name !== current;
+  });
+  if (comparable.length === 0) {
+    return 'No hay otras comercializadoras con las que comparar.';
+  }
+  return 'No se encontró una oferta con ahorro con los datos extraídos.';
+}
+
+/**
  * Normaliza factura a coste mensual y obtiene ofertas comparables (excluyendo misma comercializadora).
  */
 export function runComparison(

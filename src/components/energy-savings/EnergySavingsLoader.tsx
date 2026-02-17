@@ -7,6 +7,8 @@ import { FileSearch, Scale, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const BRAND = '#26606b';
+/** Verde visible para la barra de progreso (emerald-600). */
+const PROGRESS_GREEN = '#059669';
 const DURATION_MS = 11000;
 
 const STEPS = [
@@ -75,11 +77,14 @@ export function EnergySavingsLoader() {
             className="h-full rounded-full transition-all duration-300 ease-out"
             style={{
               width: `${progress * 100}%`,
-              backgroundColor: BRAND,
+              backgroundColor: PROGRESS_GREEN,
             }}
           />
         </div>
-        <p className="text-xs text-gray-500 mt-2 text-center tabular-nums">
+        <p
+          className="text-xs mt-2 text-center tabular-nums font-medium"
+          style={{ color: progress >= 1 ? undefined : PROGRESS_GREEN }}
+        >
           {progress >= 1 ? 'Listo en unos segundos…' : `${Math.round(progress * 100)}%`}
         </p>
       </div>

@@ -43,7 +43,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   const { data, error } = await supabase
     .from('energy_comparisons')
-    .select('id, lead_id, current_company, current_monthly_cost, best_offer_company, estimated_savings_amount, estimated_savings_percentage, status, ocr_confidence, prudent_mode, created_at')
+    .select('id, lead_id, current_company, current_monthly_cost, best_offer_company, estimated_savings_amount, estimated_savings_percentage, status, ocr_confidence, prudent_mode, error_message, created_at')
     .eq('lead_id', leadId)
     .order('created_at', { ascending: false })
     .limit(1)
