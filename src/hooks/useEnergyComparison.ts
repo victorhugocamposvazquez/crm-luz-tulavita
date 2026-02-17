@@ -26,6 +26,12 @@ export interface EnergyComparisonResult {
   created_at: string;
 }
 
+export interface ManualExtractionInput {
+  consumption_kwh: number;
+  total_factura: number;
+  period_months?: number;
+}
+
 export function useEnergyComparison() {
   const [status, setStatus] = useState<'idle' | 'processing' | 'completed' | 'failed'>('idle');
   const [comparison, setComparison] = useState<EnergyComparisonResult | null>(null);
@@ -110,6 +116,45 @@ export function useEnergyComparison() {
     }
   }, []);
 
+  /** Plan B: calcular ahorro con datos introducidos por el usuario (sin procesar archivo). */
+  const runWithManual = useCallback(async (leadId: string, data: ManualExtractionInput) => {
+    setStatus('processing');
+    setComparison(null);
+    setError(null);
+    try {
+      const res = await fetch(PROCESS_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          lead_id: leadId,
+          manual_extraction: {
+            consumption_kwh: data.consumption_kwh,
+            total_factura: data.total_factura,
+            period_months: data.period_months ?? 1,
+          },
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(json.error || 'Error al calcular el ahorro');
+        setStatus('failed');
+        return;
+      }
+      const comp = json.comparison;
+      if (comp?.status === 'completed') {
+        setComparison(comp as EnergyComparisonResult);
+        setError(null);
+        setStatus('completed');
+        return;
+      }
+      setError(comp?.error_message || 'No se pudo calcular el ahorro');
+      setStatus('failed');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Error de conexión');
+      setStatus('failed');
+    }
+  }, []);
+
   const reset = useCallback(() => {
     abortRef.current = true;
     setStatus('idle');
@@ -117,5 +162,5 @@ export function useEnergyComparison() {
     setError(null);
   }, []);
 
-  return { status, comparison, error, run, reset };
+  return { status, comparison, error, run, runWithManual, reset };
 }

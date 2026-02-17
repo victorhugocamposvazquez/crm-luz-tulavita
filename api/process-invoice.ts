@@ -2,6 +2,8 @@
  * POST /api/process-invoice
  * Procesa factura (PDF/imagen), extrae datos, calcula ahorro y guarda en energy_comparisons.
  * Body: { lead_id, attachment_path } — path en bucket lead-attachments.
+ * Alternativa (plan B): { lead_id, manual_extraction: { consumption_kwh, total_factura, period_months?, company_name? } }
+ *   para cuando la extracción automática falla; no se usa el archivo, solo se ejecuta la comparación con esos datos.
  * Mejoras: validación de path, rate limit por lead_id y por IP.
  */
 
@@ -59,7 +61,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  let body: { lead_id?: string; attachment_path?: string };
+  type ManualExtraction = {
+    consumption_kwh?: number;
+    total_factura?: number;
+    period_months?: number;
+    company_name?: string | null;
+  };
+  let body: { lead_id?: string; attachment_path?: string; manual_extraction?: ManualExtraction };
   try {
     body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body as Record<string, unknown>) ?? {};
   } catch {
@@ -70,18 +78,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   const lead_id = body.lead_id;
   const attachment_path = body.attachment_path;
-  if (!lead_id || typeof lead_id !== 'string' || !attachment_path || typeof attachment_path !== 'string') {
-    cors();
-    res.status(400).json({ error: 'lead_id y attachment_path son obligatorios', code: 'VALIDATION_ERROR' });
-    return;
-  }
+  const manual_extraction = body.manual_extraction;
+  const useManual = manual_extraction != null &&
+    typeof manual_extraction.consumption_kwh === 'number' &&
+    manual_extraction.consumption_kwh > 0 &&
+    typeof manual_extraction.total_factura === 'number' &&
+    manual_extraction.total_factura > 0;
 
-  const pathValidation = validateAttachmentPath(attachment_path);
-  if (!pathValidation.valid) {
+  if (!lead_id || typeof lead_id !== 'string') {
     cors();
-    res.status(400).json({ error: pathValidation.error || 'Ruta no válida', code: 'INVALID_PATH' });
+    res.status(400).json({ error: 'lead_id es obligatorio', code: 'VALIDATION_ERROR' });
     return;
   }
+  if (!useManual && (!attachment_path || typeof attachment_path !== 'string')) {
+    cors();
+    res.status(400).json({ error: 'attachment_path es obligatorio si no envías manual_extraction', code: 'VALIDATION_ERROR' });
+    return;
+  }
+  if (!useManual) {
+    const pathValidation = validateAttachmentPath(attachment_path!);
+    if (!pathValidation.valid) {
+      cors();
+      res.status(400).json({ error: pathValidation.error || 'Ruta no válida', code: 'INVALID_PATH' });
+      return;
+    }
+  }
+  const period_months = useManual
+    ? Math.min(12, Math.max(1, Math.floor(Number(manual_extraction!.period_months)) || 1))
+    : undefined;
 
   const clientIp = getClientIp(req);
   const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_HOURS * 60 * 60 * 1000).toISOString();
@@ -121,6 +145,58 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     .from('process_invoice_rate_log')
     .delete()
     .lt('created_at', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString());
+
+  /** Plan B: comparación solo con datos manuales (sin procesar archivo). */
+  if (useManual) {
+    try {
+      const offers = await getActiveOffers(supabase);
+      const extraction = {
+        company_name: manual_extraction!.company_name ?? null,
+        consumption_kwh: manual_extraction!.consumption_kwh!,
+        total_factura: manual_extraction!.total_factura!,
+        period_start: null,
+        period_end: null,
+        period_months,
+        confidence: 0.9,
+        raw_text: undefined,
+      };
+      const result = runComparison(extraction, offers);
+      const row = {
+        lead_id,
+        current_company: result?.current_company ?? extraction.company_name,
+        current_monthly_cost: result?.current_monthly_cost ?? null,
+        best_offer_company: result?.best_offer_company ?? null,
+        estimated_savings_amount: result?.estimated_savings_amount ?? null,
+        estimated_savings_percentage: result?.estimated_savings_percentage ?? null,
+        status: result ? 'completed' : 'failed',
+        ocr_confidence: 0.9,
+        invoice_period_months: period_months,
+        prudent_mode: result?.prudent_mode ?? false,
+        raw_extraction: {
+          company_name: extraction.company_name,
+          consumption_kwh: extraction.consumption_kwh,
+          total_factura: extraction.total_factura,
+          period_months: extraction.period_months,
+        },
+        error_message: result ? null : getComparisonFailureReason(extraction, offers),
+      };
+      const { data: inserted, error: insertError } = await supabase
+        .from('energy_comparisons')
+        .insert(row)
+        .select('id, status, estimated_savings_amount, estimated_savings_percentage, best_offer_company, error_message')
+        .single();
+      if (insertError) throw insertError;
+      cors();
+      res.status(200).json({ success: true, comparison: inserted });
+      return;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Error calculando ahorro con los datos introducidos';
+      console.error('[process-invoice] manual', message);
+      cors();
+      res.status(500).json({ success: false, error: message, code: 'MANUAL_COMPARISON_ERROR' });
+      return;
+    }
+  }
 
   const runWithTimeout = async () => {
     const timeoutPromise = new Promise<never>((_, reject) =>
