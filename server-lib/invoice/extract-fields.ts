@@ -17,7 +17,10 @@ const CONSUMPTION_PATTERNS = [
   /(?:término\s+de\s+)?energía\s*activa\s*[:\s]*(\d+(?:[.,\s]\d{3})*(?:[.,]\d+)?)/gi,
   /(\d+(?:[.,\s]\d{3})*(?:[.,]\d+)?)\s*kwh\s*(?:consumo|total|facturado)?/gi,
   /consumo\s*[:\s]*(\d+(?:[.,\s]\d{3})*(?:[.,]\d+)?)\s*kwh/gi,
+  /(?:energía|energia)\s*(?:activa|consumida)?\s*[:\s]*(\d+(?:[.,\s]\d{3})*(?:[.,]\d+)?)\s*k?wh/gi,
+  /(\d+(?:[.,\s]\d{3})*(?:[.,]\d+)?)\s*k?w\s*[hH]/gi,
   /(\d+(?:[.,]\d+)?)\s*kwh(?!\s*[hH])/gi,
+  /kwh\s*[:\s]*(\d+(?:[.,\s]\d{3})*(?:[.,]\d+)?)/gi,
 ];
 
 const TOTAL_PATTERNS = [
@@ -27,6 +30,8 @@ const TOTAL_PATTERNS = [
   /(\d+(?:[.,]\d+)?)\s*€\s*\(?\s*total/gi,
   /total\s*[:\s]*(\d+(?:[.,]\d+)?)\s*eur/gi,
   /(?:iva\s+incluido|total)\s*[:\s]*(\d+(?:[.,]\d+)?)\s*€/gi,
+  /total\s*[:\s]*(\d+(?:[.,]\d+)?)\s*[€euro]/gi,
+  /(?:total|total\s*factura)\s*[:\s]*(\d+[.,]\d{2})/gi,
 ];
 
 /** Acepta "1.234,56" (europeo), "1 234,56", "1234.56", "1,234.56". */
@@ -84,8 +89,41 @@ export function normalizeCompanyName(name: string | null): string | null {
   return name.trim();
 }
 
+/** Normaliza texto para OCR: espacios/saltos múltiples a uno, unificar caracteres. */
+function normalizeForOcr(raw: string): string {
+  return raw
+    .replace(/\s+/g, ' ')
+    .replace(/[\r\n]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/** Fallback: busca el mayor número que parezca consumo en kWh (cercano a "kwh" o "energía"). */
+function fallbackConsumptionKwh(text: string): number | null {
+  const re = /(\d+(?:[.,\s]\d{3})*(?:[.,]\d+)?)\s*(?:kwh|kwh\.|kw\s*h)/gi;
+  let best: number | null = null;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const n = parseDecimal(m[1]);
+    if (n >= 10 && n <= 50000 && (best == null || n > best)) best = n;
+  }
+  return best;
+}
+
+/** Fallback: busca el mayor importe con 2 decimales (candidato a total en €). */
+function fallbackTotalEur(text: string): number | null {
+  const re = /\b(\d{1,4}[.,]\d{2})\s*(?:€|eur|euros)?/gi;
+  let best: number | null = null;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    const n = parseDecimal(m[1]);
+    if (n >= 5 && n <= 2000 && (best == null || n > best)) best = n;
+  }
+  return best;
+}
+
 export function extractFieldsFromText(rawText: string): InvoiceExtraction {
-  const text = rawText.replace(/\s+/g, ' ');
+  const text = normalizeForOcr(rawText);
   let company_name: string | null = null;
   for (const re of COMPANY_PATTERNS) {
     const m = text.match(re);
@@ -94,8 +132,12 @@ export function extractFieldsFromText(rawText: string): InvoiceExtraction {
       break;
     }
   }
-  const consumption_kwh = firstMatchNumber(text, CONSUMPTION_PATTERNS);
-  const total_factura = firstMatchNumber(text, TOTAL_PATTERNS);
+  let consumption_kwh = firstMatchNumber(text, CONSUMPTION_PATTERNS);
+  if (consumption_kwh == null) consumption_kwh = fallbackConsumptionKwh(text);
+
+  let total_factura = firstMatchNumber(text, TOTAL_PATTERNS);
+  if (total_factura == null) total_factura = fallbackTotalEur(text);
+
   const period_months = detectPeriodMonths(text);
   return {
     company_name: company_name ? normalizeCompanyName(company_name) : null,

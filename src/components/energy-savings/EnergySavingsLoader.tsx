@@ -71,12 +71,20 @@ export function EnergySavingsLoader() {
       </p>
 
       {/* Barra de progreso (una sola pasada) */}
-      <div className="w-full max-w-xs">
-        <div className="h-2 rounded-full bg-gray-200 overflow-hidden">
+      <div className="w-full max-w-xs" style={{ minWidth: 200 }}>
+        <div
+          className="rounded-full overflow-hidden bg-gray-200"
+          style={{ height: 10, width: '100%' }}
+          role="progressbar"
+          aria-valuenow={Math.round(progress * 100)}
+          aria-valuemin={0}
+          aria-valuemax={100}
+        >
           <div
             className="h-full rounded-full transition-all duration-300 ease-out"
             style={{
               width: `${progress * 100}%`,
+              minWidth: progress > 0 ? 10 : 0,
               backgroundColor: PROGRESS_GREEN,
             }}
           />
