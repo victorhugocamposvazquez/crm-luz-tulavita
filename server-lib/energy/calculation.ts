@@ -81,7 +81,7 @@ export function getComparisonFailureReason(
   const currentCompany = extraction.company_name ? normalizeCompanyName(extraction.company_name) : null;
 
   if (consumption == null || consumption <= 0 || totalFactura == null || totalFactura <= 0) {
-    return 'No se pudieron extraer el consumo o el total de la factura. Comprueba que la factura sea legible.';
+    return 'No hemos podido leer todos los datos de esta factura de forma automática. Un asesor revisará tu factura y te contactará con una estimación personalizada.';
   }
   if (offers.length === 0) {
     return 'No hay ofertas configuradas para comparar.';

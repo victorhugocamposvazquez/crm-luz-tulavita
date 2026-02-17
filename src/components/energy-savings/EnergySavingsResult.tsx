@@ -35,8 +35,8 @@ export function EnergySavingsResult({ data }: { data: EnergyComparisonData }) {
   return (
     <div className="space-y-4">
       {showExact && (
-        <p className="text-xl sm:text-2xl font-bold text-[#26606b]">
-          Podrías ahorrar hasta un {percent}%
+        <p className="text-3xl sm:text-4xl font-semibold text-emerald-600">
+          Podrías ahorrar hasta un <strong className="font-bold">{percent}%</strong>
         </p>
       )}
       {prudent && percent > 0 && (

@@ -28,15 +28,15 @@ const CONSUMPTION_PATTERNS = [
 ];
 
 const TOTAL_PATTERNS = [
-  /\bTOTAL\s+(\d+[.,]\d{2})\s*[€]?/g,
-  /total\s*(?:a\s*)?pagar\s*[:\s]*(\d+(?:[.,]\d+)?)\s*€?/gi,
-  /importe\s*total\s*(?:\(.*?\))?\s*[:\s]*(\d+(?:[.,]\d+)?)/gi,
-  /total\s*(?:importe|factura)\s*[:\s]*(\d+(?:[.,]\d+)?)/gi,
-  /(\d+(?:[.,]\d+)?)\s*€\s*\(?\s*total/gi,
-  /total\s*[:\s]*(\d+(?:[.,]\d+)?)\s*eur/gi,
-  /(?:iva\s+incluido|total)\s*[:\s]*(\d+(?:[.,]\d+)?)\s*€/gi,
-  /total\s*[:\s]*(\d+(?:[.,]\d+)?)\s*[€euro]/gi,
-  /(?:total|total\s*factura)\s*[:\s]*(\d+[.,]\d{2})/gi,
+  /\bTOTAL\s+(\d+[.,]\d{2})\s*[€]?/i,
+  /total\s*(?:a\s*)?pagar\s*[:\s]*(\d+(?:[.,]\d+)?)\s*€?/i,
+  /importe\s*total\s*(?:\(.*?\))?\s*[:\s]*(\d+(?:[.,]\d+)?)/i,
+  /total\s*(?:importe|factura)\s*[:\s]*(\d+(?:[.,]\d+)?)/i,
+  /(\d+(?:[.,]\d+)?)\s*€\s*\(?\s*total/i,
+  /total\s*[:\s]*(\d+(?:[.,]\d+)?)\s*eur/i,
+  /(?:iva\s+incluido|total)\s*[:\s]*(\d+(?:[.,]\d+)?)\s*€/i,
+  /total\s*[:\s]*(\d+(?:[.,]\d+)?)\s*[€euro]/i,
+  /(?:total|total\s*factura)\s*[:\s]*(\d+[.,]\d{2})/i,
 ];
 
 /** Acepta "1.234,56" (europeo), "1 234,56", "1234.56", "1,234.56". */
@@ -55,7 +55,7 @@ function parseDecimal(str: string): number {
 
 function firstMatch(text: string, patterns: RegExp[]): string | null {
   for (const re of patterns) {
-    const m = text.match(re);
+    const m = re.exec(text);
     if (m && m[1]) return m[1].trim();
   }
   return null;
@@ -160,14 +160,21 @@ export function extractFieldsFromText(rawText: string): InvoiceExtraction {
       break;
     }
   }
-  let consumption_kwh = firstMatchNumber(text, CONSUMPTION_PATTERNS);
-  if (consumption_kwh == null) consumption_kwh = fallbackConsumptionKwh(text);
-
   let total_factura = firstMatchNumber(text, TOTAL_PATTERNS);
   if (total_factura == null) total_factura = fallbackTotalEur(text);
 
+  let consumption_kwh = firstMatchNumber(text, CONSUMPTION_PATTERNS);
+  if (consumption_kwh == null) consumption_kwh = fallbackConsumptionKwh(text);
+  // Evitar confusión total (€) con consumo (kWh): si coinciden, es casi seguro un match erróneo
+  if (
+    total_factura != null &&
+    consumption_kwh != null &&
+    Math.abs(consumption_kwh - total_factura) < 0.02
+  ) {
+    consumption_kwh = fallbackConsumptionKwh(text);
+  }
+
   const period_months = detectPeriodMonths(text);
-  console.log('[DEBUG-INVOICE] extractFieldsFromText', { textLen: text.length, consumption_kwh, total_factura, company_name: company_name ? 'set' : null });
   return {
     company_name: company_name ? normalizeCompanyName(company_name) : null,
     consumption_kwh,

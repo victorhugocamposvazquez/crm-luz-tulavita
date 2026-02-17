@@ -7,8 +7,6 @@ import { FileSearch, Scale, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const BRAND = '#26606b';
-/** Verde visible para la barra de progreso (emerald-600). */
-const PROGRESS_GREEN = '#059669';
 const DURATION_MS = 11000;
 
 const STEPS = [
@@ -81,17 +79,18 @@ export function EnergySavingsLoader() {
           aria-valuemax={100}
         >
           <div
-            className="h-full rounded-full transition-all duration-300 ease-out"
+            className="h-full rounded-full transition-all duration-300 ease-out bg-emerald-600"
             style={{
               width: `${progress * 100}%`,
               minWidth: progress > 0 ? 10 : 0,
-              backgroundColor: PROGRESS_GREEN,
             }}
           />
         </div>
         <p
-          className="text-xs mt-2 text-center tabular-nums font-medium"
-          style={{ color: progress >= 1 ? undefined : PROGRESS_GREEN }}
+          className={cn(
+            'text-xs mt-2 text-center tabular-nums font-medium',
+            progress < 1 && 'text-emerald-600'
+          )}
         >
           {progress >= 1 ? 'Listo en unos segundos…' : `${Math.round(progress * 100)}%`}
         </p>
