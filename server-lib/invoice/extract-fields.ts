@@ -23,6 +23,8 @@ const CONSUMPTION_PATTERNS = [
   /(\d+(?:[.,\s]\d{3})*(?:[.,]\d+)?)\s*k?w\s*[hH]/gi,
   /(\d+(?:[.,]\d+)?)\s*kwh(?!\s*[hH])/gi,
   /kwh\s*[:\s]*(\d+(?:[.,\s]\d{3})*(?:[.,]\d+)?)/gi,
+  /(\d+(?:[.,]\d+)?)\s*k\s*w\s*h/gi,
+  /(\d+)\s*kwh/gi,
 ];
 
 const TOTAL_PATTERNS = [
@@ -103,14 +105,37 @@ function normalizeForOcr(raw: string): string {
 
 /** Fallback: busca el mayor número que parezca consumo en kWh (cercano a "kwh" o "energía"). */
 function fallbackConsumptionKwh(text: string): number | null {
-  const re = /(\d+(?:[.,\s]\d{3})*(?:[.,]\d+)?)\s*(?:kwh|kwh\.|kw\s*h)/gi;
+  const re = /(\d+(?:[.,\s]\d{3})*(?:[.,]\d+)?)\s*(?:kwh|kwh\.|kw\s*h|k\s*w\s*h)/gi;
   let best: number | null = null;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
     const n = parseDecimal(m[1]);
     if (n >= 10 && n <= 50000 && (best == null || n > best)) best = n;
   }
-  return best;
+  if (best != null) return best;
+  // Último recurso: buscar "kwh" (o "KWh") y tomar el número inmediatamente anterior (ej. "81 kWh" o "Total 81,00 kWh")
+  const kwhIndex = text.toLowerCase().indexOf('kwh');
+  if (kwhIndex > 0) {
+    const before = text.slice(Math.max(0, kwhIndex - 40), kwhIndex);
+    const numMatch = before.match(/(\d+(?:[.,]\d+)?)\s*$/);
+    if (numMatch) {
+      const n = parseDecimal(numMatch[1]);
+      if (n >= 10 && n <= 50000) return n;
+    }
+  }
+  // Si hay "consumo" pero sin "kwh" visible: buscar número 10-50000 en los 60 chars tras "consumo total" o "Total"
+  const consumoTotalIdx = text.toLowerCase().search(/consumo\s+total|total\s+(\d+)/);
+  if (consumoTotalIdx >= 0) {
+    const slice = text.slice(consumoTotalIdx, consumoTotalIdx + 80);
+    const allNums = slice.match(/\d+(?:[.,]\d+)?/g);
+    if (allNums) {
+      for (const s of allNums) {
+        const n = parseDecimal(s);
+        if (n >= 10 && n <= 50000) return n;
+      }
+    }
+  }
+  return null;
 }
 
 /** Fallback: busca el mayor importe con 2 decimales (candidato a total en €). */
