@@ -2,10 +2,17 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-//VARIABLES PRODUCCION.
+// Variables producción (usadas si .env no está o tiene placeholders)
+const DEFAULT_SUPABASE_URL = "https://kamfdjczamfgumkiwjpw.supabase.co";
+const DEFAULT_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImthbWZkamN6YW1mZ3Vta2l3anB3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQwNzM5NDQsImV4cCI6MjA2OTY0OTk0NH0.ut5c7kjfAqOOy4dhP1XJxhU9W6VkLJpGSxz4DKQIMwU";
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? "https://kamfdjczamfgumkiwjpw.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImthbWZkamN6YW1mZ3Vta2l3anB3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQwNzM5NDQsImV4cCI6MjA2OTY0OTk0NH0.ut5c7kjfAqOOy4dhP1XJxhU9W6VkLJpGSxz4DKQIMwU";
+const envUrl = import.meta.env.VITE_SUPABASE_URL;
+const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Si .env.local tiene placeholders, usar valores por defecto para que la subida funcione en local
+const isPlaceholderUrl = typeof envUrl === 'string' && (envUrl.includes('TU_PROYECTO') || !envUrl.includes('supabase.co'));
+const isPlaceholderKey = typeof envKey === 'string' && (envKey.length < 100 || envKey.includes('aquí') || envKey.includes('tu_'));
+const SUPABASE_URL = !isPlaceholderUrl && envUrl ? envUrl : DEFAULT_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = !isPlaceholderKey && envKey ? envKey : DEFAULT_SUPABASE_ANON_KEY;
 
 // Variables Vite estáticas para que el build reemplace correctamente en desarrollo
 /* const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? "https://oslvdbmcwzfwekulqabk.supabase.co";

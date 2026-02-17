@@ -137,6 +137,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const mimeType = fileData.type || (attachment_path.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
 
       const extraction = await extractInvoiceFromBuffer(buffer, mimeType);
+      console.log('[DEBUG-INVOICE] extraction before runComparison', { consumption_kwh: extraction.consumption_kwh, total_factura: extraction.total_factura, company_name: extraction.company_name ? 'set' : null });
       const offers = await getActiveOffers(supabase);
       const result = runComparison(extraction, offers);
 

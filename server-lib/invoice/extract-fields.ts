@@ -142,6 +142,7 @@ export function extractFieldsFromText(rawText: string): InvoiceExtraction {
   if (total_factura == null) total_factura = fallbackTotalEur(text);
 
   const period_months = detectPeriodMonths(text);
+  console.log('[DEBUG-INVOICE] extractFieldsFromText', { textLen: text.length, consumption_kwh, total_factura, company_name: company_name ? 'set' : null });
   return {
     company_name: company_name ? normalizeCompanyName(company_name) : null,
     consumption_kwh,

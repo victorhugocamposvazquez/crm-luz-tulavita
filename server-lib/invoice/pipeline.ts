@@ -32,6 +32,7 @@ export async function extractInvoiceFromBuffer(
 
   const result = await runDocumentAiInvoiceParser(buffer, mimeType);
   if (!result || !result.text || result.text.length < MIN_TEXT_LENGTH) {
+    console.log('[DEBUG-INVOICE] pipeline early return', { hasResult: !!result, textLen: result?.text?.length ?? 0 });
     return {
       company_name: null,
       consumption_kwh: null,
@@ -54,7 +55,7 @@ export async function extractInvoiceFromBuffer(
 
   const total_factura = entities.total_factura ?? fromText.total_factura;
   const consumption_kwh = entities.consumption_kwh ?? fromText.consumption_kwh;
-
+  console.log('[DEBUG-INVOICE] pipeline merge', { fromText_total: fromText.total_factura, fromText_consumption: fromText.consumption_kwh, entity_total: entities.total_factura, entity_consumption: entities.consumption_kwh, final_total_factura: total_factura, final_consumption_kwh: consumption_kwh });
   return {
     company_name,
     consumption_kwh,

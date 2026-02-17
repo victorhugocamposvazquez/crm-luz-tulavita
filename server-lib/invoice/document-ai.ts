@@ -136,7 +136,10 @@ export async function runDocumentAiInvoiceParser(
   const project = process.env.GOOGLE_CLOUD_PROJECT || process.env.DOCUMENT_AI_PROJECT_ID;
   const location = process.env.DOCUMENT_AI_LOCATION || 'eu';
   const processorId = process.env.DOCUMENT_AI_PROCESSOR_ID;
-  if (!project || !processorId) return null;
+  if (!project || !processorId) {
+    console.log('[DEBUG-INVOICE] document-ai early return: no project or processorId', { project: !!project, processorId: !!processorId });
+    return null;
+  }
 
   const token = await getAccessToken();
   const url = `https://${location}-documentai.googleapis.com/v1/projects/${project}/locations/${location}/processors/${processorId}:process`;
@@ -157,6 +160,7 @@ export async function runDocumentAiInvoiceParser(
   if (!res.ok) {
     const err = await res.text();
     console.error('[document-ai]', res.status, err);
+    console.log('[DEBUG-INVOICE] document-ai API error', { status: res.status, errPreview: err?.slice(0, 200) });
     return null;
   }
   const data = (await res.json()) as {
@@ -167,7 +171,10 @@ export async function runDocumentAiInvoiceParser(
     };
   };
   const text = data.document?.text?.trim() ?? '';
-  if (!text || text.length < 20) return null;
+  if (!text || text.length < 20) {
+    console.log('[DEBUG-INVOICE] document-ai short/no text', { textLen: text?.length ?? 0 });
+    return null;
+  }
 
   let confidence = 0.85;
   const pages = data.document?.pages;
@@ -180,7 +187,8 @@ export async function runDocumentAiInvoiceParser(
 
   const entities = data.document?.entities ?? [];
   const parsed = parseInvoiceEntities(entities);
-
+  const entityTypes = entities.slice(0, 15).map((e) => e.type);
+  console.log('[DEBUG-INVOICE] document-ai result', { textLen: text.length, entityCount: entities.length, entityTypes, total_factura: parsed.total_factura, company_name: parsed.company_name ? 'set' : null, consumption_kwh: parsed.consumption_kwh });
   return {
     text,
     confidence,
