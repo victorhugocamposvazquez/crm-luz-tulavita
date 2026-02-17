@@ -14,7 +14,7 @@ import { EnergySavingsFlow } from '@/components/energy-savings/EnergySavingsFlow
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
-import { pdfFirstPageToImageBlob } from '@/lib/pdfFirstPageToImage';
+import { pdfFirstTwoPagesToImageBlob } from '@/lib/pdfFirstPageToImage';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -163,8 +163,8 @@ export default function AhorroLuz() {
     let fileToUpload = file;
     if (file.type === 'application/pdf') {
       try {
-        const blob = await pdfFirstPageToImageBlob(file);
-        fileToUpload = new File([blob], 'factura-pagina1.jpg', { type: 'image/jpeg' });
+        const blob = await pdfFirstTwoPagesToImageBlob(file);
+        fileToUpload = new File([blob], 'factura-paginas-1-2.jpg', { type: 'image/jpeg' });
         fileToUpload = await imageCompression(fileToUpload, IMAGE_COMPRESSION_OPTIONS);
       } catch (e) {
         console.warn('Conversión PDF a imagen fallida:', e);

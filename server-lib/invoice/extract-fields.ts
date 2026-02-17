@@ -13,6 +13,8 @@ const COMPANY_PATTERNS = [
 ];
 
 const CONSUMPTION_PATTERNS = [
+  /(?:Total|consumo\s*total)\s*:?\s*(\d+(?:[.,]\d+)?)\s*kwh/gi,
+  /Total\s+(\d+)\s*kwh\s+(?:hasta|facturado)/gi,
   /consumo\s*(?:total|de\s*energía|eléctrico)?\s*[:\s]*(\d+(?:[.,\s]\d{3})*(?:[.,]\d+)?)\s*kwh/gi,
   /(?:término\s+de\s+)?energía\s*activa\s*[:\s]*(\d+(?:[.,\s]\d{3})*(?:[.,]\d+)?)/gi,
   /(\d+(?:[.,\s]\d{3})*(?:[.,]\d+)?)\s*kwh\s*(?:consumo|total|facturado)?/gi,
@@ -24,6 +26,7 @@ const CONSUMPTION_PATTERNS = [
 ];
 
 const TOTAL_PATTERNS = [
+  /\bTOTAL\s+(\d+[.,]\d{2})\s*[€]?/g,
   /total\s*(?:a\s*)?pagar\s*[:\s]*(\d+(?:[.,]\d+)?)\s*€?/gi,
   /importe\s*total\s*(?:\(.*?\))?\s*[:\s]*(\d+(?:[.,]\d+)?)/gi,
   /total\s*(?:importe|factura)\s*[:\s]*(\d+(?:[.,]\d+)?)/gi,
