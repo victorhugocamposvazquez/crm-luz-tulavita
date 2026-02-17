@@ -9,6 +9,8 @@ import { normalizeCompanyName } from '../invoice/extract-fields.js';
 export interface EnergyOffer {
   id: string;
   company_name: string;
+  p1: number | null;
+  p2: number | null;
   price_per_kwh: number;
   monthly_fixed_cost: number;
   active: boolean;
@@ -33,12 +35,14 @@ const MIN_OCR_CONFIDENCE = 0.8;
 export async function getActiveOffers(supabase: SupabaseClient): Promise<EnergyOffer[]> {
   const { data, error } = await supabase
     .from('energy_offers')
-    .select('id, company_name, price_per_kwh, monthly_fixed_cost, active')
+    .select('id, company_name, p1, p2, price_per_kwh, monthly_fixed_cost, active')
     .eq('active', true);
   if (error) throw error;
   return (data || []).map((r) => ({
     id: r.id,
     company_name: r.company_name,
+    p1: r.p1 != null ? Number(r.p1) : null,
+    p2: r.p2 != null ? Number(r.p2) : null,
     price_per_kwh: Number(r.price_per_kwh),
     monthly_fixed_cost: Number(r.monthly_fixed_cost),
     active: r.active,

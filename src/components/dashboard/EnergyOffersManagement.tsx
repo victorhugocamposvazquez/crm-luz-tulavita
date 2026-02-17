@@ -1,6 +1,5 @@
 /**
- * Configuración de ofertas energéticas (comercializadoras) para el cálculo de ahorro.
- * Solo visible para admin. Campos: company_name, price_per_kwh, monthly_fixed_cost, active.
+ * Configuración de ofertas energéticas: Nombre, P1, P2, Precio consumo.
  */
 
 import { useState, useEffect } from 'react';
@@ -24,6 +23,8 @@ import { Zap, Edit } from 'lucide-react';
 export interface EnergyOfferRow {
   id: string;
   company_name: string;
+  p1: number | null;
+  p2: number | null;
   price_per_kwh: number;
   monthly_fixed_cost: number;
   active: boolean;
@@ -38,15 +39,16 @@ export default function EnergyOffersManagement() {
   const [editingOffer, setEditingOffer] = useState<EnergyOfferRow | null>(null);
   const [saving, setSaving] = useState(false);
   const [formName, setFormName] = useState('');
+  const [formP1, setFormP1] = useState('');
+  const [formP2, setFormP2] = useState('');
   const [formPriceKwh, setFormPriceKwh] = useState('');
-  const [formFixedCost, setFormFixedCost] = useState('');
   const [formActive, setFormActive] = useState(true);
 
   const fetchOffers = async () => {
     try {
       const { data, error } = await supabase
         .from('energy_offers')
-        .select('id, company_name, price_per_kwh, monthly_fixed_cost, active, created_at, updated_at')
+        .select('id, company_name, p1, p2, price_per_kwh, monthly_fixed_cost, active, created_at, updated_at')
         .order('company_name');
 
       if (error) throw error;
@@ -70,8 +72,9 @@ export default function EnergyOffersManagement() {
   const openEdit = (offer: EnergyOfferRow) => {
     setEditingOffer(offer);
     setFormName(offer.company_name);
+    setFormP1(offer.p1 != null ? String(offer.p1) : '');
+    setFormP2(offer.p2 != null ? String(offer.p2) : '');
     setFormPriceKwh(String(offer.price_per_kwh));
-    setFormFixedCost(String(offer.monthly_fixed_cost));
     setFormActive(offer.active);
     setDialogOpen(true);
   };
@@ -80,20 +83,25 @@ export default function EnergyOffersManagement() {
     setDialogOpen(false);
     setEditingOffer(null);
     setFormName('');
+    setFormP1('');
+    setFormP2('');
     setFormPriceKwh('');
-    setFormFixedCost('');
     setFormActive(true);
+  };
+
+  const parseNum = (s: string): number | null => {
+    const n = parseFloat(s.replace(',', '.').trim());
+    return Number.isFinite(n) && n >= 0 ? n : null;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingOffer) return;
-    const price = parseFloat(formPriceKwh.replace(',', '.'));
-    const fixed = parseFloat(formFixedCost.replace(',', '.'));
-    if (Number.isNaN(price) || price < 0 || Number.isNaN(fixed) || fixed < 0) {
+    const price = parseNum(formPriceKwh);
+    if (price === null || price < 0) {
       toast({
         title: 'Datos inválidos',
-        description: 'Precio por kWh y coste fijo deben ser números ≥ 0',
+        description: 'Precio consumo debe ser un número ≥ 0',
         variant: 'destructive',
       });
       return;
@@ -104,8 +112,9 @@ export default function EnergyOffersManagement() {
         .from('energy_offers')
         .update({
           company_name: formName.trim(),
+          p1: parseNum(formP1) ?? null,
+          p2: parseNum(formP2) ?? null,
           price_per_kwh: price,
-          monthly_fixed_cost: fixed,
           active: formActive,
         })
         .eq('id', editingOffer.id);
@@ -147,9 +156,10 @@ export default function EnergyOffersManagement() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Comercializadora</TableHead>
-                <TableHead className="text-right">Precio kWh (€)</TableHead>
-                <TableHead className="text-right">Coste fijo mensual (€)</TableHead>
+                <TableHead>Empresa</TableHead>
+                <TableHead className="text-right">P1</TableHead>
+                <TableHead className="text-right">P2</TableHead>
+                <TableHead className="text-right">Precio consumo (€/kWh)</TableHead>
                 <TableHead>Activa</TableHead>
                 <TableHead className="w-[80px]"></TableHead>
               </TableRow>
@@ -157,7 +167,7 @@ export default function EnergyOffersManagement() {
             <TableBody>
               {offers.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">
                     No hay ofertas. Ejecuta la migración con seed o añade una.
                   </TableCell>
                 </TableRow>
@@ -165,8 +175,9 @@ export default function EnergyOffersManagement() {
                 offers.map((offer) => (
                   <TableRow key={offer.id}>
                     <TableCell className="font-medium">{offer.company_name}</TableCell>
+                    <TableCell className="text-right">{offer.p1 != null ? Number(offer.p1).toFixed(4) : '–'}</TableCell>
+                    <TableCell className="text-right">{offer.p2 != null ? Number(offer.p2).toFixed(4) : '–'}</TableCell>
                     <TableCell className="text-right">{Number(offer.price_per_kwh).toFixed(4)}</TableCell>
-                    <TableCell className="text-right">{Number(offer.monthly_fixed_cost).toFixed(2)}</TableCell>
                     <TableCell>{offer.active ? 'Sí' : 'No'}</TableCell>
                     <TableCell>
                       <Button variant="ghost" size="icon" onClick={() => openEdit(offer)} aria-label="Editar">
@@ -188,7 +199,7 @@ export default function EnergyOffersManagement() {
             <form onSubmit={handleSubmit}>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="energy-company-name">Comercializadora</Label>
+                  <Label htmlFor="energy-company-name">Nombre empresa</Label>
                   <Input
                     id="energy-company-name"
                     value={formName}
@@ -197,8 +208,32 @@ export default function EnergyOffersManagement() {
                     required
                   />
                 </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="energy-p1">P1</Label>
+                    <Input
+                      id="energy-p1"
+                      type="text"
+                      inputMode="decimal"
+                      value={formP1}
+                      onChange={(e) => setFormP1(e.target.value)}
+                      placeholder="0.xxxxx"
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="energy-p2">P2</Label>
+                    <Input
+                      id="energy-p2"
+                      type="text"
+                      inputMode="decimal"
+                      value={formP2}
+                      onChange={(e) => setFormP2(e.target.value)}
+                      placeholder="0.xxxxx"
+                    />
+                  </div>
+                </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="energy-price-kwh">Precio por kWh (€)</Label>
+                  <Label htmlFor="energy-price-kwh">Precio consumo (€/kWh)</Label>
                   <Input
                     id="energy-price-kwh"
                     type="text"
@@ -206,18 +241,6 @@ export default function EnergyOffersManagement() {
                     value={formPriceKwh}
                     onChange={(e) => setFormPriceKwh(e.target.value)}
                     placeholder="0.145"
-                    required
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="energy-fixed-cost">Coste fijo mensual (€)</Label>
-                  <Input
-                    id="energy-fixed-cost"
-                    type="text"
-                    inputMode="decimal"
-                    value={formFixedCost}
-                    onChange={(e) => setFormFixedCost(e.target.value)}
-                    placeholder="5.50"
                     required
                   />
                 </div>

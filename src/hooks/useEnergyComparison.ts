@@ -1,5 +1,6 @@
 /**
- * Procesa factura y obtiene comparación de ahorro (polling hasta completed/failed)
+ * Procesa factura y obtiene comparación de ahorro (polling hasta completed/failed).
+ * El loader se muestra al menos MIN_LOADER_MS para que el usuario vea el progreso.
  */
 
 import { useState, useCallback, useRef } from 'react';
@@ -8,6 +9,8 @@ const PROCESS_API = import.meta.env.VITE_PROCESS_INVOICE_API_URL ?? '/api/proces
 const COMPARISON_API = import.meta.env.VITE_ENERGY_COMPARISON_API_URL ?? '/api/energy-comparison';
 const POLL_INTERVAL_MS = 2000;
 const POLL_MAX_ATTEMPTS = 30;
+/** Tiempo mínimo mostrando el loader para que se vea la secuencia (no parpadeo). */
+const MIN_LOADER_MS = 2500;
 
 export interface EnergyComparisonResult {
   id: string;
@@ -30,10 +33,28 @@ export function useEnergyComparison() {
   const abortRef = useRef(false);
 
   const run = useCallback(async (leadId: string, attachmentPath: string) => {
+    const startedAt = Date.now();
     setStatus('processing');
     setComparison(null);
     setError(null);
     abortRef.current = false;
+
+    const applyResult = (
+      nextStatus: 'completed' | 'failed',
+      nextComparison: EnergyComparisonResult | null,
+      nextError: string | null
+    ) => {
+      const elapsed = Date.now() - startedAt;
+      const delay = Math.max(0, MIN_LOADER_MS - elapsed);
+      const apply = () => {
+        if (abortRef.current) return;
+        setComparison(nextComparison);
+        setError(nextError);
+        setStatus(nextStatus);
+      };
+      if (delay > 0) setTimeout(apply, delay);
+      else apply();
+    };
 
     try {
       const processRes = await fetch(PROCESS_API, {
@@ -44,23 +65,24 @@ export function useEnergyComparison() {
       const processData = await processRes.json().catch(() => ({}));
 
       if (!processRes.ok) {
-        if (processRes.status === 429) {
-          setError('Demasiadas solicitudes. Por favor, espera un poco e inténtalo de nuevo.');
-        } else {
-          setError(processData.error || 'Error al procesar la factura');
-        }
-        setStatus('failed');
+        const msg =
+          processRes.status === 429
+            ? 'Demasiadas solicitudes. Por favor, espera un poco e inténtalo de nuevo.'
+            : processData.error || 'Error al procesar la factura';
+        applyResult('failed', null, msg);
         return;
       }
 
       if (processData.comparison?.status === 'completed') {
-        setComparison(processData.comparison as EnergyComparisonResult);
-        setStatus('completed');
+        applyResult('completed', processData.comparison as EnergyComparisonResult, null);
         return;
       }
       if (processData.comparison?.status === 'failed') {
-        setStatus('failed');
-        setError(processData.comparison?.error_message || 'No se pudo calcular el ahorro');
+        applyResult(
+          'failed',
+          null,
+          processData.comparison?.error_message || 'No se pudo calcular el ahorro'
+        );
         return;
       }
 
@@ -71,24 +93,20 @@ export function useEnergyComparison() {
         const getRes = await fetch(`${COMPARISON_API}/${leadId}`);
         const getData = await getRes.json().catch(() => null);
         if (getData?.status === 'completed') {
-          setComparison(getData as EnergyComparisonResult);
-          setStatus('completed');
+          applyResult('completed', getData as EnergyComparisonResult, null);
           return;
         }
         if (getData?.status === 'failed') {
-          setStatus('failed');
-          setError(getData?.error_message || 'No se pudo calcular el ahorro');
+          applyResult('failed', null, getData?.error_message || 'No se pudo calcular el ahorro');
           return;
         }
         attempts++;
       }
 
       if (abortRef.current) return;
-      setStatus('failed');
-      setError('Tiempo de espera agotado. Un asesor te contactará.');
+      applyResult('failed', null, 'Tiempo de espera agotado. Un asesor te contactará.');
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error de conexión');
-      setStatus('failed');
+      applyResult('failed', null, e instanceof Error ? e.message : 'Error de conexión');
     }
   }, []);
 

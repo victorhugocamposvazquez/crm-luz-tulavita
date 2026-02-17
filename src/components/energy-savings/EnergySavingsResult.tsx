@@ -27,7 +27,6 @@ export function EnergySavingsResult({ data }: { data: EnergyComparisonData }) {
     );
   }
 
-  const amount = data.estimated_savings_amount ?? 0;
   const percent = roundDownPercent(data.estimated_savings_percentage);
   const prudent = data.prudent_mode === true;
   const showExact = percent >= MIN_PERCENT_TO_SHOW && !prudent;
@@ -37,7 +36,7 @@ export function EnergySavingsResult({ data }: { data: EnergyComparisonData }) {
     <div className="space-y-4">
       {showExact && (
         <p className="text-xl sm:text-2xl font-bold text-[#26606b]">
-          Podrías ahorrar hasta un {percent}% (≈ {amount.toFixed(0)}€ al mes)
+          Podrías ahorrar hasta un {percent}%
         </p>
       )}
       {prudent && percent > 0 && (
