@@ -14,6 +14,7 @@ import { EnergySavingsFlow } from '@/components/energy-savings/EnergySavingsFlow
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
+import { pdfFirstPageToImageBlob } from '@/lib/pdfFirstPageToImage';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
@@ -160,7 +161,17 @@ export default function AhorroLuz() {
 
   const uploadLeadAttachment = useCallback(async (file: File): Promise<{ name: string; path: string }> => {
     let fileToUpload = file;
-    if (file.type.startsWith('image/')) {
+    if (file.type === 'application/pdf') {
+      try {
+        const blob = await pdfFirstPageToImageBlob(file);
+        fileToUpload = new File([blob], 'factura-pagina1.jpg', { type: 'image/jpeg' });
+        fileToUpload = await imageCompression(fileToUpload, IMAGE_COMPRESSION_OPTIONS);
+      } catch (e) {
+        console.warn('Conversión PDF a imagen fallida:', e);
+        toast({ title: 'Error al procesar el PDF', description: 'Prueba con una foto o captura de la factura.', variant: 'destructive' });
+        throw e;
+      }
+    } else if (file.type.startsWith('image/')) {
       try {
         fileToUpload = await imageCompression(file, IMAGE_COMPRESSION_OPTIONS);
       } catch (e) {
