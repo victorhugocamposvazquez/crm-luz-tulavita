@@ -20,9 +20,10 @@ import { toast } from '@/hooks/use-toast';
 const BRAND_COLOR = '#26606b';
 const LEAD_ATTACHMENTS_BUCKET = 'lead-attachments';
 
+/** Compresión fuerte para que Document AI responda en <10s (límite Vercel Hobby). */
 const IMAGE_COMPRESSION_OPTIONS = {
-  maxSizeMB: 1.5,
-  maxWidthOrHeight: 1920,
+  maxSizeMB: 0.6,
+  maxWidthOrHeight: 1200,
   useWebWorker: true,
 };
 
