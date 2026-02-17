@@ -1,6 +1,6 @@
 # Configurar Google Document AI para extracción de facturas
 
-El flujo de ahorro energético (landing AhorroLuz) usa **Google Document AI** para extraer texto de facturas en PDF o imagen cuando el backend corre en Vercel (donde no está disponible la extracción nativa de PDF).
+El flujo de ahorro energético (landing AhorroLuz) usa **Google Document AI Invoice Parser** para extraer datos estructurados de facturas (total, comercializadora, consumo) en PDF o imagen cuando el backend corre en Vercel.
 
 ---
 
@@ -30,15 +30,15 @@ Si al crear la clave JSON ves *"La creación de claves de la cuenta de servicio 
 
 ---
 
-## 3. Crear un processor (OCR)
+## 3. Crear un processor (Invoice Parser)
 
 1. Ve a [Document AI](https://console.cloud.google.com/ai/document-ai) en el menú (o busca "Document AI" en la consola).
 2. Asegúrate de tener seleccionada la **región correcta**:
    - Para Europa (recomendado): **europe-west2** (Londres) u otra región EU.
    - La variable `DOCUMENT_AI_LOCATION` debe coincidir con la región del processor: `europe-west2`, `eu`, `us`, etc. (según lo que muestre la consola en la URL del processor).
 3. Pulsa **"Create processor"** / **Crear processor**.
-4. Elige **"Document OCR"** (extrae texto de PDFs e imágenes en muchos idiomas, incluido español).
-5. Pon un nombre, ej. `facturas-ocr`, y crea.
+4. Elige **"Invoice Parser"** (extrae entidades de facturas: total, proveedor, fechas, line items; soporta varios formatos de factura).
+5. Pon un nombre, ej. `facturas-luz`, y crea.
 6. En la página del processor verás un **Processor ID** (algo como `a1b2c3d4e5f6g7h8`). **Cópialo**: es el valor de `DOCUMENT_AI_PROCESSOR_ID`.
 
 ---
@@ -110,8 +110,8 @@ Pega aquí el contenido completo del JSON de la cuenta de servicio (una sola lí
 | Variable | Obligatoria | Descripción |
 |----------|-------------|-------------|
 | `GOOGLE_CLOUD_PROJECT` | Sí | ID del proyecto en Google Cloud |
-| `DOCUMENT_AI_PROCESSOR_ID` | Sí | ID del processor Document OCR que creaste |
+| `DOCUMENT_AI_PROCESSOR_ID` | Sí | ID del processor **Invoice Parser** que creaste |
 | `DOCUMENT_AI_LOCATION` | No | Región del processor (`eu`, `us`, etc.). Por defecto: `eu` |
 | `GOOGLE_APPLICATION_CREDENTIALS_JSON` | Sí | JSON completo de la clave de la cuenta de servicio (o el mismo en base64) |
 
-Con esto, el endpoint `/api/process-invoice` podrá extraer texto de las facturas con Document AI y calcular el ahorro en Vercel.
+Con esto, el endpoint `/api/process-invoice` usará el Invoice Parser para extraer total, comercializadora y (cuando aplique) consumo de las facturas, y combinará con reglas sobre el texto para consumo en kWh y periodo, calculando el ahorro en Vercel.

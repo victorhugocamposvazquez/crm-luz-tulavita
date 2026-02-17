@@ -1,10 +1,24 @@
 /**
- * Google Document AI OCR para PDFs sin texto o imágenes.
- * Requiere: GOOGLE_CLOUD_PROJECT, DOCUMENT_AI_LOCATION, DOCUMENT_AI_PROCESSOR_ID,
- * y GOOGLE_APPLICATION_CREDENTIALS_JSON (service account key en base64 o JSON string).
+ * Google Document AI Invoice Parser para facturas (PDF o imagen).
+ * Extrae texto y entidades estructuradas: total_amount, supplier_name, line_item, etc.
+ * Requiere: GOOGLE_CLOUD_PROJECT, DOCUMENT_AI_LOCATION, DOCUMENT_AI_PROCESSOR_ID
+ * (processor tipo "Invoice Parser"), y GOOGLE_APPLICATION_CREDENTIALS_JSON.
  */
 
 const DOCUMENT_AI_SCOPE = 'https://www.googleapis.com/auth/cloud-platform';
+
+interface DocAiEntity {
+  type?: string;
+  mentionText?: string;
+  confidence?: number;
+  normalizedValue?: {
+    moneyValue?: { units?: string; nanos?: number; currencyCode?: string };
+    floatValue?: number;
+    integerValue?: number;
+    textValue?: string;
+  };
+  properties?: DocAiEntity[];
+}
 
 async function getAccessToken(): Promise<string> {
   const credsJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
@@ -53,15 +67,72 @@ async function getAccessToken(): Promise<string> {
   return data.access_token;
 }
 
-export interface DocumentAiResult {
-  text: string;
-  confidence: number;
+function moneyToNumber(money?: { units?: string; nanos?: number }): number | null {
+  if (!money) return null;
+  const units = Number(money.units ?? 0);
+  const nanos = Number(money.nanos ?? 0) / 1e9;
+  const n = units + nanos;
+  return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-export async function runDocumentAiOcr(
+function getEntityProp(entity: DocAiEntity, typeName: string): DocAiEntity | undefined {
+  return entity.properties?.find((p) => (p.type === typeName || p.type?.endsWith('/' + typeName)));
+}
+
+/** Extrae total_factura y company_name de entidades del Invoice Parser. */
+function parseInvoiceEntities(entities: DocAiEntity[]): {
+  total_factura: number | null;
+  company_name: string | null;
+  consumption_kwh: number | null;
+} {
+  let total_factura: number | null = null;
+  let company_name: string | null = null;
+  let consumption_kwh: number | null = null;
+
+  for (const e of entities) {
+    const type = (e.type ?? '').toLowerCase();
+    if (type === 'total_amount' || type === 'invoice_total') {
+      const n = moneyToNumber(e.normalizedValue?.moneyValue);
+      if (n != null && (total_factura == null || n > total_factura)) total_factura = n;
+      if (total_factura == null && e.mentionText) {
+        const parsed = parseFloat(e.mentionText.replace(/[^\d.,]/g, '').replace(',', '.'));
+        if (Number.isFinite(parsed) && parsed > 0) total_factura = parsed;
+      }
+    }
+    if (
+      (type === 'supplier_name' || type === 'receiver_name' || type === 'supplier_address') &&
+      e.mentionText?.trim()
+    ) {
+      if (!company_name) company_name = e.mentionText.trim();
+    }
+    if (type === 'line_item' && e.properties?.length) {
+      const desc = getEntityProp(e, 'description')?.mentionText?.toLowerCase() ?? '';
+      const quantity = getEntityProp(e, 'quantity');
+      if (/kwh|energía|energia/.test(desc) && quantity) {
+        const q = quantity.normalizedValue?.floatValue ?? quantity.normalizedValue?.integerValue ?? parseFloat(quantity.mentionText?.replace(/[^\d.,]/g, '') ?? '');
+        if (Number.isFinite(q) && q > 0 && (consumption_kwh == null || q > consumption_kwh))
+          consumption_kwh = q;
+      }
+    }
+  }
+  return { total_factura, company_name, consumption_kwh };
+}
+
+export interface DocumentAiInvoiceResult {
+  text: string;
+  confidence: number;
+  /** Campos extraídos por el Invoice Parser (cuando están presentes). */
+  entities: {
+    total_factura: number | null;
+    company_name: string | null;
+    consumption_kwh: number | null;
+  };
+}
+
+export async function runDocumentAiInvoiceParser(
   buffer: Buffer,
   mimeType: string
-): Promise<DocumentAiResult | null> {
+): Promise<DocumentAiInvoiceResult | null> {
   const project = process.env.GOOGLE_CLOUD_PROJECT || process.env.DOCUMENT_AI_PROJECT_ID;
   const location = process.env.DOCUMENT_AI_LOCATION || 'eu';
   const processorId = process.env.DOCUMENT_AI_PROCESSOR_ID;
@@ -89,15 +160,30 @@ export async function runDocumentAiOcr(
     return null;
   }
   const data = (await res.json()) as {
-    document?: { text?: string; pages?: Array<{ layout?: { textAnchor?: { textSegments?: Array<{ confidence?: number }> } } }> };
+    document?: {
+      text?: string;
+      entities?: DocAiEntity[];
+      pages?: Array<{ layout?: { confidence?: number }; detectedBlocks?: unknown[] }>;
+    };
   };
-  const text = data.document?.text?.trim() || '';
-  if (!text) return null;
-  let confidence = 0.8;
+  const text = data.document?.text?.trim() ?? '';
+  if (!text || text.length < 20) return null;
+
+  let confidence = 0.85;
   const pages = data.document?.pages;
   if (pages?.length) {
-    const confs = pages.flatMap((p) => (p.layout as { textAnchor?: { textSegments?: Array<{ confidence?: number }> } })?.textAnchor?.textSegments?.map((s) => s.confidence) ?? []);
-    if (confs.length) confidence = confs.reduce((a, b) => a + (b ?? 0), 0) / confs.length;
+    const confs = pages
+      .map((p) => (p.layout as { confidence?: number } | undefined)?.confidence)
+      .filter((c): c is number => typeof c === 'number');
+    if (confs.length) confidence = confs.reduce((a, b) => a + b, 0) / confs.length;
   }
-  return { text, confidence };
+
+  const entities = data.document?.entities ?? [];
+  const parsed = parseInvoiceEntities(entities);
+
+  return {
+    text,
+    confidence,
+    entities: parsed,
+  };
 }
