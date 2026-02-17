@@ -36,10 +36,11 @@ export function EnergySavingsLoader() {
   }, []);
 
   const stepIndex = Math.min(
-    Math.floor(progress * STEPS.length),
+    Math.max(0, Math.floor(Number(progress) * STEPS.length)),
     STEPS.length - 1
   );
-  const currentStep = STEPS[stepIndex];
+  const currentStep = STEPS[stepIndex] ?? STEPS[0];
+  const StepIcon = currentStep.icon;
 
   return (
     <div className="flex flex-col items-center gap-8 py-10 px-4">
@@ -51,7 +52,7 @@ export function EnergySavingsLoader() {
           boxShadow: progress < 1 ? `0 0 40px ${BRAND}40` : `0 0 24px ${BRAND}30`,
         }}
       >
-        <currentStep.icon
+        <StepIcon
           className="w-10 h-10 transition-all duration-300"
           style={{ color: BRAND }}
           strokeWidth={1.8}
@@ -87,10 +88,10 @@ export function EnergySavingsLoader() {
       <div className="flex gap-2">
         {STEPS.map((step, i) => {
           const active = i <= stepIndex;
-          const Icon = step.icon;
+          const Icon = step?.icon ?? FileSearch;
           return (
             <div
-              key={step.label}
+              key={step?.label ?? i}
               className={cn(
                 'flex items-center justify-center w-9 h-9 rounded-full border-2 transition-all duration-300',
                 active

@@ -31,6 +31,9 @@ const PRUDENT_MIN_PERCENT = 8;
 const MIN_CONSUMPTION_KWH = 50;
 const MAX_CONSUMPTION_KWH = 5000;
 const MIN_OCR_CONFIDENCE = 0.8;
+/** Potencia contratada por defecto (kW) cuando no viene en factura, para calcular término potencia con P1/P2. */
+const DEFAULT_POWER_KW = 4.6;
+const DAYS_PER_MONTH = 30;
 
 export async function getActiveOffers(supabase: SupabaseClient): Promise<EnergyOffer[]> {
   const { data, error } = await supabase
@@ -49,9 +52,21 @@ export async function getActiveOffers(supabase: SupabaseClient): Promise<EnergyO
   }));
 }
 
-/** Coste mensual de una oferta para un consumo dado (kWh/mes). */
+/**
+ * Coste mensual de una oferta para un consumo dado (kWh/mes).
+ * - Término energía: consumo (kWh) × precio consumo (€/kWh).
+ * - Término potencia: si la oferta tiene P1 y P2 (€/kW día), se usa potencia por defecto y 30 días;
+ *   si no, se usa el coste fijo mensual (monthly_fixed_cost).
+ */
 export function monthlyCost(consumptionKwh: number, offer: EnergyOffer): number {
-  return consumptionKwh * offer.price_per_kwh + offer.monthly_fixed_cost;
+  const terminoEnergia = consumptionKwh * offer.price_per_kwh;
+  const p1 = offer.p1 ?? null;
+  const p2 = offer.p2 ?? null;
+  const terminoPotencia =
+    p1 != null && p2 != null
+      ? DEFAULT_POWER_KW * DAYS_PER_MONTH * ((p1 + p2) / 2)
+      : offer.monthly_fixed_cost;
+  return terminoEnergia + terminoPotencia;
 }
 
 /**
