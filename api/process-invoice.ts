@@ -12,7 +12,8 @@ import { getActiveOffers, runComparison } from '../server-lib/energy/calculation
 import { validateAttachmentPath } from '../server-lib/invoice/validate-path.js';
 
 const BUCKET = 'lead-attachments';
-const TIMEOUT_MS = 10000;
+/** Document AI puede tardar 15-30s en PDFs/imágenes. En Vercel Hobby el límite es 10s; en Pro, 60s. */
+const TIMEOUT_MS = 30000;
 const RATE_LIMIT_LEAD_PER_HOUR = 3;
 const RATE_LIMIT_IP_PER_HOUR = 20;
 const RATE_LIMIT_WINDOW_HOURS = 1;
