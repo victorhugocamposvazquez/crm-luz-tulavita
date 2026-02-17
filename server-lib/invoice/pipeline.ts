@@ -1,14 +1,17 @@
 /**
  * Pipeline: obtener archivo → extraer texto (PDF o OCR) → extraer campos.
+ * En Vercel/serverless no usamos pdf-parse (requiere canvas/DOMMatrix); solo Document AI OCR.
  */
 
 import type { InvoiceExtraction } from './types.js';
-import { extractTextFromPdf } from './pdf-text.js';
 import { runDocumentAiOcr } from './document-ai.js';
 import { extractFieldsFromText } from './extract-fields.js';
 
 const MIN_TEXT_LENGTH = 80;
 const IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+
+/** En Vercel no hay canvas/DOMMatrix; no cargar pdf-parse para evitar warnings. */
+const skipNativePdf = typeof process !== 'undefined' && !!process.env.VERCEL;
 
 export async function extractInvoiceFromBuffer(
   buffer: Buffer,
@@ -20,7 +23,8 @@ export async function extractInvoiceFromBuffer(
   const isPdf = mimeType === 'application/pdf';
   const isImage = IMAGE_MIMES.has(mimeType);
 
-  if (isPdf) {
+  if (isPdf && !skipNativePdf) {
+    const { extractTextFromPdf } = await import('./pdf-text.js');
     const pdfResult = await extractTextFromPdf(buffer);
     if (pdfResult && pdfResult.text.length >= MIN_TEXT_LENGTH) {
       text = pdfResult.text;
