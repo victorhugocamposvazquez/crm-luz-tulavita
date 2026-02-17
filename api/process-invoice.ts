@@ -219,6 +219,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
       const row = {
         lead_id,
+        attachment_path,
+        raw_text: extraction.raw_text != null ? extraction.raw_text.slice(0, 10000) : null,
         current_company: result?.current_company ?? extraction.company_name,
         current_monthly_cost: result?.current_monthly_cost ?? null,
         best_offer_company: result?.best_offer_company ?? null,
@@ -262,6 +264,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     try {
       await supabase.from('energy_comparisons').insert({
         lead_id,
+        attachment_path: attachment_path ?? null,
         status: 'failed',
         error_message: message,
       });
