@@ -11,14 +11,13 @@ const NEUTRAL_PERCENT_MAX = 10;
 const LEGAL_TEXT = 'Cálculo estimado basado en los datos de tu factura.';
 
 const ENCHUFE_ANIMATION_URL = '/animations/enchufe.json';
-const ENCHUFE_TOTAL_FRAMES = 180;
-/** Frame donde empieza (estado inicial). */
-const ENCHUFE_FRAME_START = 131;
-/** Frame donde acaba y se para (desenchufado). */
-const ENCHUFE_FRAME_END = 102;
+/** Frame desenchufado (inicio). */
+const ENCHUFE_FRAME_UNPLUGGED = 102;
+/** Frame enchufado (final). */
+const ENCHUFE_FRAME_PLUGGED = 131;
 
 /**
- * Animación Lottie del enchufe. Empieza en 131, hace todo el bucle (131 → 180 → 0 → 102) y para en 102, luego onPlugged().
+ * Animación Lottie del enchufe. Empieza en 102 (desenchufado), reproduce hasta 131 (enchufado), luego onPlugged().
  */
 function PlugIllustration({ onPlugged }: { onPlugged: () => void }) {
   const [animationData, setAnimationData] = useState<object | null>(null);
@@ -45,12 +44,12 @@ function PlugIllustration({ onPlugged }: { onPlugged: () => void }) {
   const onDataReady = () => {
     const lottie = lottieRef.current;
     if (!lottie) return;
-    // Mostrar primero el frame inicial (131)
-    lottie.goToAndStop(ENCHUFE_FRAME_START, true);
+    // Mostrar primero desenchufado (frame 102)
+    lottie.goToAndStop(ENCHUFE_FRAME_UNPLUGGED, true);
     setPhase('unplugged');
     startTimeoutRef.current = setTimeout(() => {
-      // Bucle completo: 131 → 180, luego 0 → 102, y parar
-      lottie.playSegments([[ENCHUFE_FRAME_START, ENCHUFE_TOTAL_FRAMES], [0, ENCHUFE_FRAME_END]], true);
+      // Reproducir 102 → 131 (desenchufado → enchufado)
+      lottie.playSegments([[ENCHUFE_FRAME_UNPLUGGED, ENCHUFE_FRAME_PLUGGED]], true);
       setPhase('plugging');
     }, 400);
   };
@@ -129,17 +128,15 @@ export function EnergySavingsResult({ data }: { data: EnergyComparisonData }) {
         <div className="space-y-4">
           {/* 1. Al enchufar aparece el texto de ahorro y debajo el legal */}
           {showSavingsText && (
-            <div className="space-y-2 text-center w-full min-w-0">
-              <div className="overflow-x-auto flex justify-center">
-                <p
-                  className="text-3xl sm:text-4xl font-semibold text-emerald-600 animate-in fade-in duration-500 zoom-in-95 whitespace-nowrap"
-                  style={{
-                    textShadow: '0 0 20px rgba(5, 150, 105, 0.5), 0 0 40px rgba(5, 150, 105, 0.25)',
-                  }}
-                >
-                  Podrías ahorrar hasta un <strong className="font-bold">{percent}%</strong>
-                </p>
-              </div>
+            <div className="space-y-2 text-center w-full min-w-0 px-1">
+              <p
+                className="text-2xl sm:text-4xl font-semibold text-emerald-600 animate-in fade-in duration-500 zoom-in-95 break-words"
+                style={{
+                  textShadow: '0 0 20px rgba(5, 150, 105, 0.5), 0 0 40px rgba(5, 150, 105, 0.25)',
+                }}
+              >
+                Podrías ahorrar hasta un <strong className="font-bold">{percent}%</strong>
+              </p>
               <p className="text-sm text-gray-500">{LEGAL_TEXT}</p>
             </div>
           )}
