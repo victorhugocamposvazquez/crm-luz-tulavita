@@ -1,6 +1,6 @@
 /**
  * Pantalla de resultado del ahorro estimado.
- * Secuencia: desenchufado (frame 0 del Lottie) → se enchufa → al terminar aparece el texto de ahorro.
+ * Secuencia: desenchufado (frame 148) → se enchufa en reversa hasta 0 → al terminar aparece el texto de ahorro.
  */
 
 import { useState, useEffect, useRef } from 'react';
@@ -11,18 +11,22 @@ const NEUTRAL_PERCENT_MAX = 10;
 const LEGAL_TEXT = 'Cálculo estimado basado en los datos de tu factura.';
 
 const ENCHUFE_ANIMATION_URL = '/animations/enchufe.json';
+const ENCHUFE_FRAME_UNPLUGGED = 148;
+/** Menor delay para que la frase de ahorro aparezca antes. */
+const DELAY_BEFORE_PLAY_MS = 200;
 
 /**
- * Animación Lottie del enchufe. El JSON está remapeado (script scripts/remap-lottie-time.js):
- * frame 0 = desenchufado, al reproducir avanza hasta enchufado. onComplete → onPlugged().
+ * Animación Lottie del enchufe. Empieza en 148 (desenchufado), reproduce en reversa hasta 0 (enchufado), luego onPlugged().
  */
 function PlugIllustration({ onPlugged }: { onPlugged: () => void }) {
   const [animationData, setAnimationData] = useState<object | null>(null);
   const [phase, setPhase] = useState<'loading' | 'unplugged' | 'plugging' | 'plugged'>('loading');
+  const [readyToShow, setReadyToShow] = useState(false);
   const onPluggedRef = useRef(onPlugged);
   onPluggedRef.current = onPlugged;
   const lottieRef = useRef<LottieRef['current']>(null);
   const startTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const initDoneRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,36 +41,43 @@ function PlugIllustration({ onPlugged }: { onPlugged: () => void }) {
     return () => { cancelled = true; };
   }, []);
 
-  const startPlay = () => {
+  const initAnimation = () => {
+    if (initDoneRef.current) return;
+    const lottie = lottieRef.current;
+    if (!lottie) return;
+    initDoneRef.current = true;
+    lottie.goToAndStop(ENCHUFE_FRAME_UNPLUGGED, true);
+    setReadyToShow(true);
     setPhase('unplugged');
     startTimeoutRef.current = setTimeout(() => {
-      const lottie = lottieRef.current;
-      if (lottie) {
-        lottie.play();
-        setPhase('plugging');
-      }
-    }, 400);
+      lottie.setDirection(-1);
+      lottie.play();
+      setPhase('plugging');
+    }, DELAY_BEFORE_PLAY_MS);
   };
 
-  const onDataReady = () => startPlay();
+  const onDataReady = () => initAnimation();
+  const onConfigReady = () => setTimeout(() => initAnimation(), 0);
 
-  const handleComplete = () => {
-    setPhase('plugged');
-    onPluggedRef.current();
-  };
+  useEffect(() => {
+    if (!animationData) return;
+    let attempts = 0;
+    const id = setInterval(() => {
+      attempts++;
+      initAnimation();
+      if (initDoneRef.current || attempts >= 5) clearInterval(id);
+    }, 300);
+    return () => clearInterval(id);
+  }, [animationData]);
 
   useEffect(() => () => {
     if (startTimeoutRef.current) clearTimeout(startTimeoutRef.current);
   }, []);
 
-  // Fallback si onDataReady no se llama (p. ej. con autoplay=false en algunos entornos)
-  useEffect(() => {
-    if (!animationData) return;
-    const t = setTimeout(() => {
-      if (phase === 'loading' && lottieRef.current) startPlay();
-    }, 1000);
-    return () => clearTimeout(t);
-  }, [animationData, phase]);
+  const handleComplete = () => {
+    setPhase('plugged');
+    onPluggedRef.current();
+  };
 
   if (!animationData) {
     return (
@@ -78,12 +89,16 @@ function PlugIllustration({ onPlugged }: { onPlugged: () => void }) {
 
   return (
     <div className="bg-white rounded-2xl p-6 flex flex-col items-center border border-gray-100">
-      <div className="w-28 h-28 flex items-center justify-center" style={{ minHeight: 120 }}>
+      <div
+        className={`w-28 h-28 flex items-center justify-center transition-opacity duration-200 ${readyToShow ? 'opacity-100' : 'opacity-0'}`}
+        style={{ minHeight: 120 }}
+      >
         <Lottie
           lottieRef={lottieRef}
           animationData={animationData}
           loop={false}
           autoplay={false}
+          onConfigReady={onConfigReady}
           onDataReady={onDataReady}
           onComplete={handleComplete}
           style={{ width: 120, height: 120 }}

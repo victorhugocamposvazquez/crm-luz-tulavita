@@ -316,9 +316,11 @@ export default function AhorroLuz() {
         </header>
         <div className="flex-1 overflow-y-auto pt-24 pb-8 px-4 sm:px-6">
           <div className="max-w-lg w-full mx-auto text-center animate-in fade-in duration-500 space-y-6">
-            <h2 className="text-2xl sm:text-3xl font-semibold" style={{ color: BRAND_COLOR }}>
-              ¡Gracias!
-            </h2>
+            {!showEnergyFlow && (
+              <h2 className="text-2xl sm:text-3xl font-semibold" style={{ color: BRAND_COLOR }}>
+                ¡Gracias!
+              </h2>
+            )}
             {showEnergyFlow ? (
               <EnergySavingsFlow
                 leadId={lastLeadId}
