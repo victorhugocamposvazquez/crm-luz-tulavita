@@ -13,12 +13,22 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, MessageSquarePlus, User, Mail, Phone, FileText, History, ExternalLink, MessageCircle, Expand, Tag, Pencil } from 'lucide-react';
+import { Loader2, MessageSquarePlus, User, Mail, Phone, FileText, History, ExternalLink, MessageCircle, Expand, Tag, Pencil, Trash2 } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { useConversation } from '@/hooks/useConversation';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -215,6 +225,8 @@ export default function LeadDetailSheet({
   const [editPhone, setEditPhone] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [contactSaving, setContactSaving] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 
   const {
     timeline,
@@ -374,6 +386,28 @@ export default function LeadDetailSheet({
       });
     } finally {
       setContactSaving(false);
+    }
+  };
+
+  const handleDeleteLead = async () => {
+    if (!lead?.id) return;
+    setDeleteLoading(true);
+    try {
+      const { error } = await supabase.from('leads').delete().eq('id', lead.id);
+      if (error) throw error;
+      setDeleteConfirmOpen(false);
+      onClose();
+      onLeadUpdated?.();
+      toast({ title: 'Lead eliminado' });
+    } catch (e) {
+      console.error(e);
+      toast({
+        title: 'Error',
+        description: 'No se pudo eliminar el lead',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -703,6 +737,19 @@ export default function LeadDetailSheet({
               </div>
             </section>
 
+            {/* Eliminar lead */}
+            <section className="pt-4 border-t">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-destructive border-destructive/50 hover:bg-destructive/10 hover:text-destructive"
+                onClick={() => setDeleteConfirmOpen(true)}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Eliminar lead
+              </Button>
+            </section>
+
             {/* Timeline: eventos + mensajes */}
             <section>
               <h3 className="flex items-center gap-2 text-sm font-semibold text-muted-foreground mb-3">
@@ -760,6 +807,27 @@ export default function LeadDetailSheet({
             </section>
           </div>
         </ScrollArea>
+
+        <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>¿Eliminar este lead?</AlertDialogTitle>
+              <AlertDialogDescription>
+                Se eliminará el lead y todos sus datos asociados (eventos, conversaciones, comparaciones de ahorro). Esta acción no se puede deshacer.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleteLoading}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={(e) => { e.preventDefault(); handleDeleteLead(); }}
+                disabled={deleteLoading}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                {deleteLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Eliminar'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </SheetContent>
     </Sheet>
   );

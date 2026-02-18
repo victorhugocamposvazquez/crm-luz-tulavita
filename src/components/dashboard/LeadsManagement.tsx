@@ -7,8 +7,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
-import { Search, RefreshCw, ExternalLink, Loader2, Plus, Eye } from 'lucide-react';
+import { Search, RefreshCw, ExternalLink, Loader2, Plus, Eye, Trash2 } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Checkbox } from '@/components/ui/checkbox';
 import LeadDetailSheet from './LeadDetailSheet';
 import NewLeadDialog from './NewLeadDialog';
 import { LeadTagBadges } from './LeadTagBadges';
@@ -55,6 +66,9 @@ export default function LeadsManagement() {
   const [selectedLead, setSelectedLead] = useState<LeadRow | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [newLeadOpen, setNewLeadOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const fetchLeads = useCallback(
     async (selectedId?: string) => {
@@ -131,6 +145,46 @@ export default function LeadsManagement() {
     fetchLeads(selectedLead?.id ?? undefined);
   };
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredLeads.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredLeads.map((l) => l.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    setBulkDeleting(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const { error } = await supabase.from('leads').delete().in('id', ids);
+      if (error) throw error;
+      setBulkDeleteOpen(false);
+      setSelectedIds(new Set());
+      fetchLeads();
+      toast({ title: `${ids.length} lead(s) eliminados` });
+    } catch (e) {
+      console.error(e);
+      toast({
+        title: 'Error',
+        description: 'No se pudieron eliminar los leads',
+        variant: 'destructive',
+      });
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -142,7 +196,18 @@ export default function LeadsManagement() {
                 Gestión de leads del formulario y otras fuentes
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              {selectedIds.size > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive border-destructive/50 hover:bg-destructive/10"
+                  onClick={() => setBulkDeleteOpen(true)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Eliminar ({selectedIds.size})
+                </Button>
+              )}
               <Button onClick={() => setNewLeadOpen(true)} size="sm">
                 <Plus className="h-4 w-4" />
                 Nuevo lead
@@ -250,6 +315,13 @@ export default function LeadsManagement() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-10">
+                      <Checkbox
+                        checked={filteredLeads.length > 0 && selectedIds.size === filteredLeads.length}
+                        onCheckedChange={toggleSelectAll}
+                        aria-label="Seleccionar todos"
+                      />
+                    </TableHead>
                     <TableHead className="w-10"></TableHead>
                     <TableHead>Nombre</TableHead>
                     <TableHead>Teléfono</TableHead>
@@ -267,6 +339,13 @@ export default function LeadsManagement() {
                       className="cursor-pointer hover:bg-muted/50"
                       onClick={() => openDetail(lead)}
                     >
+                      <TableCell className="w-10" onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedIds.has(lead.id)}
+                          onCheckedChange={() => toggleSelect(lead.id)}
+                          aria-label={`Seleccionar ${lead.name || lead.email || 'lead'}`}
+                        />
+                      </TableCell>
                       <TableCell className="w-10">
                         <Eye className="h-4 w-4 text-muted-foreground" />
                       </TableCell>
@@ -320,6 +399,27 @@ export default function LeadsManagement() {
         onClose={() => setNewLeadOpen(false)}
         onSuccess={handleLeadUpdated}
       />
+
+      <AlertDialog open={bulkDeleteOpen} onOpenChange={setBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar {selectedIds.size} lead(s)?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Se eliminarán los leads seleccionados y todos sus datos asociados (eventos, conversaciones, comparaciones). Esta acción no se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleBulkDelete(); }}
+              disabled={bulkDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {bulkDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
