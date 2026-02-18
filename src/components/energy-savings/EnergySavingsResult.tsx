@@ -40,21 +40,41 @@ function PlugIllustration({ onPlugged }: { onPlugged: () => void }) {
   }, []);
 
   const startTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const initDoneRef = useRef(false);
 
-  const onDataReady = () => {
+  const initAnimation = () => {
+    if (initDoneRef.current) return;
     const lottie = lottieRef.current;
     if (!lottie) return;
+    initDoneRef.current = true;
     // Ir al frame desenchufado antes de mostrar (evita flash del frame 0)
     lottie.goToAndStop(ENCHUFE_FRAME_UNPLUGGED, true);
     setReadyToShow(true);
     setPhase('unplugged');
     startTimeoutRef.current = setTimeout(() => {
-      // Reproducir en reversa: 148 → 0 (desenchufado → enchufado)
       lottie.setDirection(-1);
       lottie.play();
       setPhase('plugging');
     }, 400);
   };
+
+  const onDataReady = () => initAnimation();
+  const onConfigReady = () => {
+    // Fallback: a veces con autoplay=false onDataReady no se llama; onConfigReady sí
+    setTimeout(() => initAnimation(), 0);
+  };
+
+  // Fallback por si onDataReady/onConfigReady no disparan: reintentar con el ref cada 300ms hasta 1.5s
+  useEffect(() => {
+    if (!animationData) return;
+    let attempts = 0;
+    const id = setInterval(() => {
+      attempts++;
+      initAnimation();
+      if (initDoneRef.current || attempts >= 5) clearInterval(id);
+    }, 300);
+    return () => clearInterval(id);
+  }, [animationData]);
 
   useEffect(() => () => {
     if (startTimeoutRef.current) clearTimeout(startTimeoutRef.current);
@@ -84,6 +104,7 @@ function PlugIllustration({ onPlugged }: { onPlugged: () => void }) {
           animationData={animationData}
           loop={false}
           autoplay={false}
+          onConfigReady={onConfigReady}
           onDataReady={onDataReady}
           onComplete={handleComplete}
           style={{ width: 120, height: 120 }}
