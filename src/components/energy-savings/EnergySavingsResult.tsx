@@ -1,67 +1,89 @@
 /**
  * Pantalla de resultado del ahorro estimado.
- * Secuencia: desenchufado → se enchufa → al enchufar aparece el texto de ahorro con efecto luz. Fondo blanco.
+ * Secuencia: desenchufado (Lottie en reversa) → se enchufa → al terminar aparece el texto de ahorro. Fondo blanco.
  */
 
 import { useState, useEffect, useRef } from 'react';
+import Lottie, { type LottieRef } from 'lottie-react';
 
 const MIN_PERCENT_TO_SHOW = 8;
 const NEUTRAL_PERCENT_MAX = 10;
 const LEGAL_TEXT = 'Cálculo estimado basado en los datos de tu factura.';
 
-type PlugPhase = 'unplugged' | 'plugging' | 'plugged';
+const ENCHUFE_ANIMATION_URL = '/animations/enchufe.json';
+const ENCHUFE_TOTAL_FRAMES = 180;
 
 /**
- * Ilustración enchufe/socket: desenchufado → animación de enchufar → al terminar onPlugged().
- * Puedes sustituir los SVG por tus propios assets (socket + plug por separado) para la animación.
+ * Animación Lottie del enchufe. El JSON original empieza enchufado; la reproducimos al revés
+ * para mostrar primero desenchufado y al final enchufado, luego onPlugged().
  */
 function PlugIllustration({ onPlugged }: { onPlugged: () => void }) {
-  const [phase, setPhase] = useState<PlugPhase>('unplugged');
+  const [animationData, setAnimationData] = useState<object | null>(null);
+  const [phase, setPhase] = useState<'loading' | 'unplugged' | 'plugging' | 'plugged'>('loading');
   const onPluggedRef = useRef(onPlugged);
   onPluggedRef.current = onPlugged;
+  const lottieRef = useRef<LottieRef['current']>(null);
 
   useEffect(() => {
-    const startPlugging = setTimeout(() => setPhase('plugging'), 600);
-    const finishPlugged = setTimeout(() => {
-      setPhase('plugged');
-      onPluggedRef.current();
-    }, 600 + 1000);
-    return () => {
-      clearTimeout(startPlugging);
-      clearTimeout(finishPlugged);
-    };
+    let cancelled = false;
+    fetch(ENCHUFE_ANIMATION_URL)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!cancelled) setAnimationData(data);
+      })
+      .catch(() => {
+        if (!cancelled) setAnimationData(null);
+      });
+    return () => { cancelled = true; };
   }, []);
 
-  // Desplazamiento del plug: desenchufado = +72px a la derecha; enchufando/plugged = 0 (encajado)
-  const plugTranslateX = phase === 'unplugged' ? 72 : 0;
+  const startTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const onDataReady = () => {
+    const lottie = lottieRef.current;
+    if (!lottie) return;
+    // Empezar en el último frame (desenchufado), luego reproducir en reversa hasta enchufado
+    lottie.goToAndStop(ENCHUFE_TOTAL_FRAMES, true);
+    setPhase('unplugged');
+    startTimeoutRef.current = setTimeout(() => {
+      lottie.setDirection(-1);
+      lottie.play();
+      setPhase('plugging');
+    }, 400);
+  };
+
+  useEffect(() => () => {
+    if (startTimeoutRef.current) clearTimeout(startTimeoutRef.current);
+  }, []);
+
+  const handleComplete = () => {
+    setPhase('plugged');
+    onPluggedRef.current();
+  };
+
+  if (!animationData) {
+    return (
+      <div className="bg-white rounded-2xl p-6 flex flex-col items-center border border-gray-100 min-h-[140px] justify-center">
+        <p className="text-sm text-muted-foreground">Cargando…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-white rounded-2xl p-6 flex flex-col items-center border border-gray-100">
-      <div className="relative flex items-center justify-center h-28 w-64 overflow-visible">
-        {/* Socket (hembra) - fijo a la izquierda */}
-        <svg className="absolute left-0 w-24 h-24 shrink-0" viewBox="0 0 96 96" fill="none" aria-hidden>
-          <rect x="12" y="32" width="48" height="40" rx="8" fill="#f8fafc" stroke="#94a3b8" strokeWidth="2" />
-          <circle cx="28" cy="52" r="5" fill="#64748b" />
-          <circle cx="44" cy="52" r="5" fill="#64748b" />
-          <path d="M34 32 v-10 M46 32 v-10" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" />
-        </svg>
-        {/* Plug (macho) - se mueve de derecha (desenchufado) a izquierda (enchufado) */}
-        <svg
-          className="absolute right-0 w-24 h-24 shrink-0"
-          style={{
-            transform: `translateX(-${plugTranslateX}px)`,
-            transition: 'transform 1s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
-          }}
-          viewBox="0 0 96 96"
-          fill="none"
-          aria-hidden
-        >
-          <rect x="28" y="34" width="40" height="32" rx="6" fill="#f8fafc" stroke="#059669" strokeWidth="2" />
-          <rect x="36" y="10" width="8" height="26" rx="2" fill="#eab308" stroke="#ca8a04" strokeWidth="1" />
-          <rect x="52" y="10" width="8" height="26" rx="2" fill="#eab308" stroke="#ca8a04" strokeWidth="1" />
-        </svg>
+      <div className="w-28 h-28 flex items-center justify-center">
+        <Lottie
+          lottieRef={lottieRef}
+          animationData={animationData}
+          loop={false}
+          onDataReady={onDataReady}
+          onComplete={handleComplete}
+          style={{ width: 120, height: 120 }}
+          rendererSettings={{ preserveAspectRatio: 'xMidYMid meet' }}
+        />
       </div>
       <p className="text-sm text-muted-foreground mt-3 font-medium">
+        {phase === 'loading' && 'Cargando…'}
         {phase === 'unplugged' && 'Desenchufado'}
         {phase === 'plugging' && 'Enchufando…'}
         {phase === 'plugged' && 'Enchufado al ahorro'}
