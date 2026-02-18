@@ -95,9 +95,7 @@ export function EnergySavingsResult({ data }: { data: EnergyComparisonData }) {
     <div className="space-y-4 bg-white rounded-xl p-4 sm:p-6">
       {showExact && (
         <div className="space-y-4">
-          {/* Primero: ilustración desenchufado → enchufar (fondo blanco) */}
-          <PlugIllustration onPlugged={() => setShowSavingsText(true)} />
-          {/* Al enchufar: aparece el texto de ahorro con efecto de luz */}
+          {/* 1. Al enchufar aparece primero el texto de ahorro (arriba) */}
           {showSavingsText && (
             <p
               className="text-3xl sm:text-4xl font-semibold text-emerald-600 text-center animate-in fade-in duration-500 zoom-in-95"
@@ -108,6 +106,8 @@ export function EnergySavingsResult({ data }: { data: EnergyComparisonData }) {
               Podrías ahorrar hasta un <strong className="font-bold">{percent}%</strong>
             </p>
           )}
+          {/* 2. Ilustración: primero desenchufado → efecto de enchufar → al enchufar se muestra el texto de arriba; debajo queda el enchufe y "Enchufado al ahorro" */}
+          <PlugIllustration onPlugged={() => setShowSavingsText(true)} />
         </div>
       )}
       {prudent && percent > 0 && (
