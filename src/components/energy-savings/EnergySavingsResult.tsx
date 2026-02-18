@@ -1,6 +1,6 @@
 /**
  * Pantalla de resultado del ahorro estimado.
- * Secuencia: desenchufado (Lottie en reversa) → se enchufa → al terminar aparece el texto de ahorro. Fondo blanco.
+ * Secuencia: desenchufado (frame 0 del Lottie) → se enchufa → al terminar aparece el texto de ahorro.
  */
 
 import { useState, useEffect, useRef } from 'react';
@@ -11,20 +11,18 @@ const NEUTRAL_PERCENT_MAX = 10;
 const LEGAL_TEXT = 'Cálculo estimado basado en los datos de tu factura.';
 
 const ENCHUFE_ANIMATION_URL = '/animations/enchufe.json';
-/** Frame desenchufado (inicio). Referencia: dotLottie Player (ThorVG); en lottie-web puede variar ligeramente. */
-const ENCHUFE_FRAME_UNPLUGGED = 148;
 
 /**
- * Animación Lottie del enchufe. Empieza en 148 (desenchufado), reproduce en reversa hasta 0 (enchufado), luego onPlugged().
+ * Animación Lottie del enchufe. El JSON está remapeado (script scripts/remap-lottie-time.js):
+ * frame 0 = desenchufado, al reproducir avanza hasta enchufado. onComplete → onPlugged().
  */
 function PlugIllustration({ onPlugged }: { onPlugged: () => void }) {
   const [animationData, setAnimationData] = useState<object | null>(null);
   const [phase, setPhase] = useState<'loading' | 'unplugged' | 'plugging' | 'plugged'>('loading');
-  /** No mostrar la Lottie hasta haber ido al frame desenchufado, así no se ve el frame 0 (enchufado). */
-  const [readyToShow, setReadyToShow] = useState(false);
   const onPluggedRef = useRef(onPlugged);
   onPluggedRef.current = onPlugged;
   const lottieRef = useRef<LottieRef['current']>(null);
+  const startTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -39,51 +37,36 @@ function PlugIllustration({ onPlugged }: { onPlugged: () => void }) {
     return () => { cancelled = true; };
   }, []);
 
-  const startTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const initDoneRef = useRef(false);
-
-  const initAnimation = () => {
-    if (initDoneRef.current) return;
-    const lottie = lottieRef.current;
-    if (!lottie) return;
-    initDoneRef.current = true;
-    // Ir al frame desenchufado antes de mostrar (evita flash del frame 0)
-    lottie.goToAndStop(ENCHUFE_FRAME_UNPLUGGED, true);
-    setReadyToShow(true);
+  const startPlay = () => {
     setPhase('unplugged');
     startTimeoutRef.current = setTimeout(() => {
-      lottie.setDirection(-1);
-      lottie.play();
-      setPhase('plugging');
+      const lottie = lottieRef.current;
+      if (lottie) {
+        lottie.play();
+        setPhase('plugging');
+      }
     }, 400);
   };
 
-  const onDataReady = () => initAnimation();
-  const onConfigReady = () => {
-    // Fallback: a veces con autoplay=false onDataReady no se llama; onConfigReady sí
-    setTimeout(() => initAnimation(), 0);
-  };
-
-  // Fallback por si onDataReady/onConfigReady no disparan: reintentar con el ref cada 300ms hasta 1.5s
-  useEffect(() => {
-    if (!animationData) return;
-    let attempts = 0;
-    const id = setInterval(() => {
-      attempts++;
-      initAnimation();
-      if (initDoneRef.current || attempts >= 5) clearInterval(id);
-    }, 300);
-    return () => clearInterval(id);
-  }, [animationData]);
-
-  useEffect(() => () => {
-    if (startTimeoutRef.current) clearTimeout(startTimeoutRef.current);
-  }, []);
+  const onDataReady = () => startPlay();
 
   const handleComplete = () => {
     setPhase('plugged');
     onPluggedRef.current();
   };
+
+  useEffect(() => () => {
+    if (startTimeoutRef.current) clearTimeout(startTimeoutRef.current);
+  }, []);
+
+  // Fallback si onDataReady no se llama (p. ej. con autoplay=false en algunos entornos)
+  useEffect(() => {
+    if (!animationData) return;
+    const t = setTimeout(() => {
+      if (phase === 'loading' && lottieRef.current) startPlay();
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [animationData, phase]);
 
   if (!animationData) {
     return (
@@ -95,16 +78,12 @@ function PlugIllustration({ onPlugged }: { onPlugged: () => void }) {
 
   return (
     <div className="bg-white rounded-2xl p-6 flex flex-col items-center border border-gray-100">
-      <div
-        className={`w-28 h-28 flex items-center justify-center transition-opacity duration-200 ${readyToShow ? 'opacity-100' : 'opacity-0'}`}
-        style={{ minHeight: 120 }}
-      >
+      <div className="w-28 h-28 flex items-center justify-center" style={{ minHeight: 120 }}>
         <Lottie
           lottieRef={lottieRef}
           animationData={animationData}
           loop={false}
           autoplay={false}
-          onConfigReady={onConfigReady}
           onDataReady={onDataReady}
           onComplete={handleComplete}
           style={{ width: 120, height: 120 }}
