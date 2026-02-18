@@ -10,7 +10,7 @@ const BRAND = '#26606b';
 const DURATION_MS = 11000;
 const SIZE = 280;
 const STROKE = 8;
-const R = (SIZE - STROKE) / 2;
+const R = (SIZE - STROKE) / 2; // radio del path (centro del trazo)
 const CX = SIZE / 2;
 const CY = SIZE / 2;
 const CIRCUMFERENCE = 2 * Math.PI * R;
@@ -59,11 +59,12 @@ export function EnergySavingsLoader() {
         aria-valuemin={0}
         aria-valuemax={100}
       >
-        {/* Círculo de progreso en verde (contorno que se va rellenando) */}
+        {/* Círculo de progreso: fondo gris y arco verde que crece con progress */}
         <svg
-          className="absolute inset-0 -rotate-90"
+          className="absolute inset-0"
           width={SIZE}
           height={SIZE}
+          style={{ transform: 'rotate(-90deg)' }}
           aria-hidden
         >
           <circle
@@ -71,7 +72,7 @@ export function EnergySavingsLoader() {
             cy={CY}
             r={R}
             fill="none"
-            stroke="var(--gray-200, #e5e7eb)"
+            stroke="#e5e7eb"
             strokeWidth={STROKE}
           />
           <circle
@@ -82,9 +83,11 @@ export function EnergySavingsLoader() {
             stroke="#059669"
             strokeWidth={STROKE}
             strokeLinecap="round"
-            strokeDasharray={CIRCUMFERENCE}
-            strokeDashoffset={strokeDashoffset}
-            className="transition-[stroke-dashoffset] duration-300 ease-out"
+            strokeDasharray={`${CIRCUMFERENCE} ${CIRCUMFERENCE}`}
+            style={{
+              strokeDashoffset: strokeDashoffset,
+              transition: 'stroke-dashoffset 150ms ease-out',
+            }}
           />
         </svg>
 
