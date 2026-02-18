@@ -11,40 +11,47 @@ const LEGAL_TEXT = 'Cálculo estimado basado en los datos de tu factura.';
 
 type PlugPhase = 'unplugged' | 'plugging' | 'plugged';
 
-/** Ilustración enchufe/socket: primero desenchufado, luego animación de enchufar, al terminar se muestra el ahorro. Fondo blanco. */
+/**
+ * Ilustración enchufe/socket: desenchufado → animación de enchufar → al terminar onPlugged().
+ * Puedes sustituir los SVG por tus propios assets (socket + plug por separado) para la animación.
+ */
 function PlugIllustration({ onPlugged }: { onPlugged: () => void }) {
   const [phase, setPhase] = useState<PlugPhase>('unplugged');
   const onPluggedRef = useRef(onPlugged);
   onPluggedRef.current = onPlugged;
 
   useEffect(() => {
-    const t1 = setTimeout(() => setPhase('plugging'), 500);
-    const t2 = setTimeout(() => {
+    const startPlugging = setTimeout(() => setPhase('plugging'), 600);
+    const finishPlugged = setTimeout(() => {
       setPhase('plugged');
       onPluggedRef.current();
-    }, 500 + 900);
+    }, 600 + 1000);
     return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
+      clearTimeout(startPlugging);
+      clearTimeout(finishPlugged);
     };
   }, []);
 
-  const plugOffsetPx = phase === 'unplugged' ? 44 : 0;
+  // Desplazamiento del plug: desenchufado = +72px a la derecha; enchufando/plugged = 0 (encajado)
+  const plugTranslateX = phase === 'unplugged' ? 72 : 0;
 
   return (
     <div className="bg-white rounded-2xl p-6 flex flex-col items-center border border-gray-100">
-      <div className="relative flex items-center justify-center h-28 w-56">
-        {/* Socket (hembra): a la izquierda, estilo tipo foto */}
-        <svg className="absolute left-2 w-24 h-24 shrink-0" viewBox="0 0 96 96" fill="none" aria-hidden>
+      <div className="relative flex items-center justify-center h-28 w-64 overflow-visible">
+        {/* Socket (hembra) - fijo a la izquierda */}
+        <svg className="absolute left-0 w-24 h-24 shrink-0" viewBox="0 0 96 96" fill="none" aria-hidden>
           <rect x="12" y="32" width="48" height="40" rx="8" fill="#f8fafc" stroke="#94a3b8" strokeWidth="2" />
           <circle cx="28" cy="52" r="5" fill="#64748b" />
           <circle cx="44" cy="52" r="5" fill="#64748b" />
           <path d="M34 32 v-10 M46 32 v-10" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" />
         </svg>
-        {/* Plug (macho): empieza separado y se desplaza hacia el socket */}
+        {/* Plug (macho) - se mueve de derecha (desenchufado) a izquierda (enchufado) */}
         <svg
-          className="absolute right-2 w-24 h-24 shrink-0 transition-transform duration-700 ease-out"
-          style={{ transform: `translateX(-${plugOffsetPx}px)` }}
+          className="absolute right-0 w-24 h-24 shrink-0"
+          style={{
+            transform: `translateX(-${plugTranslateX}px)`,
+            transition: 'transform 1s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+          }}
           viewBox="0 0 96 96"
           fill="none"
           aria-hidden
@@ -54,7 +61,7 @@ function PlugIllustration({ onPlugged }: { onPlugged: () => void }) {
           <rect x="52" y="10" width="8" height="26" rx="2" fill="#eab308" stroke="#ca8a04" strokeWidth="1" />
         </svg>
       </div>
-      <p className="text-xs text-muted-foreground mt-3">
+      <p className="text-sm text-muted-foreground mt-3 font-medium">
         {phase === 'unplugged' && 'Desenchufado'}
         {phase === 'plugging' && 'Enchufando…'}
         {phase === 'plugged' && 'Enchufado al ahorro'}

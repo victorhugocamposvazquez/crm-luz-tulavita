@@ -304,7 +304,7 @@ export default function AhorroLuz() {
     const sinFactura = answers.tiene_factura === 'no';
     const showEnergyFlow = !sinFactura && lastLeadId && lastFacturaPath;
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-white">
+      <div className="min-h-screen flex flex-col bg-white">
         <header className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 pt-6 pb-4 sm:pt-7 sm:pb-5 bg-white/80 backdrop-blur-sm border-b border-gray-200/50">
           <div className="flex items-center justify-center min-w-[3rem] sm:min-w-[3.5rem]">
             <img src="/logo-tulavita.png" alt="Tulavita" className="h-14 w-14 sm:h-16 sm:w-16 object-contain" />
@@ -314,41 +314,43 @@ export default function AhorroLuz() {
           </h1>
           <div className="min-w-[3rem] sm:min-w-[3.5rem]" aria-hidden />
         </header>
-        <div className="max-w-lg w-full text-center animate-in fade-in duration-500">
-          <h2 className="text-2xl sm:text-3xl font-semibold mb-4" style={{ color: BRAND_COLOR }}>
-            ¡Gracias!
-          </h2>
-          <p className="text-lg text-gray-600 mb-6">
-            Hemos recibido tu información
-          </p>
-          {showEnergyFlow ? (
-            <EnergySavingsFlow
-              leadId={lastLeadId}
-              attachmentPath={lastFacturaPath}
-              onReset={handleReset}
-            />
-          ) : sinFactura ? (
-            <>
-              <p className="text-xl sm:text-2xl font-bold mb-6" style={{ color: BRAND_COLOR }}>
-                ¿Sabías que cerca del 99% de las facturas que recibimos les mejoramos el precio? Seguro que la tuya también! 💪
-              </p>
-              <p className="text-lg text-gray-600 mb-8">
-                Un asesor te contactará pronto para ponernos manos a la obra
-              </p>
-              <button onClick={handleReset} className="text-lg font-medium hover:underline" style={{ color: BRAND_COLOR }}>
-                Enviar otra solicitud
-              </button>
-            </>
-          ) : (
-            <>
-              <p className="text-lg text-gray-600 mb-8">
-                Un asesor te contactará en las próximas horas para ayudarte a ahorrar en tu factura.
-              </p>
-              <button onClick={handleReset} className="text-lg font-medium hover:underline" style={{ color: BRAND_COLOR }}>
-                Enviar otra solicitud
-              </button>
-            </>
-          )}
+        <div className="flex-1 overflow-y-auto pt-24 pb-8 px-4 sm:px-6">
+          <div className="max-w-lg w-full mx-auto text-center animate-in fade-in duration-500 space-y-6">
+            <h2 className="text-2xl sm:text-3xl font-semibold" style={{ color: BRAND_COLOR }}>
+              ¡Gracias!
+            </h2>
+            <p className="text-lg text-gray-600">
+              Hemos recibido tu información
+            </p>
+            {showEnergyFlow ? (
+              <EnergySavingsFlow
+                leadId={lastLeadId}
+                attachmentPath={lastFacturaPath}
+                onReset={handleReset}
+              />
+            ) : sinFactura ? (
+              <>
+                <p className="text-xl sm:text-2xl font-bold" style={{ color: BRAND_COLOR }}>
+                  ¿Sabías que cerca del 99% de las facturas que recibimos les mejoramos el precio? Seguro que la tuya también! 💪
+                </p>
+                <p className="text-lg text-gray-600">
+                  Un asesor te contactará pronto para ponernos manos a la obra
+                </p>
+                <button onClick={handleReset} className="text-lg font-medium hover:underline" style={{ color: BRAND_COLOR }}>
+                  Enviar otra solicitud
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-lg text-gray-600">
+                  Un asesor te contactará en las próximas horas para ayudarte a ahorrar en tu factura.
+                </p>
+                <button onClick={handleReset} className="text-lg font-medium hover:underline" style={{ color: BRAND_COLOR }}>
+                  Enviar otra solicitud
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
     );

@@ -59,7 +59,7 @@ export function EnergySavingsLoader() {
         aria-valuemin={0}
         aria-valuemax={100}
       >
-        {/* Círculo de progreso: fondo gris y arco verde que crece con progress */}
+        {/* Círculo de progreso: un solo arco verde que crece de 0% a 100% según progress */}
         <svg
           className="absolute inset-0"
           width={SIZE}
@@ -83,10 +83,10 @@ export function EnergySavingsLoader() {
             stroke="#059669"
             strokeWidth={STROKE}
             strokeLinecap="round"
-            strokeDasharray={`${CIRCUMFERENCE} ${CIRCUMFERENCE}`}
+            strokeDasharray={CIRCUMFERENCE}
             style={{
-              strokeDashoffset: strokeDashoffset,
-              transition: 'stroke-dashoffset 150ms ease-out',
+              strokeDashoffset,
+              transition: 'stroke-dashoffset 80ms linear',
             }}
           />
         </svg>
