@@ -11,13 +11,11 @@ const NEUTRAL_PERCENT_MAX = 10;
 const LEGAL_TEXT = 'Cálculo estimado basado en los datos de tu factura.';
 
 const ENCHUFE_ANIMATION_URL = '/animations/enchufe.json';
-/** Frame desenchufado (inicio). */
-const ENCHUFE_FRAME_UNPLUGGED = 102;
-/** Frame enchufado (final). */
-const ENCHUFE_FRAME_PLUGGED = 131;
+/** Frame desenchufado (inicio). Referencia: dotLottie Player (ThorVG); en lottie-web puede variar ligeramente. */
+const ENCHUFE_FRAME_UNPLUGGED = 148;
 
 /**
- * Animación Lottie del enchufe. Empieza en 102 (desenchufado), reproduce hasta 131 (enchufado), luego onPlugged().
+ * Animación Lottie del enchufe. Empieza en 148 (desenchufado), reproduce en reversa hasta 0 (enchufado), luego onPlugged().
  */
 function PlugIllustration({ onPlugged }: { onPlugged: () => void }) {
   const [animationData, setAnimationData] = useState<object | null>(null);
@@ -44,12 +42,13 @@ function PlugIllustration({ onPlugged }: { onPlugged: () => void }) {
   const onDataReady = () => {
     const lottie = lottieRef.current;
     if (!lottie) return;
-    // Mostrar primero desenchufado (frame 102)
+    // Mostrar primero desenchufado (frame 148)
     lottie.goToAndStop(ENCHUFE_FRAME_UNPLUGGED, true);
     setPhase('unplugged');
     startTimeoutRef.current = setTimeout(() => {
-      // Reproducir 102 → 131 (desenchufado → enchufado)
-      lottie.playSegments([[ENCHUFE_FRAME_UNPLUGGED, ENCHUFE_FRAME_PLUGGED]], true);
+      // Reproducir en reversa: 148 → 0 (desenchufado → enchufado)
+      lottie.setDirection(-1);
+      lottie.play();
       setPhase('plugging');
     }, 400);
   };

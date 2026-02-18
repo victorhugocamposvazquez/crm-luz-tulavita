@@ -16,6 +16,8 @@ import { validateAttachmentPath } from '../server-lib/invoice/validate-path.js';
 const BUCKET = 'lead-attachments';
 /** Document AI puede tardar 15-30s en PDFs/imágenes. En Vercel Hobby el límite es 10s; en Pro, 60s. */
 const TIMEOUT_MS = 30000;
+/** Desactivado por ahora; reactivar poniendo true. */
+const RATE_LIMIT_ENABLED = false;
 const RATE_LIMIT_LEAD_PER_HOUR = 3;
 const RATE_LIMIT_IP_PER_HOUR = 20;
 const RATE_LIMIT_WINDOW_HOURS = 1;
@@ -107,44 +109,46 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     ? Math.min(12, Math.max(1, Math.floor(Number(manual_extraction!.period_months)) || 1))
     : undefined;
 
-  const clientIp = getClientIp(req);
-  const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_HOURS * 60 * 60 * 1000).toISOString();
+  if (RATE_LIMIT_ENABLED) {
+    const clientIp = getClientIp(req);
+    const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_HOURS * 60 * 60 * 1000).toISOString();
 
-  const { count: leadCount } = await supabase
-    .from('energy_comparisons')
-    .select('*', { count: 'exact', head: true })
-    .eq('lead_id', lead_id)
-    .gte('created_at', windowStart);
+    const { count: leadCount } = await supabase
+      .from('energy_comparisons')
+      .select('*', { count: 'exact', head: true })
+      .eq('lead_id', lead_id)
+      .gte('created_at', windowStart);
 
-  if ((leadCount ?? 0) >= RATE_LIMIT_LEAD_PER_HOUR) {
-    cors();
-    res.status(429).json({
-      error: 'Demasiadas solicitudes para este lead. Intenta de nuevo más tarde.',
-      code: 'RATE_LIMIT_LEAD',
-    });
-    return;
+    if ((leadCount ?? 0) >= RATE_LIMIT_LEAD_PER_HOUR) {
+      cors();
+      res.status(429).json({
+        error: 'Demasiadas solicitudes para este lead. Intenta de nuevo más tarde.',
+        code: 'RATE_LIMIT_LEAD',
+      });
+      return;
+    }
+
+    const { count: ipCount } = await supabase
+      .from('process_invoice_rate_log')
+      .select('*', { count: 'exact', head: true })
+      .eq('ip', clientIp)
+      .gte('created_at', windowStart);
+
+    if ((ipCount ?? 0) >= RATE_LIMIT_IP_PER_HOUR) {
+      cors();
+      res.status(429).json({
+        error: 'Demasiadas solicitudes. Intenta de nuevo más tarde.',
+        code: 'RATE_LIMIT_IP',
+      });
+      return;
+    }
+
+    await supabase.from('process_invoice_rate_log').insert({ ip: clientIp });
+    await supabase
+      .from('process_invoice_rate_log')
+      .delete()
+      .lt('created_at', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString());
   }
-
-  const { count: ipCount } = await supabase
-    .from('process_invoice_rate_log')
-    .select('*', { count: 'exact', head: true })
-    .eq('ip', clientIp)
-    .gte('created_at', windowStart);
-
-  if ((ipCount ?? 0) >= RATE_LIMIT_IP_PER_HOUR) {
-    cors();
-    res.status(429).json({
-      error: 'Demasiadas solicitudes. Intenta de nuevo más tarde.',
-      code: 'RATE_LIMIT_IP',
-    });
-    return;
-  }
-
-  await supabase.from('process_invoice_rate_log').insert({ ip: clientIp });
-  await supabase
-    .from('process_invoice_rate_log')
-    .delete()
-    .lt('created_at', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString());
 
   /** Plan B: comparación solo con datos manuales (sin procesar archivo). */
   if (useManual) {
