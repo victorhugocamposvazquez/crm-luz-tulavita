@@ -319,9 +319,6 @@ export default function AhorroLuz() {
             <h2 className="text-2xl sm:text-3xl font-semibold" style={{ color: BRAND_COLOR }}>
               ¡Gracias!
             </h2>
-            <p className="text-lg text-gray-600">
-              Hemos recibido tu información
-            </p>
             {showEnergyFlow ? (
               <EnergySavingsFlow
                 leadId={lastLeadId}

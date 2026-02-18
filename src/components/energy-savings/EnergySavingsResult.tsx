@@ -12,10 +12,13 @@ const LEGAL_TEXT = 'Cálculo estimado basado en los datos de tu factura.';
 
 const ENCHUFE_ANIMATION_URL = '/animations/enchufe.json';
 const ENCHUFE_TOTAL_FRAMES = 180;
+/** Frame donde empieza (estado inicial). */
+const ENCHUFE_FRAME_START = 131;
+/** Frame donde acaba y se para (desenchufado). */
+const ENCHUFE_FRAME_END = 102;
 
 /**
- * Animación Lottie del enchufe. El JSON original empieza enchufado; la reproducimos al revés
- * para mostrar primero desenchufado y al final enchufado, luego onPlugged().
+ * Animación Lottie del enchufe. Empieza en 131, hace todo el bucle (131 → 180 → 0 → 102) y para en 102, luego onPlugged().
  */
 function PlugIllustration({ onPlugged }: { onPlugged: () => void }) {
   const [animationData, setAnimationData] = useState<object | null>(null);
@@ -42,12 +45,12 @@ function PlugIllustration({ onPlugged }: { onPlugged: () => void }) {
   const onDataReady = () => {
     const lottie = lottieRef.current;
     if (!lottie) return;
-    // Empezar en el último frame (desenchufado), luego reproducir en reversa hasta enchufado
-    lottie.goToAndStop(ENCHUFE_TOTAL_FRAMES, true);
+    // Mostrar primero el frame inicial (131)
+    lottie.goToAndStop(ENCHUFE_FRAME_START, true);
     setPhase('unplugged');
     startTimeoutRef.current = setTimeout(() => {
-      lottie.setDirection(-1);
-      lottie.play();
+      // Bucle completo: 131 → 180, luego 0 → 102, y parar
+      lottie.playSegments([[ENCHUFE_FRAME_START, ENCHUFE_TOTAL_FRAMES], [0, ENCHUFE_FRAME_END]], true);
       setPhase('plugging');
     }, 400);
   };
@@ -124,16 +127,21 @@ export function EnergySavingsResult({ data }: { data: EnergyComparisonData }) {
     <div className="space-y-4 bg-white rounded-xl p-4 sm:p-6">
       {showExact && (
         <div className="space-y-4">
-          {/* 1. Al enchufar aparece primero el texto de ahorro (arriba) */}
+          {/* 1. Al enchufar aparece el texto de ahorro y debajo el legal */}
           {showSavingsText && (
-            <p
-              className="text-3xl sm:text-4xl font-semibold text-emerald-600 text-center animate-in fade-in duration-500 zoom-in-95"
-              style={{
-                textShadow: '0 0 20px rgba(5, 150, 105, 0.5), 0 0 40px rgba(5, 150, 105, 0.25)',
-              }}
-            >
-              Podrías ahorrar hasta un <strong className="font-bold">{percent}%</strong>
-            </p>
+            <div className="space-y-2 text-center w-full min-w-0">
+              <div className="overflow-x-auto flex justify-center">
+                <p
+                  className="text-3xl sm:text-4xl font-semibold text-emerald-600 animate-in fade-in duration-500 zoom-in-95 whitespace-nowrap"
+                  style={{
+                    textShadow: '0 0 20px rgba(5, 150, 105, 0.5), 0 0 40px rgba(5, 150, 105, 0.25)',
+                  }}
+                >
+                  Podrías ahorrar hasta un <strong className="font-bold">{percent}%</strong>
+                </p>
+              </div>
+              <p className="text-sm text-gray-500">{LEGAL_TEXT}</p>
+            </div>
           )}
           {/* 2. Ilustración: primero desenchufado → efecto de enchufar → al enchufar se muestra el texto de arriba; debajo queda el enchufe y "Enchufado al ahorro" */}
           <PlugIllustration onPlugged={() => setShowSavingsText(true)} />
@@ -154,7 +162,7 @@ export function EnergySavingsResult({ data }: { data: EnergyComparisonData }) {
           Hemos revisado tu factura. Un asesor te contactará para comentar las mejores opciones.
         </p>
       )}
-      <p className="text-sm text-gray-500">{LEGAL_TEXT}</p>
+      {!showExact && <p className="text-sm text-gray-500">{LEGAL_TEXT}</p>}
     </div>
   );
 }
