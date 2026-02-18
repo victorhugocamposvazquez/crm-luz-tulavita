@@ -20,6 +20,8 @@ const ENCHUFE_FRAME_UNPLUGGED = 148;
 function PlugIllustration({ onPlugged }: { onPlugged: () => void }) {
   const [animationData, setAnimationData] = useState<object | null>(null);
   const [phase, setPhase] = useState<'loading' | 'unplugged' | 'plugging' | 'plugged'>('loading');
+  /** No mostrar la Lottie hasta haber ido al frame desenchufado, así no se ve el frame 0 (enchufado). */
+  const [readyToShow, setReadyToShow] = useState(false);
   const onPluggedRef = useRef(onPlugged);
   onPluggedRef.current = onPlugged;
   const lottieRef = useRef<LottieRef['current']>(null);
@@ -42,8 +44,9 @@ function PlugIllustration({ onPlugged }: { onPlugged: () => void }) {
   const onDataReady = () => {
     const lottie = lottieRef.current;
     if (!lottie) return;
-    // Mostrar primero desenchufado (frame 148)
+    // Ir al frame desenchufado antes de mostrar (evita flash del frame 0)
     lottie.goToAndStop(ENCHUFE_FRAME_UNPLUGGED, true);
+    setReadyToShow(true);
     setPhase('unplugged');
     startTimeoutRef.current = setTimeout(() => {
       // Reproducir en reversa: 148 → 0 (desenchufado → enchufado)
@@ -72,11 +75,15 @@ function PlugIllustration({ onPlugged }: { onPlugged: () => void }) {
 
   return (
     <div className="bg-white rounded-2xl p-6 flex flex-col items-center border border-gray-100">
-      <div className="w-28 h-28 flex items-center justify-center">
+      <div
+        className={`w-28 h-28 flex items-center justify-center transition-opacity duration-200 ${readyToShow ? 'opacity-100' : 'opacity-0'}`}
+        style={{ minHeight: 120 }}
+      >
         <Lottie
           lottieRef={lottieRef}
           animationData={animationData}
           loop={false}
+          autoplay={false}
           onDataReady={onDataReady}
           onComplete={handleComplete}
           style={{ width: 120, height: 120 }}
