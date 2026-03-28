@@ -12,10 +12,10 @@ import { createClient } from '@supabase/supabase-js';
 import { extractInvoiceFromBuffer } from '../server-lib/invoice/pipeline.js';
 import { getActiveOffers, runComparison, getComparisonFailureReason } from '../server-lib/energy/calculation.js';
 import { validateAttachmentPath } from '../server-lib/invoice/validate-path.js';
+import { emptyExtraction } from '../server-lib/invoice/types.js';
 
 const BUCKET = 'lead-attachments';
-/** Document AI puede tardar 15-30s en PDFs/imágenes. En Vercel Hobby el límite es 10s; en Pro, 60s. */
-const TIMEOUT_MS = 30000;
+const TIMEOUT_MS = 55000;
 const RATE_LIMIT_ENABLED = true;
 const RATE_LIMIT_LEAD_PER_HOUR = 3;
 const RATE_LIMIT_IP_PER_HOUR = 20;
@@ -154,14 +154,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     try {
       const offers = await getActiveOffers(supabase);
       const extraction = {
+        ...emptyExtraction(),
         company_name: manual_extraction!.company_name ?? null,
         consumption_kwh: manual_extraction!.consumption_kwh!,
         total_factura: manual_extraction!.total_factura!,
-        period_start: null,
-        period_end: null,
-        period_months,
+        period_months: period_months ?? 1,
         confidence: 0.9,
-        raw_text: undefined,
       };
       const result = runComparison(extraction, offers);
       const row = {
@@ -216,7 +214,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const mimeType = fileData.type || (attachment_path.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
 
       const extraction = await extractInvoiceFromBuffer(buffer, mimeType);
-      console.log('[DEBUG-INVOICE] extraction before runComparison', { consumption_kwh: extraction.consumption_kwh, total_factura: extraction.total_factura, company_name: extraction.company_name ? 'set' : null });
       const offers = await getActiveOffers(supabase);
       const result = runComparison(extraction, offers);
 
@@ -238,6 +235,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           consumption_kwh: extraction.consumption_kwh,
           total_factura: extraction.total_factura,
           period_months: extraction.period_months,
+          potencia_contratada_kw: extraction.potencia_contratada_kw,
+          potencia_p1_kw: extraction.potencia_p1_kw,
+          potencia_p2_kw: extraction.potencia_p2_kw,
+          precio_energia_kwh: extraction.precio_energia_kwh,
+          precio_p1_kwh: extraction.precio_p1_kwh,
+          precio_p2_kwh: extraction.precio_p2_kwh,
+          tipo_tarifa: extraction.tipo_tarifa,
+          cups: extraction.cups,
+          titular: extraction.titular,
         },
         error_message: result ? null : getComparisonFailureReason(extraction, offers),
       };

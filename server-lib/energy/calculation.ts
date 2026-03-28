@@ -1,10 +1,10 @@
 /**
  * Cálculo de ahorro: ofertas activas, coste oferta, mejor oferta, validaciones.
+ * Usa potencia real extraída de la factura cuando está disponible.
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { InvoiceExtraction } from '../invoice/types.js';
-import { normalizeCompanyName } from '../invoice/extract-fields.js';
 
 export interface EnergyOffer {
   id: string;
@@ -31,7 +31,6 @@ const PRUDENT_MIN_PERCENT = 8;
 const MIN_CONSUMPTION_KWH = 50;
 const MAX_CONSUMPTION_KWH = 5000;
 const MIN_OCR_CONFIDENCE = 0.8;
-/** Potencia contratada por defecto (kW) cuando no viene en factura, para calcular término potencia con P1/P2. */
 const DEFAULT_POWER_KW = 4.6;
 const DAYS_PER_MONTH = 30;
 
@@ -53,25 +52,34 @@ export async function getActiveOffers(supabase: SupabaseClient): Promise<EnergyO
 }
 
 /**
- * Coste mensual de una oferta para un consumo dado (kWh/mes).
- * - Término energía: consumo (kWh) × precio consumo (€/kWh).
- * - Término potencia: si la oferta tiene P1 y P2 (€/kW día), se usa potencia por defecto y 30 días;
- *   si no, se usa el coste fijo mensual (monthly_fixed_cost).
+ * Coste mensual de una oferta.
+ * - Término energía: consumo × precio.
+ * - Término potencia: usa la potencia real de la factura si se proporciona;
+ *   si no, usa DEFAULT_POWER_KW.
  */
-export function monthlyCost(consumptionKwh: number, offer: EnergyOffer): number {
+export function monthlyCost(
+  consumptionKwh: number,
+  offer: EnergyOffer,
+  powerKw?: number | null
+): number {
   const terminoEnergia = consumptionKwh * offer.price_per_kwh;
   const p1 = offer.p1 ?? null;
   const p2 = offer.p2 ?? null;
+  const power = powerKw ?? DEFAULT_POWER_KW;
   const terminoPotencia =
     p1 != null && p2 != null
-      ? DEFAULT_POWER_KW * DAYS_PER_MONTH * ((p1 + p2) / 2)
+      ? power * DAYS_PER_MONTH * ((p1 + p2) / 2)
       : offer.monthly_fixed_cost;
   return terminoEnergia + terminoPotencia;
 }
 
-/**
- * Mensaje de error cuando la comparación no puede realizarse (para mostrar al usuario).
- */
+export function normalizeCompanyName(name: string): string {
+  return name
+    .replace(/,?\s*(S\.?L\.?U?\.?|S\.?A\.?|S\.?L\.?|S\.?Coop\.?)$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export function getComparisonFailureReason(
   extraction: InvoiceExtraction,
   offers: EnergyOffer[]
@@ -98,7 +106,9 @@ export function getComparisonFailureReason(
 }
 
 /**
- * Normaliza factura a coste mensual y obtiene ofertas comparables (excluyendo misma comercializadora).
+ * Normaliza factura a coste mensual y obtiene ofertas comparables.
+ * Usa potencia real de la factura (potencia_contratada_kw o media de P1/P2)
+ * en vez de asumir un valor por defecto.
  */
 export function runComparison(
   extraction: InvoiceExtraction,
@@ -116,6 +126,11 @@ export function runComparison(
   const currentMonthlyCost = totalFactura / periodMonths;
   const consumptionMonthly = consumption / periodMonths;
 
+  const extractedPower = extraction.potencia_contratada_kw
+    ?? (extraction.potencia_p1_kw != null && extraction.potencia_p2_kw != null
+      ? (extraction.potencia_p1_kw + extraction.potencia_p2_kw) / 2
+      : null);
+
   const comparable = offers.filter((o) => {
     const name = o.company_name.trim().toLowerCase();
     const current = (currentCompany || '').trim().toLowerCase();
@@ -125,9 +140,9 @@ export function runComparison(
   if (comparable.length === 0) return null;
 
   let best = comparable[0];
-  let bestCost = monthlyCost(consumptionMonthly, best);
+  let bestCost = monthlyCost(consumptionMonthly, best, extractedPower);
   for (let i = 1; i < comparable.length; i++) {
-    const cost = monthlyCost(consumptionMonthly, comparable[i]);
+    const cost = monthlyCost(consumptionMonthly, comparable[i], extractedPower);
     if (cost < bestCost) {
       bestCost = cost;
       best = comparable[i];

@@ -1,69 +1,50 @@
 /**
- * Pipeline: obtener archivo → Document AI Invoice Parser (entidades + texto) → extraer campos.
- * Combina entidades del Invoice Parser (total, supplier) con extracción por regex sobre el texto
- * (consumo kWh, periodo) para facturas de luz con distintos formatos.
+ * Pipeline de extracción de facturas energéticas.
+ *
+ * Flujo: archivo (PDF/imagen) → GPT-4o via Responses API → JSON estructurado.
+ * La Responses API acepta PDFs nativamente (extrae texto + renderiza páginas),
+ * eliminando la necesidad de conversión previa a imágenes.
  */
 
 import type { InvoiceExtraction } from './types.js';
-import { runDocumentAiInvoiceParser } from './document-ai.js';
-import { extractFieldsFromText, normalizeCompanyName } from './extract-fields.js';
+import { emptyExtraction } from './types.js';
+import { extractWithLLM } from './llm-extract.js';
 
-const MIN_TEXT_LENGTH = 30;
 const IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20 MB
 
 export async function extractInvoiceFromBuffer(
   buffer: Buffer,
   mimeType: string
-): Promise<InvoiceExtraction & { raw_text?: string }> {
+): Promise<InvoiceExtraction> {
   const isPdf = mimeType === 'application/pdf';
   const isImage = IMAGE_MIMES.has(mimeType);
 
   if (!isPdf && !isImage) {
-    return {
-      company_name: null,
-      consumption_kwh: null,
-      total_factura: null,
-      period_start: null,
-      period_end: null,
-      period_months: 1,
-      confidence: 0,
-    };
+    console.warn('[pipeline] Unsupported mime:', mimeType);
+    return emptyExtraction();
   }
 
-  const result = await runDocumentAiInvoiceParser(buffer, mimeType);
-  if (!result || !result.text || result.text.length < MIN_TEXT_LENGTH) {
-    console.log('[DEBUG-INVOICE] pipeline early return', { hasResult: !!result, textLen: result?.text?.length ?? 0 });
-    return {
-      company_name: null,
-      consumption_kwh: null,
-      total_factura: null,
-      period_start: null,
-      period_end: null,
-      period_months: 1,
-      confidence: 0,
-      raw_text: result?.text?.slice(0, 500) || undefined,
-    };
+  if (buffer.length > MAX_FILE_SIZE) {
+    console.warn('[pipeline] File too large:', buffer.length);
+    return emptyExtraction();
   }
 
-  const fromText = extractFieldsFromText(result.text);
-  const entities = result.entities;
+  if (buffer.length === 0) {
+    console.warn('[pipeline] Empty buffer');
+    return emptyExtraction();
+  }
 
-  const company_name =
-    entities.company_name != null && entities.company_name.trim() !== ''
-      ? normalizeCompanyName(entities.company_name)
-      : fromText.company_name;
+  try {
+    const extraction = await extractWithLLM(buffer, mimeType);
 
-  const total_factura = entities.total_factura ?? fromText.total_factura;
-  const consumption_kwh = entities.consumption_kwh ?? fromText.consumption_kwh;
-  console.log('[DEBUG-INVOICE] pipeline merge', { fromText_total: fromText.total_factura, fromText_consumption: fromText.consumption_kwh, entity_total: entities.total_factura, entity_consumption: entities.consumption_kwh, final_total_factura: total_factura, final_consumption_kwh: consumption_kwh });
-  return {
-    company_name,
-    consumption_kwh,
-    total_factura,
-    period_start: fromText.period_start,
-    period_end: fromText.period_end,
-    period_months: fromText.period_months,
-    confidence: result.confidence,
-    raw_text: fromText.raw_text,
-  };
+    if (!extraction.consumption_kwh && !extraction.total_factura) {
+      console.warn('[pipeline] LLM returned no consumption and no total — possible non-energy document');
+    }
+
+    return extraction;
+  } catch (err) {
+    console.error('[pipeline] Extraction failed:', err instanceof Error ? err.message : err);
+    return emptyExtraction();
+  }
 }
