@@ -467,55 +467,51 @@ function ComparisonView({
 
   return (
     <div className="space-y-4">
-      {thumbnail && (
-        <Card>
-          <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2"><ImageIcon className="h-4 w-4" />Factura subida</CardTitle></CardHeader>
-          <CardContent>
-            <img
-              src={thumbnail} alt="Factura"
-              className="max-h-48 rounded-lg border object-contain cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={() => setThumbOpen(true)}
-            />
-            <Dialog open={thumbOpen} onOpenChange={setThumbOpen}>
-              <DialogContent className="max-w-3xl p-2">
-                <img src={thumbnail} alt="Factura" className="w-full rounded-lg object-contain max-h-[80vh]" />
-              </DialogContent>
-            </Dialog>
-          </CardContent>
-        </Card>
-      )}
-
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-xs text-muted-foreground mb-1">Coste actual mensual</p>
-            <p className="text-2xl font-bold">{currentMonthlyCost.toFixed(2)} €</p>
-            <p className="text-xs text-muted-foreground mt-1">{currentCompany ?? 'No identificada'}</p>
-          </CardContent>
-        </Card>
-        {best && (
-          <Card className="border-emerald-200 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-950/20">
-            <CardContent className="pt-6">
-              <p className="text-xs text-muted-foreground mb-1">Mejor oferta</p>
-              <p className="text-2xl font-bold text-emerald-600">{best.monthlyCost.toFixed(2)} €</p>
-              <p className="text-xs text-muted-foreground mt-1">{best.company_name}</p>
-            </CardContent>
-          </Card>
-        )}
-        {best && savingsAmount > 0 && (
-          <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20">
-            <CardContent className="pt-6">
-              <p className="text-xs text-muted-foreground mb-1">Ahorro estimado</p>
-              <p className="text-2xl font-bold text-blue-600">{savingsAmount.toFixed(2)} €/mes</p>
-              <div className="flex items-center gap-1.5 mt-1">
-                <TrendingDown className="h-3 w-3 text-emerald-500" />
-                <span className="text-xs font-medium text-emerald-600">{savingsPercent.toFixed(1)}%</span>
-                {savingsPercent > 45 && <Badge variant="secondary" className="text-[10px] px-1.5 py-0"><AlertTriangle className="h-2.5 w-2.5 mr-0.5" />Prudente</Badge>}
+      <Card>
+        <CardContent className="pt-6 space-y-4">
+          <div className="flex flex-col sm:flex-row gap-4">
+            {thumbnail && (
+              <div className="shrink-0">
+                <img
+                  src={thumbnail} alt="Factura"
+                  className="h-32 rounded-lg border object-contain cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => setThumbOpen(true)}
+                />
+                <Dialog open={thumbOpen} onOpenChange={setThumbOpen}>
+                  <DialogContent className="max-w-3xl p-2">
+                    <img src={thumbnail} alt="Factura" className="w-full rounded-lg object-contain max-h-[80vh]" />
+                  </DialogContent>
+                </Dialog>
               </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+            )}
+            <div className="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="rounded-lg border p-4">
+                <p className="text-xs text-muted-foreground mb-1">Coste actual mensual</p>
+                <p className="text-2xl font-bold">{currentMonthlyCost.toFixed(2)} €</p>
+                <p className="text-xs text-muted-foreground mt-1">{currentCompany ?? 'No identificada'}</p>
+              </div>
+              {best && (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-950/20 p-4">
+                  <p className="text-xs text-muted-foreground mb-1">Mejor oferta</p>
+                  <p className="text-2xl font-bold text-emerald-600">{best.monthlyCost.toFixed(2)} €</p>
+                  <p className="text-xs text-muted-foreground mt-1">{best.company_name}</p>
+                </div>
+              )}
+              {best && savingsAmount > 0 && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20 p-4">
+                  <p className="text-xs text-muted-foreground mb-1">Ahorro estimado</p>
+                  <p className="text-2xl font-bold text-blue-600">{savingsAmount.toFixed(2)} €/mes</p>
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <TrendingDown className="h-3 w-3 text-emerald-500" />
+                    <span className="text-xs font-medium text-emerald-600">{savingsPercent.toFixed(1)}%</span>
+                    {savingsPercent > 45 && <Badge variant="secondary" className="text-[10px] px-1.5 py-0"><AlertTriangle className="h-2.5 w-2.5 mr-0.5" />Prudente</Badge>}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="pb-3"><CardTitle className="text-base">Datos de la factura</CardTitle></CardHeader>
