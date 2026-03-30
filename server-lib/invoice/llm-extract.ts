@@ -39,7 +39,8 @@ ESQUEMA JSON A DEVOLVER:
   "precio_p3_kwh": null,
   "tipo_tarifa": "2.0TD",
   "cups": "ES0021000012345678AB",
-  "titular": "Juan Pérez García"
+  "titular": "Juan Pérez García",
+  "direccion_suministro": "Calle Mayor 5, 2ºB, 28001 Madrid"
 }
 
 NOTAS IMPORTANTES:
@@ -52,6 +53,7 @@ NOTAS IMPORTANTES:
 - "tipo_tarifa": tipo de tarifa (2.0TD doméstico, 3.0TD >15kW, etc.).
 - "cups": código CUPS (empieza por ES seguido de 16 dígitos y 2 letras).
 - "titular": nombre del titular del contrato.
+- "direccion_suministro": dirección del punto de suministro. Busca "dirección de suministro", "punto de suministro", "dirección del contrato". Incluye calle, número, piso, CP y localidad si aparecen.
 - "company_name": normaliza al nombre comercial conocido (Iberdrola, Endesa, Naturgy, Repsol, EDP, Total Energies, Plenitude, Holaluz, Octopus, Cepsa, Viesgo, Fenie Energía, Gaba Energía, Contigo Energía, etc.)
 - Si la factura es de GAS: extrae los mismos campos adaptados.
 - Si NO es de energía: devuelve todos los campos como null.`;
@@ -236,6 +238,7 @@ function parseLLMResponse(raw: string): InvoiceExtraction {
     tipo_tarifa: safeString(parsed.tipo_tarifa),
     cups: safeCups(parsed.cups),
     titular: safeString(parsed.titular),
+    direccion_suministro: safeString(parsed.direccion_suministro),
   };
 }
 

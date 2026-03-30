@@ -55,6 +55,7 @@ import {
   Download,
   List,
   Image as ImageIcon,
+  MapPin,
 } from 'lucide-react';
 
 const SIMULATE_API = import.meta.env.VITE_SIMULATE_INVOICE_API_URL ?? '/api/simulate-invoice';
@@ -82,6 +83,7 @@ interface InvoiceExtraction {
   tipo_tarifa: string | null;
   cups: string | null;
   titular: string | null;
+  direccion_suministro: string | null;
 }
 
 interface EnergyOffer {
@@ -403,6 +405,9 @@ function ExtractionStep({
             {textField('CUPS', 'cups', <Hash className="h-3 w-3" />)}
             {textField('Tarifa', 'tipo_tarifa', <Zap className="h-3 w-3" />)}
           </div>
+          <div className="grid grid-cols-1 gap-3 mt-3">
+            {textField('Dirección suministro', 'direccion_suministro', <MapPin className="h-3 w-3" />)}
+          </div>
         </div>
         <Separator />
         <div>
@@ -516,12 +521,13 @@ function ComparisonView({
       <Card>
         <CardHeader className="pb-3"><CardTitle className="text-base">Datos de la factura</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          {(extraction.titular || extraction.cups || extraction.tipo_tarifa || extraction.company_name) && (
+          {(extraction.titular || extraction.cups || extraction.tipo_tarifa || extraction.company_name || extraction.direccion_suministro) && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 text-sm">
               {extraction.titular && <div><span className="text-muted-foreground">Titular:</span> <span className="font-medium">{extraction.titular}</span></div>}
               {extraction.cups && <div><span className="text-muted-foreground">CUPS:</span> <span className="font-mono text-xs font-medium">{extraction.cups}</span></div>}
               {extraction.tipo_tarifa && <div><span className="text-muted-foreground">Tarifa:</span> <span className="font-medium">{extraction.tipo_tarifa}</span></div>}
               {extraction.company_name && <div><span className="text-muted-foreground">Comercializadora:</span> <span className="font-medium">{extraction.company_name}</span></div>}
+              {extraction.direccion_suministro && <div className="col-span-2 sm:col-span-4"><span className="text-muted-foreground">Dirección suministro:</span> <span className="font-medium">{extraction.direccion_suministro}</span></div>}
             </div>
           )}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 text-sm">

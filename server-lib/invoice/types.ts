@@ -25,6 +25,7 @@ export interface InvoiceExtraction {
   tipo_tarifa: string | null;
   cups: string | null;
   titular: string | null;
+  direccion_suministro: string | null;
 
   raw_text?: string;
 }
@@ -49,6 +50,7 @@ export function emptyExtraction(): InvoiceExtraction {
     tipo_tarifa: null,
     cups: null,
     titular: null,
+    direccion_suministro: null,
   };
 }
 
