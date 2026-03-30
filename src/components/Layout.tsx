@@ -1,6 +1,6 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { Users, Building2, MapPin, TrendingUp, LogOut, Menu, User, ChevronDown, Key, Bell, Navigation, UserPlus, Zap } from 'lucide-react';
+import { Users, Building2, MapPin, TrendingUp, LogOut, Menu, User, ChevronDown, Key, Bell, Navigation, UserPlus, Zap, FileSearch } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import AdminPasswordDialog from '@/components/AdminPasswordDialog';
@@ -45,6 +45,7 @@ export default function Layout({ children, currentView, onViewChange }: LayoutPr
     { name: 'Visitas', icon: MapPin, view: 'visits' },
     { name: 'Recordatorios', icon: Bell, view: 'reminders' },
     { name: 'Ofertas energéticas', icon: Zap, view: 'energy-offers' },
+    { name: 'Simulador facturas', icon: FileSearch, view: 'invoice-simulator' },
   ] : [
     { name: 'Estadísticas', icon: TrendingUp, view: 'stats' },
     { name: 'Leads', icon: UserPlus, view: 'leads' },

@@ -12,6 +12,7 @@ import AdminVisitsView from '@/components/dashboard/AdminVisitsView';
 import RemindersManagement from '@/components/reminders/RemindersManagement';
 import LeadsManagement from '@/components/dashboard/LeadsManagement';
 import EnergyOffersManagement from '@/components/dashboard/EnergyOffersManagement';
+import InvoiceSimulator from '@/components/dashboard/InvoiceSimulator';
 
 const ClientManagement = lazy(() => import('@/components/dashboard/ClientManagement'));
 
@@ -58,6 +59,8 @@ export default function Dashboard() {
         return isAdmin ? <RemindersManagement /> : <CommercialVisitsManager />;
       case 'energy-offers':
         return isAdmin ? <EnergyOffersManagement /> : <CommercialVisitsManager />;
+      case 'invoice-simulator':
+        return isAdmin ? <InvoiceSimulator /> : <CommercialVisitsManager />;
       case 'stats':
         return <CommercialStatistics />;
       default:
