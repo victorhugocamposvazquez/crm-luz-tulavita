@@ -48,12 +48,20 @@ ESQUEMA JSON A DEVOLVER:
   "direccion_suministro": "Calle Mayor 5, 2ºB, 28001 Madrid"
 }
 
+FORMATO NUMÉRICO ESPAÑOL — MUY IMPORTANTE:
+- En España el PUNTO es separador de miles y la COMA es separador decimal.
+- "714,000 kWh" = 714.0 kWh (setecientos catorce), NO 714000.
+- "1.473,059 kWh" = 1473.059 kWh (mil cuatrocientos setenta y tres).
+- "26,000 kW" = 26.0 kW (veintiséis), NO 26000.
+- "835,00 €" = 835.00 € (ochocientos treinta y cinco).
+- Convierte SIEMPRE al formato numérico con punto decimal para el JSON.
+
 NOTAS IMPORTANTES:
-- "consumption_kwh": consumo TOTAL en kWh del periodo facturado. Busca "energía activa", "consumo total", "kWh facturados" o la SUMA de consumos por tramo horario.
+- "consumption_kwh": consumo TOTAL en kWh del periodo facturado. DEBES SUMAR todos los tramos de energía activa (P1+P2+P3+P4+P5+P6) si la factura los desglosa. En tarifas 3.0TD puede haber hasta 6 tramos. Busca "energía activa", "consumo total", "kWh facturados". Si hay varios bloques temporales dentro del mismo periodo, SUMA TODOS. El resultado debe ser coherente con el total de la factura (ej: para un precio medio de ~0.15 €/kWh, 835€ implican ~3500 kWh, no 714000 kWh).
 - "total_factura": importe TOTAL a pagar (IVA incluido). Busca "total a pagar", "importe total", "total factura".
 - "period_months": 1 para mensual, 2 para bimensual, 3 para trimestral. Calcula a partir de las fechas si las tienes.
-- "potencia_contratada_kw": potencia contratada en kW. Si hay varias (P1, P2, P3), pon la P1 aquí también.
-- "precio_energia_kwh": precio medio del kWh (€/kWh). Si hay tramos, calcula la media o usa el general.
+- "potencia_contratada_kw": potencia contratada en kW. Si hay varias (P1, P2, P3...), pon la P1 aquí. Recuerda: "26,000 kW" = 26.0 kW.
+- "precio_energia_kwh": precio medio del kWh (€/kWh). Si hay tramos, calcula la media ponderada o usa el general. Típicamente entre 0.05 y 0.30 €/kWh.
 - "precio_p1_kwh", "precio_p2_kwh", "precio_p3_kwh": precios por tramo horario (€/kWh) si aparecen.
 - "tipo_tarifa": tipo de tarifa (2.0TD doméstico, 3.0TD >15kW, etc.).
 - "cups": código CUPS (empieza por ES seguido de 16 dígitos y 2 letras).
@@ -61,7 +69,10 @@ NOTAS IMPORTANTES:
 - "direccion_suministro": dirección del punto de suministro. Busca "dirección de suministro", "punto de suministro", "dirección del contrato". Incluye calle, número, piso, CP y localidad si aparecen.
 - "company_name": normaliza al nombre comercial conocido (Iberdrola, Endesa, Naturgy, Repsol, EDP, Total Energies, Plenitude, Holaluz, Octopus, Cepsa, Viesgo, Fenie Energía, Gaba Energía, Contigo Energía, etc.)
 - Si la factura es de GAS: extrae los mismos campos adaptados.
-- Si NO es de energía: devuelve todos los campos como null.`;
+- Si NO es de energía: devuelve todos los campos como null.
+
+VERIFICACIÓN FINAL:
+Antes de responder, comprueba que el precio implícito (total_factura / consumption_kwh) está entre 0.05 y 0.50 €/kWh. Si no, revisa el consumo — probablemente has confundido el formato decimal español.`;
 
 const USER_PROMPT = 'Extrae todos los datos de esta factura de energía. Devuelve SOLO el JSON, sin explicaciones.';
 

@@ -20,37 +20,85 @@ function fileHash(buffer: Buffer): string {
   return createHash('md5').update(buffer).digest('hex');
 }
 
+/**
+ * Intenta corregir un consumo que parece estar multiplicado por 1000
+ * (error típico del formato decimal español: "714,000" → 714000 en vez de 714).
+ */
+function tryFixSpanishDecimal(value: number, total: number | null): number | null {
+  if (total == null || total <= 0) return null;
+  const fixed = value / 1000;
+  const impliedPrice = total / fixed;
+  if (impliedPrice >= 0.05 && impliedPrice <= 0.50) return fixed;
+  return null;
+}
+
 function validateExtraction(e: InvoiceExtraction): InvoiceExtraction {
   const warnings: string[] = [];
+  const fixes: string[] = [];
 
-  if (e.consumption_kwh != null && e.consumption_kwh > 50_000) {
-    warnings.push(`consumption_kwh sospechosamente alto: ${e.consumption_kwh}`);
-    e.confidence = Math.max(0, e.confidence - 0.15);
+  if (e.consumption_kwh != null && e.total_factura != null && e.consumption_kwh > 0) {
+    const impliedPrice = e.total_factura / e.consumption_kwh;
+
+    if (impliedPrice < 0.01) {
+      const fixed = tryFixSpanishDecimal(e.consumption_kwh, e.total_factura);
+      if (fixed != null) {
+        fixes.push(`consumption_kwh corregido: ${e.consumption_kwh} → ${fixed} (error formato decimal español)`);
+        e.consumption_kwh = fixed;
+      } else {
+        warnings.push(`precio implícito ${impliedPrice.toFixed(4)} €/kWh — consumo probablemente erróneo (${e.consumption_kwh} kWh para ${e.total_factura} €)`);
+        e.confidence = Math.max(0, e.confidence - 0.30);
+      }
+    } else if (impliedPrice < 0.03) {
+      warnings.push(`precio implícito bajo: ${impliedPrice.toFixed(4)} €/kWh — revisar consumo`);
+      e.confidence = Math.max(0, e.confidence - 0.15);
+    } else if (impliedPrice > 2) {
+      warnings.push(`precio implícito alto: ${impliedPrice.toFixed(2)} €/kWh — posible error en consumo o total`);
+      e.confidence = Math.max(0, e.confidence - 0.10);
+    }
   }
-  if (e.total_factura != null && e.total_factura > 10_000) {
-    warnings.push(`total_factura sospechosamente alto: ${e.total_factura}`);
-    e.confidence = Math.max(0, e.confidence - 0.10);
+
+  if (e.potencia_contratada_kw != null && e.potencia_contratada_kw > 500) {
+    const fixed = e.potencia_contratada_kw / 1000;
+    if (fixed >= 1 && fixed <= 500) {
+      fixes.push(`potencia_contratada_kw corregida: ${e.potencia_contratada_kw} → ${fixed} (error formato decimal español)`);
+      e.potencia_contratada_kw = fixed;
+    }
+  }
+  if (e.potencia_p1_kw != null && e.potencia_p1_kw > 500) {
+    const fixed = e.potencia_p1_kw / 1000;
+    if (fixed >= 1 && fixed <= 500) {
+      fixes.push(`potencia_p1_kw corregida: ${e.potencia_p1_kw} → ${fixed}`);
+      e.potencia_p1_kw = fixed;
+    }
+  }
+  if (e.potencia_p2_kw != null && e.potencia_p2_kw > 500) {
+    const fixed = e.potencia_p2_kw / 1000;
+    if (fixed >= 1 && fixed <= 500) {
+      fixes.push(`potencia_p2_kw corregida: ${e.potencia_p2_kw} → ${fixed}`);
+      e.potencia_p2_kw = fixed;
+    }
+  }
+
+  if (e.consumption_kwh != null && e.consumption_kwh > 100_000) {
+    warnings.push(`consumption_kwh extremo: ${e.consumption_kwh}`);
+    e.confidence = Math.max(0, e.confidence - 0.20);
   }
   if (e.total_factura != null && e.total_factura < 1) {
     warnings.push(`total_factura sospechosamente bajo: ${e.total_factura}`);
     e.confidence = Math.max(0, e.confidence - 0.15);
   }
   if (e.potencia_contratada_kw != null && e.potencia_contratada_kw > 100) {
-    warnings.push(`potencia_contratada_kw sospechosamente alta: ${e.potencia_contratada_kw}`);
+    warnings.push(`potencia_contratada_kw alta: ${e.potencia_contratada_kw}`);
     e.confidence = Math.max(0, e.confidence - 0.10);
   }
   if (e.precio_energia_kwh != null && e.precio_energia_kwh > 1) {
     warnings.push(`precio_energia_kwh > 1 €/kWh: ${e.precio_energia_kwh}`);
     e.confidence = Math.max(0, e.confidence - 0.10);
   }
-  if (e.consumption_kwh != null && e.total_factura != null && e.consumption_kwh > 0) {
-    const impliedPrice = e.total_factura / e.consumption_kwh;
-    if (impliedPrice > 2) {
-      warnings.push(`precio implícito ${impliedPrice.toFixed(2)} €/kWh — posible error en consumo o total`);
-      e.confidence = Math.max(0, e.confidence - 0.10);
-    }
-  }
 
+  if (fixes.length > 0) {
+    console.log('[pipeline] Auto-fixes applied:', fixes.join('; '));
+  }
   if (warnings.length > 0) {
     console.warn('[pipeline] Validation warnings:', warnings.join('; '));
   }
