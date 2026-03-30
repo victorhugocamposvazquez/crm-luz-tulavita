@@ -933,7 +933,7 @@ export default function InvoiceSimulator() {
   }, [deleteTarget, fetchSimulations]);
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="mx-auto">
       <div className="mb-6">
         <h2 className="text-2xl font-bold flex items-center gap-2"><Zap className="h-6 w-6" />Simulador de facturas</h2>
         <p className="text-muted-foreground mt-1">Sube una factura, revisa los datos extraídos y consulta la mejor oferta</p>
