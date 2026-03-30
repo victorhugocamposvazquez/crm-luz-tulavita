@@ -882,18 +882,29 @@ export default function InvoiceSimulator() {
     setStep(2);
   }, []);
 
-  const handleSelectOffer = useCallback((offerId: string) => {
+  const handleSelectOffer = useCallback(async (offerId: string) => {
     setSelectedOfferId(offerId);
-    setCurrentSnapshot((prev) => {
-      if (!prev) return prev;
-      const offer = prev.offers.find((o) => o.id === offerId);
+    const updated = (() => {
+      if (!currentSnapshot) return null;
+      const offer = currentSnapshot.offers.find((o) => o.id === offerId);
       return {
-        ...prev,
+        ...currentSnapshot,
         selected_offer_id: offerId,
         selected_offer_company: offer?.company_name ?? null,
       };
-    });
-  }, []);
+    })();
+    setCurrentSnapshot(updated);
+
+    if (editingId && updated) {
+      await supabase
+        .from('invoice_simulations')
+        .update({ comparison_result: updated as unknown as Json })
+        .eq('id', editingId);
+      setSimulations((prev) =>
+        prev.map((s) => s.id === editingId ? { ...s, comparison_result: updated } : s),
+      );
+    }
+  }, [currentSnapshot, editingId]);
 
   const openSaveDialog = useCallback(() => {
     if (editingId) {
@@ -1052,7 +1063,7 @@ export default function InvoiceSimulator() {
             snapshot={currentSnapshot}
             thumbnail={thumbnail}
             selectedOfferId={selectedOfferId}
-            readonly
+            onSelectOffer={handleSelectOffer}
           />
         </>
       )}
