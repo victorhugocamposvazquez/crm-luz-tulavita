@@ -105,6 +105,8 @@ interface ComparisonSnapshot {
   best_offer_monthly_cost: number | null;
   savings_amount: number | null;
   savings_percent: number | null;
+  selected_offer_id: string | null;
+  selected_offer_company: string | null;
   offers: OfferWithCost[];
 }
 
@@ -177,6 +179,8 @@ function buildComparison(extraction: InvoiceExtraction, offers: EnergyOffer[]): 
       best_offer_monthly_cost: best?.monthlyCost ?? null,
       savings_amount: savingsAmount,
       savings_percent: savingsPercent,
+      selected_offer_id: best?.id ?? null,
+      selected_offer_company: best?.company_name ?? null,
       offers: offersWithCost,
     },
     offersWithCost,
@@ -210,10 +214,11 @@ function formatDate(iso: string): string {
 }
 
 function exportCsv(simulations: SimulationRow[]) {
-  const headers = ['Cliente', 'Comercializadora', 'Consumo kWh', 'Total €', 'Mejor oferta', 'Ahorro €/mes', 'Ahorro %', 'Fecha'];
+  const headers = ['Cliente', 'Comercializadora', 'Oferta propuesta', 'Consumo kWh', 'Total €', 'Mejor oferta', 'Ahorro €/mes', 'Ahorro %', 'Fecha'];
   const rows = simulations.map((s) => [
     s.client_name,
     s.extraction.company_name ?? '',
+    s.comparison_result?.selected_offer_company ?? '',
     s.extraction.consumption_kwh ?? '',
     s.extraction.total_factura ?? '',
     s.comparison_result?.best_offer_company ?? '',
@@ -414,9 +419,11 @@ function ExtractionStep({
 }
 
 function ComparisonView({
-  extraction, offersWithCost, snapshot,
+  extraction, offersWithCost, snapshot, thumbnail, selectedOfferId, onSelectOffer, readonly,
 }: {
   extraction: InvoiceExtraction; offersWithCost: OfferWithCost[]; snapshot: ComparisonSnapshot;
+  thumbnail?: string | null; selectedOfferId?: string | null;
+  onSelectOffer?: (offerId: string) => void; readonly?: boolean;
 }) {
   const periodMonths = Math.max(1, extraction.period_months || 1);
   const currentMonthlyCost = snapshot.current_monthly_cost;
@@ -428,9 +435,19 @@ function ComparisonView({
   const savingsAmount = snapshot.savings_amount ?? 0;
   const savingsPercent = snapshot.savings_percent ?? 0;
   const sorted = [...offersWithCost].sort((a, b) => a.monthlyCost - b.monthlyCost);
+  const selected = selectedOfferId ? offersWithCost.find((o) => o.id === selectedOfferId) : null;
 
   return (
     <div className="space-y-4">
+      {thumbnail && (
+        <Card>
+          <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2"><ImageIcon className="h-4 w-4" />Factura subida</CardTitle></CardHeader>
+          <CardContent>
+            <img src={thumbnail} alt="Factura" className="max-h-48 rounded-lg border object-contain" />
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-6">
@@ -483,15 +500,33 @@ function ComparisonView({
         </CardContent>
       </Card>
 
+      {selected && (
+        <Card className="border-primary/50 bg-primary/5">
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />
+              <div>
+                <p className="text-sm font-medium">Oferta propuesta: <span className="text-primary">{selected.company_name}</span></p>
+                <p className="text-xs text-muted-foreground">{selected.monthlyCost.toFixed(2)} €/mes · Ahorro: {(currentMonthlyCost - selected.monthlyCost).toFixed(2)} €/mes</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Todas las ofertas activas</CardTitle>
-          <CardDescription>Coste mensual estimado para {consumptionMonthly.toFixed(0)} kWh/mes con {extractedPower ?? DEFAULT_POWER_KW} kW</CardDescription>
+          <CardDescription>
+            Coste mensual estimado para {consumptionMonthly.toFixed(0)} kWh/mes con {extractedPower ?? DEFAULT_POWER_KW} kW
+            {!readonly && <span className="ml-1">· Haz clic en una fila para seleccionar la oferta propuesta</span>}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
               <TableRow>
+                {!readonly && <TableHead className="w-10"></TableHead>}
                 <TableHead>Comercializadora</TableHead>
                 <TableHead className="text-right">€/kWh</TableHead>
                 <TableHead className="text-right">P1</TableHead>
@@ -504,13 +539,26 @@ function ComparisonView({
               {sorted.map((o) => {
                 const saving = currentMonthlyCost - o.monthlyCost;
                 const savingPct = currentMonthlyCost > 0 ? (saving / currentMonthlyCost) * 100 : 0;
+                const isSelected = selectedOfferId === o.id;
                 return (
-                  <TableRow key={o.id} className={o.isBest ? 'bg-emerald-50 dark:bg-emerald-950/20' : o.isCurrent ? 'bg-amber-50 dark:bg-amber-950/20' : ''}>
+                  <TableRow
+                    key={o.id}
+                    className={`${isSelected ? 'bg-primary/10 dark:bg-primary/20' : o.isBest ? 'bg-emerald-50 dark:bg-emerald-950/20' : o.isCurrent ? 'bg-amber-50 dark:bg-amber-950/20' : ''} ${!readonly ? 'cursor-pointer hover:bg-muted/50' : ''}`}
+                    onClick={() => !readonly && onSelectOffer?.(o.id)}
+                  >
+                    {!readonly && (
+                      <TableCell>
+                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${isSelected ? 'border-primary bg-primary' : 'border-muted-foreground/40'}`}>
+                          {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                        </div>
+                      </TableCell>
+                    )}
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
                         {o.company_name}
                         {o.isBest && <Badge className="bg-emerald-600 text-[10px] px-1.5 py-0">Mejor</Badge>}
                         {o.isCurrent && <Badge variant="outline" className="text-[10px] px-1.5 py-0">Actual</Badge>}
+                        {isSelected && <Badge className="bg-primary text-[10px] px-1.5 py-0">Propuesta</Badge>}
                       </div>
                     </TableCell>
                     <TableCell className="text-right">{o.price_per_kwh.toFixed(4)}</TableCell>
@@ -525,7 +573,7 @@ function ComparisonView({
                   </TableRow>
                 );
               })}
-              {sorted.length === 0 && <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No hay ofertas activas</TableCell></TableRow>}
+              {sorted.length === 0 && <TableRow><TableCell colSpan={!readonly ? 7 : 6} className="text-center text-muted-foreground py-8">No hay ofertas activas</TableCell></TableRow>}
             </TableBody>
           </Table>
         </CardContent>
@@ -593,6 +641,7 @@ function SimulationsList({
                 <TableHead className="w-10"></TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Comercializadora</TableHead>
+                <TableHead>Oferta propuesta</TableHead>
                 <TableHead className="text-right">Total €</TableHead>
                 <TableHead className="text-right">Ahorro</TableHead>
                 <TableHead>Fecha</TableHead>
@@ -611,6 +660,11 @@ function SimulationsList({
                   </TableCell>
                   <TableCell className="font-medium">{s.client_name}</TableCell>
                   <TableCell className="text-sm text-muted-foreground">{s.extraction.company_name ?? '—'}</TableCell>
+                  <TableCell>
+                    {s.comparison_result?.selected_offer_company ? (
+                      <Badge variant="outline" className="text-xs font-medium">{s.comparison_result.selected_offer_company}</Badge>
+                    ) : <span className="text-muted-foreground text-sm">—</span>}
+                  </TableCell>
                   <TableCell className="text-right text-sm">{s.extraction.total_factura != null ? `${s.extraction.total_factura} €` : '—'}</TableCell>
                   <TableCell className="text-right">
                     {s.comparison_result?.savings_amount != null && s.comparison_result.savings_amount > 0 ? (
@@ -663,6 +717,7 @@ export default function InvoiceSimulator() {
   // current comparison cache
   const [currentSnapshot, setCurrentSnapshot] = useState<ComparisonSnapshot | null>(null);
   const [currentOffersWithCost, setCurrentOffersWithCost] = useState<OfferWithCost[]>([]);
+  const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
 
   const fetchOffers = useCallback(async () => {
     setLoadingOffers(true);
@@ -721,6 +776,7 @@ export default function InvoiceSimulator() {
     setEditingId(null);
     setCurrentSnapshot(null);
     setCurrentOffersWithCost([]);
+    setSelectedOfferId(null);
   }, []);
 
   const goToList = useCallback(() => {
@@ -728,6 +784,7 @@ export default function InvoiceSimulator() {
     setEditingId(null);
     setCurrentSnapshot(null);
     setCurrentOffersWithCost([]);
+    setSelectedOfferId(null);
   }, []);
 
   const handleExtracted = useCallback((data: InvoiceExtraction, name: string, thumb: string | null) => {
@@ -758,6 +815,7 @@ export default function InvoiceSimulator() {
     const { snapshot, offersWithCost } = buildComparison(extraction, offers);
     setCurrentSnapshot(snapshot);
     setCurrentOffersWithCost(offersWithCost);
+    setSelectedOfferId(snapshot.selected_offer_id);
     setStep(3);
   }, [extraction, offers]);
 
@@ -770,10 +828,12 @@ export default function InvoiceSimulator() {
     if (s.comparison_result) {
       setCurrentSnapshot(s.comparison_result);
       setCurrentOffersWithCost(s.comparison_result.offers || []);
+      setSelectedOfferId(s.comparison_result.selected_offer_id ?? null);
     } else {
       const { snapshot, offersWithCost } = buildComparison(s.extraction, offers);
       setCurrentSnapshot(snapshot);
       setCurrentOffersWithCost(offersWithCost);
+      setSelectedOfferId(snapshot.selected_offer_id);
     }
     setMode('view');
   }, [offers]);
@@ -787,6 +847,19 @@ export default function InvoiceSimulator() {
     setCurrentOffersWithCost([]);
     setMode('wizard');
     setStep(2);
+  }, []);
+
+  const handleSelectOffer = useCallback((offerId: string) => {
+    setSelectedOfferId(offerId);
+    setCurrentSnapshot((prev) => {
+      if (!prev) return prev;
+      const offer = prev.offers.find((o) => o.id === offerId);
+      return {
+        ...prev,
+        selected_offer_id: offerId,
+        selected_offer_company: offer?.company_name ?? null,
+      };
+    });
   }, []);
 
   const openSaveDialog = useCallback(() => {
@@ -905,7 +978,14 @@ export default function InvoiceSimulator() {
                 <div className="flex items-center justify-center py-12"><Loader2 className="h-6 w-6 animate-spin mr-2" />Cargando ofertas...</div>
               ) : (
                 <>
-                  <ComparisonView extraction={extraction} offersWithCost={currentOffersWithCost} snapshot={currentSnapshot} />
+                  <ComparisonView
+                    extraction={extraction}
+                    offersWithCost={currentOffersWithCost}
+                    snapshot={currentSnapshot}
+                    thumbnail={thumbnail}
+                    selectedOfferId={selectedOfferId}
+                    onSelectOffer={handleSelectOffer}
+                  />
                   <div className="flex items-center justify-between pt-4">
                     <Button variant="outline" onClick={() => setStep(2)}><ArrowLeft className="h-4 w-4 mr-2" />Editar datos</Button>
                     <div className="flex items-center gap-2">
@@ -933,7 +1013,14 @@ export default function InvoiceSimulator() {
               )}
             </div>
           </div>
-          <ComparisonView extraction={extraction} offersWithCost={currentOffersWithCost} snapshot={currentSnapshot} />
+          <ComparisonView
+            extraction={extraction}
+            offersWithCost={currentOffersWithCost}
+            snapshot={currentSnapshot}
+            thumbnail={thumbnail}
+            selectedOfferId={selectedOfferId}
+            readonly
+          />
         </>
       )}
 
