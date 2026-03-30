@@ -368,6 +368,101 @@ export type Database = {
           },
         ]
       }
+      energy_offers: {
+        Row: {
+          id: string
+          company_name: string
+          price_per_kwh: number
+          monthly_fixed_cost: number
+          p1: number | null
+          p2: number | null
+          active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          company_name: string
+          price_per_kwh: number
+          monthly_fixed_cost?: number
+          p1?: number | null
+          p2?: number | null
+          active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          company_name?: string
+          price_per_kwh?: number
+          monthly_fixed_cost?: number
+          p1?: number | null
+          p2?: number | null
+          active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      energy_comparisons: {
+        Row: {
+          id: string
+          lead_id: string
+          current_company: string | null
+          current_monthly_cost: number | null
+          best_offer_company: string | null
+          estimated_savings_amount: number | null
+          estimated_savings_percentage: number | null
+          status: string
+          ocr_confidence: number | null
+          invoice_period_months: number | null
+          prudent_mode: boolean | null
+          raw_extraction: Json | null
+          error_message: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          lead_id: string
+          current_company?: string | null
+          current_monthly_cost?: number | null
+          best_offer_company?: string | null
+          estimated_savings_amount?: number | null
+          estimated_savings_percentage?: number | null
+          status?: string
+          ocr_confidence?: number | null
+          invoice_period_months?: number | null
+          prudent_mode?: boolean | null
+          raw_extraction?: Json | null
+          error_message?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          lead_id?: string
+          current_company?: string | null
+          current_monthly_cost?: number | null
+          best_offer_company?: string | null
+          estimated_savings_amount?: number | null
+          estimated_savings_percentage?: number | null
+          status?: string
+          ocr_confidence?: number | null
+          invoice_period_months?: number | null
+          prudent_mode?: boolean | null
+          raw_extraction?: Json | null
+          error_message?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "energy_comparisons_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           created_at: string

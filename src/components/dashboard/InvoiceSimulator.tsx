@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import type { Json } from '@/integrations/supabase/types';
 import { useAuth } from '@/hooks/useAuth';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -188,8 +189,23 @@ function buildComparison(extraction: InvoiceExtraction, offers: EnergyOffer[]): 
 }
 
 async function generateThumbnail(file: File): Promise<string | null> {
-  if (!file.type.startsWith('image/')) return null;
   try {
+    if (file.type === 'application/pdf') {
+      const pdfjsLib = await import('pdfjs-dist');
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const page = await pdf.getPage(1);
+      const viewport = page.getViewport({ scale: 0.5 });
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width;
+      canvas.height = viewport.height;
+      const ctx = canvas.getContext('2d')!;
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      return canvas.toDataURL('image/jpeg', 0.6);
+    }
+
+    if (!file.type.startsWith('image/')) return null;
     const compressed = await imageCompression(file, {
       maxSizeMB: 0.05,
       maxWidthOrHeight: 400,
@@ -202,7 +218,8 @@ async function generateThumbnail(file: File): Promise<string | null> {
       reader.onerror = () => resolve(null);
       reader.readAsDataURL(compressed);
     });
-  } catch {
+  } catch (err) {
+    console.warn('Thumbnail generation failed:', err);
     return null;
   }
 }
@@ -722,13 +739,13 @@ export default function InvoiceSimulator() {
   const fetchOffers = useCallback(async () => {
     setLoadingOffers(true);
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('energy_offers')
         .select('id, company_name, p1, p2, price_per_kwh, monthly_fixed_cost, active')
         .eq('active', true)
         .order('company_name');
       if (error) throw error;
-      const mapped = (data || []).map((r: Record<string, unknown>) => ({
+      const mapped = ((data ?? []) as any[]).map((r) => ({
         id: r.id as string,
         company_name: r.company_name as string,
         p1: r.p1 != null ? Number(r.p1) : null,
@@ -882,8 +899,8 @@ export default function InvoiceSimulator() {
         client_name: saveClientName.trim(),
         file_name: fileName || null,
         thumbnail_base64: thumbnail,
-        extraction: extraction as unknown as Record<string, unknown>,
-        comparison_result: currentSnapshot as unknown as Record<string, unknown>,
+        extraction: extraction as unknown as Json,
+        comparison_result: currentSnapshot as unknown as Json,
         notes: saveNotes.trim() || null,
         created_by: user?.id ?? null,
       };
