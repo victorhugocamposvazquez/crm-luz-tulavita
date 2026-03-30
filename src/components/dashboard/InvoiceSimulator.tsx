@@ -823,7 +823,8 @@ export default function InvoiceSimulator() {
       await fetchSimulations();
       goToList();
     } catch (err) {
-      toast({ title: 'Error', description: err instanceof Error ? err.message : 'No se pudo guardar', variant: 'destructive' });
+      const msg = (err as any)?.message ?? (err instanceof Error ? err.message : 'No se pudo guardar');
+      toast({ title: 'Error', description: String(msg), variant: 'destructive' });
     } finally {
       setSaving(false);
     }

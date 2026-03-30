@@ -164,6 +164,45 @@ export type Database = {
         }
         Relationships: []
       }
+      invoice_simulations: {
+        Row: {
+          id: string
+          client_name: string
+          file_name: string | null
+          thumbnail_base64: string | null
+          extraction: Json
+          comparison_result: Json | null
+          notes: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          client_name: string
+          file_name?: string | null
+          thumbnail_base64?: string | null
+          extraction: Json
+          comparison_result?: Json | null
+          notes?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          client_name?: string
+          file_name?: string | null
+          thumbnail_base64?: string | null
+          extraction?: Json
+          comparison_result?: Json | null
+          notes?: string | null
+          created_by?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       leads: {
         Row: {
           id: string
