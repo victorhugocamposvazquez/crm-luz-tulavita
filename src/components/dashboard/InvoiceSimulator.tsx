@@ -465,7 +465,15 @@ function ComparisonView({
 
       <Card>
         <CardHeader className="pb-3"><CardTitle className="text-base">Datos de la factura</CardTitle></CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {(extraction.titular || extraction.cups || extraction.tipo_tarifa || extraction.company_name) && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 text-sm">
+              {extraction.titular && <div><span className="text-muted-foreground">Titular:</span> <span className="font-medium">{extraction.titular}</span></div>}
+              {extraction.cups && <div><span className="text-muted-foreground">CUPS:</span> <span className="font-mono text-xs font-medium">{extraction.cups}</span></div>}
+              {extraction.tipo_tarifa && <div><span className="text-muted-foreground">Tarifa:</span> <span className="font-medium">{extraction.tipo_tarifa}</span></div>}
+              {extraction.company_name && <div><span className="text-muted-foreground">Comercializadora:</span> <span className="font-medium">{extraction.company_name}</span></div>}
+            </div>
+          )}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 text-sm">
             <div><span className="text-muted-foreground">Consumo:</span> <span className="font-medium">{extraction.consumption_kwh} kWh</span></div>
             <div><span className="text-muted-foreground">Total:</span> <span className="font-medium">{extraction.total_factura} €</span></div>
@@ -693,8 +701,10 @@ export default function InvoiceSimulator() {
         .order('created_at', { ascending: false });
       if (error) throw error;
       setSimulations((data as unknown as SimulationRow[]) || []);
-    } catch {
-      toast({ title: 'Error', description: 'No se pudieron cargar las simulaciones', variant: 'destructive' });
+    } catch (err) {
+      const msg = (err as any)?.message ?? (err instanceof Error ? err.message : 'No se pudieron cargar las simulaciones');
+      console.error('fetchSimulations error:', err);
+      toast({ title: 'Error', description: String(msg), variant: 'destructive' });
     } finally {
       setLoadingSims(false);
     }
