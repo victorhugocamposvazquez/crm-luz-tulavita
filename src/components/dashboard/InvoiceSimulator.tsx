@@ -188,15 +188,25 @@ function buildComparison(extraction: InvoiceExtraction, offers: EnergyOffer[]): 
   };
 }
 
+let pdfjsWorkerReady = false;
+async function ensurePdfWorker() {
+  if (pdfjsWorkerReady) return;
+  const pdfjsLib = await import('pdfjs-dist');
+  const workerModule = await import('pdfjs-dist/build/pdf.worker.min.mjs?url');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = workerModule.default;
+  pdfjsWorkerReady = true;
+}
+
 async function generateThumbnail(file: File): Promise<string | null> {
   try {
     if (file.type === 'application/pdf') {
+      await ensurePdfWorker();
       const pdfjsLib = await import('pdfjs-dist');
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
       const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
       const page = await pdf.getPage(1);
-      const viewport = page.getViewport({ scale: 0.5 });
+      const scale = 400 / Math.max(page.getViewport({ scale: 1 }).width, 1);
+      const viewport = page.getViewport({ scale });
       const canvas = document.createElement('canvas');
       canvas.width = viewport.width;
       canvas.height = viewport.height;
