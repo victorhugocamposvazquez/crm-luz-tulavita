@@ -1,6 +1,9 @@
 /**
  * Extracción de datos de facturas energéticas españolas mediante GPT-4o Vision.
  *
+ * Estrategia: GPT-4o-mini como modelo principal (rápido y barato). Si la extracción
+ * tiene baja confianza (campos clave ausentes), reintenta con GPT-4o como fallback.
+ *
  * Usa la Responses API de OpenAI que soporta PDFs nativamente (extrae texto + imágenes
  * de cada página) e imágenes directas. No requiere conversión previa de PDF a imagen.
  */
@@ -9,7 +12,9 @@ import type { InvoiceExtraction } from './types.js';
 import { emptyExtraction } from './types.js';
 
 const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
-const MODEL = 'gpt-4o';
+const MODEL_FAST = 'gpt-4o-mini';
+const MODEL_FULL = 'gpt-4o';
+const CONFIDENCE_THRESHOLD = 0.7;
 const MAX_TOKENS = 1500;
 
 const SYSTEM_PROMPT = `Eres un experto en facturas de energía eléctrica y gas en España. Tu trabajo es extraer datos estructurados de facturas.
@@ -68,10 +73,91 @@ interface ResponsesAPIInput {
 }
 
 /**
- * Extrae datos de una factura energética usando GPT-4o.
- * Acepta un Buffer del archivo original (PDF o imagen) y su MIME type.
- * Para PDFs usa la Responses API con input_file nativo.
- * Para imágenes usa la Responses API con input_image.
+ * Llama a la Responses API de OpenAI con el modelo indicado.
+ */
+async function callResponsesAPI(
+  fileBuffer: Buffer,
+  mimeType: string,
+  model: string,
+  apiKey: string,
+): Promise<InvoiceExtraction> {
+  const isPdf = mimeType === 'application/pdf';
+  const base64Data = fileBuffer.toString('base64');
+  const content: ResponsesAPIInput[] = [
+    { type: 'input_text', text: USER_PROMPT },
+  ];
+
+  if (isPdf) {
+    content.push({
+      type: 'input_file',
+      file_data: `data:application/pdf;base64,${base64Data}`,
+      filename: 'factura.pdf',
+    });
+  } else {
+    content.push({
+      type: 'input_image',
+      image_url: `data:${mimeType};base64,${base64Data}`,
+    });
+  }
+
+  const res = await fetch(OPENAI_RESPONSES_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      instructions: SYSTEM_PROMPT,
+      input: [{ role: 'user', content }],
+      max_output_tokens: MAX_TOKENS,
+      temperature: 0,
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error(`[llm-extract] OpenAI API error (${model})`, res.status, errText.slice(0, 500));
+    return emptyExtraction();
+  }
+
+  const data = (await res.json()) as {
+    output?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>;
+    output_text?: string;
+  };
+
+  const raw = data.output_text
+    ?? data.output?.find(o => o.type === 'message')?.content?.find(c => c.type === 'output_text')?.text
+    ?? null;
+
+  if (!raw) {
+    console.error(`[llm-extract] No text in response (${model}):`, JSON.stringify(data).slice(0, 300));
+    return emptyExtraction();
+  }
+
+  return parseLLMResponse(raw.trim());
+}
+
+/**
+ * Calcula un score de confianza real basado en cuántos campos clave se extrajeron.
+ */
+function computeConfidence(e: InvoiceExtraction): number {
+  const fields: [boolean, number][] = [
+    [e.consumption_kwh != null && e.consumption_kwh > 0, 0.25],
+    [e.total_factura != null && e.total_factura > 0, 0.25],
+    [e.company_name != null, 0.10],
+    [e.titular != null, 0.10],
+    [e.cups != null, 0.10],
+    [e.potencia_contratada_kw != null || e.potencia_p1_kw != null, 0.10],
+    [e.tipo_tarifa != null, 0.05],
+    [e.direccion_suministro != null, 0.05],
+  ];
+  return fields.reduce((sum, [ok, weight]) => sum + (ok ? weight : 0), 0);
+}
+
+/**
+ * Extrae datos de una factura energética.
+ * Usa GPT-4o-mini primero (rápido/barato). Si la confianza es < 0.7, reintenta con GPT-4o.
  */
 export async function extractWithLLM(
   fileBuffer: Buffer,
@@ -91,62 +177,20 @@ export async function extractWithLLM(
     return emptyExtraction();
   }
 
-  const base64Data = fileBuffer.toString('base64');
-  const content: ResponsesAPIInput[] = [
-    { type: 'input_text', text: USER_PROMPT },
-  ];
+  const fast = await callResponsesAPI(fileBuffer, mimeType, MODEL_FAST, apiKey);
+  const fastConfidence = computeConfidence(fast);
+  fast.confidence = fastConfidence;
 
-  if (isPdf) {
-    content.push({
-      type: 'input_file',
-      file_data: `data:application/pdf;base64,${base64Data}`,
-      filename: 'factura.pdf',
-    });
-  } else {
-    content.push({
-      type: 'input_image',
-      image_url: `data:${mimeType};base64,${base64Data}`,
-    });
+  if (fastConfidence >= CONFIDENCE_THRESHOLD) {
+    console.log(`[llm-extract] gpt-4o-mini OK (confidence: ${fastConfidence.toFixed(2)})`);
+    return fast;
   }
 
-  const body = {
-    model: MODEL,
-    instructions: SYSTEM_PROMPT,
-    input: [{ role: 'user', content }],
-    max_output_tokens: MAX_TOKENS,
-    temperature: 0,
-  };
-
-  const res = await fetch(OPENAI_RESPONSES_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    const errText = await res.text();
-    console.error('[llm-extract] OpenAI API error', res.status, errText.slice(0, 500));
-    return emptyExtraction();
-  }
-
-  const data = (await res.json()) as {
-    output?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>;
-    output_text?: string;
-  };
-
-  const raw = data.output_text
-    ?? data.output?.find(o => o.type === 'message')?.content?.find(c => c.type === 'output_text')?.text
-    ?? null;
-
-  if (!raw) {
-    console.error('[llm-extract] No text in response:', JSON.stringify(data).slice(0, 300));
-    return emptyExtraction();
-  }
-
-  return parseLLMResponse(raw.trim());
+  console.log(`[llm-extract] gpt-4o-mini low confidence (${fastConfidence.toFixed(2)}), retrying with gpt-4o...`);
+  const full = await callResponsesAPI(fileBuffer, mimeType, MODEL_FULL, apiKey);
+  full.confidence = computeConfidence(full);
+  console.log(`[llm-extract] gpt-4o confidence: ${full.confidence.toFixed(2)}`);
+  return full;
 }
 
 /**
@@ -180,7 +224,7 @@ export async function extractWithLLMImages(
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: MODEL,
+      model: MODEL_FAST,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content },
@@ -226,7 +270,7 @@ function parseLLMResponse(raw: string): InvoiceExtraction {
     period_start: safeString(parsed.period_start),
     period_end: safeString(parsed.period_end),
     period_months: safePeriodMonths(parsed.period_months, safeString(parsed.period_start), safeString(parsed.period_end)),
-    confidence: 0.95,
+    confidence: 0,
     potencia_contratada_kw: safePositiveNumber(parsed.potencia_contratada_kw),
     potencia_p1_kw: safePositiveNumber(parsed.potencia_p1_kw),
     potencia_p2_kw: safePositiveNumber(parsed.potencia_p2_kw),
