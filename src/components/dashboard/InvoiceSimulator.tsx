@@ -452,6 +452,7 @@ function ComparisonView({
   thumbnail?: string | null; selectedOfferId?: string | null;
   onSelectOffer?: (offerId: string) => void; readonly?: boolean;
 }) {
+  const [thumbOpen, setThumbOpen] = useState(false);
   const periodMonths = Math.max(1, extraction.period_months || 1);
   const currentMonthlyCost = snapshot.current_monthly_cost;
   const consumptionMonthly = (extraction.consumption_kwh ?? 0) / periodMonths;
@@ -470,7 +471,16 @@ function ComparisonView({
         <Card>
           <CardHeader className="pb-3"><CardTitle className="text-base flex items-center gap-2"><ImageIcon className="h-4 w-4" />Factura subida</CardTitle></CardHeader>
           <CardContent>
-            <img src={thumbnail} alt="Factura" className="max-h-48 rounded-lg border object-contain" />
+            <img
+              src={thumbnail} alt="Factura"
+              className="max-h-48 rounded-lg border object-contain cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => setThumbOpen(true)}
+            />
+            <Dialog open={thumbOpen} onOpenChange={setThumbOpen}>
+              <DialogContent className="max-w-3xl p-2">
+                <img src={thumbnail} alt="Factura" className="w-full rounded-lg object-contain max-h-[80vh]" />
+              </DialogContent>
+            </Dialog>
           </CardContent>
         </Card>
       )}
@@ -677,7 +687,7 @@ function SimulationsList({
             </TableHeader>
             <TableBody>
               {filtered.map((s) => (
-                <TableRow key={s.id}>
+                <TableRow key={s.id} className="cursor-pointer hover:bg-muted/50" onClick={() => onView(s)}>
                   <TableCell>
                     {s.thumbnail_base64 ? (
                       <img src={s.thumbnail_base64} alt="" className="w-8 h-8 rounded object-cover" />
@@ -699,7 +709,7 @@ function SimulationsList({
                     ) : <span className="text-muted-foreground text-sm">—</span>}
                   </TableCell>
                   <TableCell className="text-sm text-muted-foreground">{formatDate(s.created_at)}</TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-end gap-1">
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onView(s)} title="Ver comparativa"><Eye className="h-4 w-4" /></Button>
                       <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(s)} title="Editar datos"><Pencil className="h-4 w-4" /></Button>
