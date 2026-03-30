@@ -156,54 +156,8 @@ function computeConfidence(e: InvoiceExtraction): number {
 }
 
 /**
- * Compara dos extracciones campo a campo. Devuelve true si los valores clave coinciden.
- */
-function extractionsAgree(a: InvoiceExtraction, b: InvoiceExtraction): boolean {
-  const numClose = (x: number | null, y: number | null, tolerance = 0.01) => {
-    if (x == null && y == null) return true;
-    if (x == null || y == null) return false;
-    return Math.abs(x - y) / Math.max(Math.abs(x), 1) <= tolerance;
-  };
-  return numClose(a.consumption_kwh, b.consumption_kwh)
-    && numClose(a.total_factura, b.total_factura)
-    && a.company_name?.toLowerCase() === b.company_name?.toLowerCase();
-}
-
-/**
- * Fusiona dos extracciones: para cada campo, elige el valor no-null.
- * Si ambos tienen valor, prefiere el de la extracción con mayor confianza.
- */
-function mergeExtractions(a: InvoiceExtraction, b: InvoiceExtraction): InvoiceExtraction {
-  const pick = <T>(va: T, vb: T): T => va ?? vb;
-  const pickNum = (va: number | null, vb: number | null): number | null => va ?? vb;
-  return {
-    company_name: pick(a.company_name, b.company_name),
-    consumption_kwh: pickNum(a.consumption_kwh, b.consumption_kwh),
-    total_factura: pickNum(a.total_factura, b.total_factura),
-    period_start: pick(a.period_start, b.period_start),
-    period_end: pick(a.period_end, b.period_end),
-    period_months: a.period_months > 1 ? a.period_months : b.period_months,
-    confidence: 0,
-    potencia_contratada_kw: pickNum(a.potencia_contratada_kw, b.potencia_contratada_kw),
-    potencia_p1_kw: pickNum(a.potencia_p1_kw, b.potencia_p1_kw),
-    potencia_p2_kw: pickNum(a.potencia_p2_kw, b.potencia_p2_kw),
-    potencia_p3_kw: pickNum(a.potencia_p3_kw, b.potencia_p3_kw),
-    precio_energia_kwh: pickNum(a.precio_energia_kwh, b.precio_energia_kwh),
-    precio_p1_kwh: pickNum(a.precio_p1_kwh, b.precio_p1_kwh),
-    precio_p2_kwh: pickNum(a.precio_p2_kwh, b.precio_p2_kwh),
-    precio_p3_kwh: pickNum(a.precio_p3_kwh, b.precio_p3_kwh),
-    tipo_tarifa: pick(a.tipo_tarifa, b.tipo_tarifa),
-    cups: pick(a.cups, b.cups),
-    titular: pick(a.titular, b.titular),
-    direccion_suministro: pick(a.direccion_suministro, b.direccion_suministro),
-  };
-}
-
-/**
  * Extrae datos de una factura energética.
- * Lanza 2 llamadas GPT-4o-mini en paralelo (temperature 0 y 0.1).
- * Si coinciden en campos clave → alta confianza, devuelve merge.
- * Si no coinciden o la confianza es baja → fallback a GPT-4o.
+ * Una sola llamada GPT-4o-mini. Si la confianza es baja (< 0.7), fallback a GPT-4o.
  */
 export async function extractWithLLM(
   fileBuffer: Buffer,
@@ -223,32 +177,15 @@ export async function extractWithLLM(
     return emptyExtraction();
   }
 
-  const [a, b] = await Promise.all([
-    callResponsesAPI(fileBuffer, mimeType, MODEL_FAST, apiKey),
-    callResponsesAPI(fileBuffer, mimeType, MODEL_FAST, apiKey),
-  ]);
+  const fast = await callResponsesAPI(fileBuffer, mimeType, MODEL_FAST, apiKey);
+  fast.confidence = computeConfidence(fast);
 
-  const confA = computeConfidence(a);
-  const confB = computeConfidence(b);
-  a.confidence = confA;
-  b.confidence = confB;
-
-  const agree = extractionsAgree(a, b);
-  const best = confA >= confB ? a : b;
-
-  if (agree && best.confidence >= CONFIDENCE_THRESHOLD) {
-    const merged = mergeExtractions(a, b);
-    merged.confidence = Math.min(best.confidence + 0.05, 1);
-    console.log(`[llm-extract] 2× gpt-4o-mini agree (confidence: ${merged.confidence.toFixed(2)})`);
-    return merged;
+  if (fast.confidence >= CONFIDENCE_THRESHOLD) {
+    console.log(`[llm-extract] gpt-4o-mini OK (confidence: ${fast.confidence.toFixed(2)})`);
+    return fast;
   }
 
-  if (best.confidence >= CONFIDENCE_THRESHOLD) {
-    console.log(`[llm-extract] gpt-4o-mini partial agree, using best (confidence: ${best.confidence.toFixed(2)})`);
-    return best;
-  }
-
-  console.log(`[llm-extract] gpt-4o-mini low confidence (${best.confidence.toFixed(2)}), retrying with gpt-4o...`);
+  console.log(`[llm-extract] gpt-4o-mini low confidence (${fast.confidence.toFixed(2)}), fallback to gpt-4o...`);
   const full = await callResponsesAPI(fileBuffer, mimeType, MODEL_FULL, apiKey);
   full.confidence = computeConfidence(full);
   console.log(`[llm-extract] gpt-4o confidence: ${full.confidence.toFixed(2)}`);

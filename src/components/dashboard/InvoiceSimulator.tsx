@@ -341,10 +341,18 @@ function UploadStep({ onExtracted }: { onExtracted: (data: InvoiceExtraction, fi
           <input ref={inputRef} type="file" className="hidden" accept={ACCEPTED_TYPES} onChange={(e) => { const f = e.target.files?.[0]; if (f) processFile(f); }} disabled={loading} />
           {loading ? (
             <div className="flex flex-col items-center gap-3 text-center px-4">
-              <Loader2 className="h-10 w-10 animate-spin text-primary" />
-              <p className="text-sm font-medium">Procesando con GPT-4o...</p>
-              <p className="text-xs text-muted-foreground">{fileName}</p>
-              <p className="text-xs text-muted-foreground">Esto puede tardar 15-30 segundos</p>
+              <div className="relative">
+                <div className="h-12 w-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+                <Zap className="h-5 w-5 text-primary absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Analizando factura<span className="inline-flex w-6 text-left"><span className="animate-pulse">...</span></span></p>
+                <p className="text-xs text-muted-foreground mt-1">{fileName}</p>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <div className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
+                <span>Extrayendo datos de consumo, potencia y tarifas</span>
+              </div>
             </div>
           ) : (
             <div className="flex flex-col items-center gap-3 text-center px-4">
