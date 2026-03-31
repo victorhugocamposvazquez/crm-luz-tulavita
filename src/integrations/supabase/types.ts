@@ -164,6 +164,30 @@ export type Database = {
         }
         Relationships: []
       }
+      invoice_estimate_settings: {
+        Row: {
+          id: number
+          electricity_tax_rate: number
+          vat_rate: number
+          fixed_charges_eur_per_day: number
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          electricity_tax_rate: number
+          vat_rate: number
+          fixed_charges_eur_per_day: number
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          electricity_tax_rate?: number
+          vat_rate?: number
+          fixed_charges_eur_per_day?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       invoice_simulations: {
         Row: {
           id: string

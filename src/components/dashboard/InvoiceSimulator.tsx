@@ -57,6 +57,12 @@ import {
   Image as ImageIcon,
   MapPin,
 } from 'lucide-react';
+import {
+  estimateSpanishBillTotal,
+  getFallbackInvoiceEstimateTaxConfig,
+  rowToInvoiceEstimateTaxConfig,
+  type InvoiceEstimateTaxConfig,
+} from '@/config/invoiceEstimateTaxes';
 
 const SIMULATE_API = import.meta.env.VITE_SIMULATE_INVOICE_API_URL ?? '/api/simulate-invoice';
 const ACCEPTED_TYPES = '.pdf,.jpg,.jpeg,.png,.webp';
@@ -121,6 +127,9 @@ interface EnergyOffer {
 
 interface OfferWithCost extends EnergyOffer {
   monthlyCost: number;
+  /** Solo energía + potencia (sin impuestos); para alinear con Excel antes de IE/IVA. */
+  terminoEnergia?: number;
+  terminoPotencia?: number;
   isBest: boolean;
   isCurrent: boolean;
 }
@@ -151,15 +160,32 @@ interface SimulationRow {
 // ---------- helpers ----------
 
 const DEFAULT_POWER_KW = 4.6;
-const DAYS_PER_MONTH = 30;
+/** Solo si no hay fechas en la factura: mismo criterio que antes (30 días/mes). */
+const FALLBACK_POWER_DAYS_PER_MONTH = 30;
 
-function calcMonthlyCost(
+/** Días del periodo facturado (inclusive). Alinea el término de potencia (€/kW/día × kW × días) con facturas y Excel. */
+function countBillingDaysInclusive(periodStart: string | null, periodEnd: string | null): number | null {
+  if (!periodStart || !periodEnd) return null;
+  try {
+    const s = new Date(`${periodStart}T12:00:00`);
+    const e = new Date(`${periodEnd}T12:00:00`);
+    if (!Number.isFinite(s.getTime()) || !Number.isFinite(e.getTime()) || e < s) return null;
+    const days = Math.round((e.getTime() - s.getTime()) / (86400000)) + 1;
+    if (days < 1 || days > 370) return null;
+    return days;
+  } catch {
+    return null;
+  }
+}
+
+function calcMonthlyCostBreakdown(
   consumptionKwh: number,
   offer: EnergyOffer,
   powerKw: number | null,
   powersByPeriod?: (number | null)[],
   consumptionByPeriod?: (number | null)[],
-): number {
+  powerDaysPerBillMonth: number = FALLBACK_POWER_DAYS_PER_MONTH,
+): { terminoEnergia: number; terminoPotencia: number; total: number } {
   const offerPrices = [offer.price_p1, offer.price_p2, offer.price_p3, offer.price_p4, offer.price_p5, offer.price_p6];
   const hasPeriodPrices = offerPrices.some((v) => v != null);
 
@@ -178,22 +204,37 @@ function calcMonthlyCost(
   const offerPotPeriods = [offer.p1, offer.p2, offer.p3, offer.p4, offer.p5, offer.p6];
   const activePotPeriods = offerPotPeriods.filter((v) => v != null) as number[];
 
-  if (activePotPeriods.length === 0) return terminoEnergia + offer.monthly_fixed_cost;
+  if (activePotPeriods.length === 0) {
+    const total = terminoEnergia + offer.monthly_fixed_cost;
+    return { terminoEnergia, terminoPotencia: offer.monthly_fixed_cost, total };
+  }
 
   let terminoPotencia = 0;
   if (powersByPeriod && powersByPeriod.length >= activePotPeriods.length) {
     for (let i = 0; i < activePotPeriods.length; i++) {
       const pw = powersByPeriod[i] ?? powerKw ?? DEFAULT_POWER_KW;
-      terminoPotencia += pw * DAYS_PER_MONTH * activePotPeriods[i];
+      terminoPotencia += pw * powerDaysPerBillMonth * activePotPeriods[i];
     }
   } else {
     const power = powerKw ?? DEFAULT_POWER_KW;
     for (const period of activePotPeriods) {
-      terminoPotencia += power * DAYS_PER_MONTH * period;
+      terminoPotencia += power * powerDaysPerBillMonth * period;
     }
   }
 
-  return terminoEnergia + terminoPotencia;
+  const total = terminoEnergia + terminoPotencia;
+  return { terminoEnergia, terminoPotencia, total };
+}
+
+function calcMonthlyCost(
+  consumptionKwh: number,
+  offer: EnergyOffer,
+  powerKw: number | null,
+  powersByPeriod?: (number | null)[],
+  consumptionByPeriod?: (number | null)[],
+  powerDaysPerBillMonth: number = FALLBACK_POWER_DAYS_PER_MONTH,
+): number {
+  return calcMonthlyCostBreakdown(consumptionKwh, offer, powerKw, powersByPeriod, consumptionByPeriod, powerDaysPerBillMonth).total;
 }
 
 function normalizeCompany(name: string): string {
@@ -211,10 +252,21 @@ function filterOffersByTarifa(offers: EnergyOffer[], tarifaTipo: string): Energy
   return matched.length > 0 ? matched : offers;
 }
 
-function buildComparison(extraction: InvoiceExtraction, offers: EnergyOffer[]): { snapshot: ComparisonSnapshot; offersWithCost: OfferWithCost[] } {
+function buildComparison(
+  extraction: InvoiceExtraction,
+  offers: EnergyOffer[],
+  taxConfig: InvoiceEstimateTaxConfig,
+): { snapshot: ComparisonSnapshot; offersWithCost: OfferWithCost[] } {
   const periodMonths = Math.max(1, extraction.period_months || 1);
   const currentMonthlyCost = (extraction.total_factura ?? 0) / periodMonths;
   const consumptionMonthly = (extraction.consumption_kwh ?? 0) / periodMonths;
+  const billDays = countBillingDaysInclusive(extraction.period_start, extraction.period_end);
+  const powerDaysPerBillMonth = billDays != null && billDays >= 28
+    ? billDays / periodMonths
+    : FALLBACK_POWER_DAYS_PER_MONTH;
+  const taxBillingDays = billDays != null && billDays >= 28 && billDays <= 370
+    ? billDays
+    : FALLBACK_POWER_DAYS_PER_MONTH;
   const currentCompany = extraction.company_name ? normalizeCompany(extraction.company_name) : null;
   const extractedPower = extraction.potencia_contratada_kw
     ?? (extraction.potencia_p1_kw != null && extraction.potencia_p2_kw != null
@@ -232,10 +284,19 @@ function buildComparison(extraction: InvoiceExtraction, offers: EnergyOffer[]): 
   ].map((v) => v != null ? v / periodMonths : null);
 
   const offersWithCost: OfferWithCost[] = offers.map((o) => {
-    const cost = calcMonthlyCost(consumptionMonthly, o, extractedPower, powersByPeriod, consumptionByPeriod);
+    const { terminoEnergia, terminoPotencia, total } = calcMonthlyCostBreakdown(
+      consumptionMonthly, o, extractedPower, powersByPeriod, consumptionByPeriod, powerDaysPerBillMonth,
+    );
     const isCurrent = currentCompany != null
       && o.company_name.trim().toLowerCase() === currentCompany.trim().toLowerCase();
-    return { ...o, monthlyCost: Math.round(cost * 100) / 100, isBest: false, isCurrent };
+    return {
+      ...o,
+      monthlyCost: Math.round(total * 100) / 100,
+      terminoEnergia: Math.round(terminoEnergia * 100) / 100,
+      terminoPotencia: Math.round(terminoPotencia * 100) / 100,
+      isBest: false,
+      isCurrent,
+    };
   });
 
   const comparable = offersWithCost.filter((o) => !o.isCurrent);
@@ -245,7 +306,11 @@ function buildComparison(extraction: InvoiceExtraction, offers: EnergyOffer[]): 
   }
 
   const best = comparable.find((o) => o.isBest);
-  const savingsAmount = best ? Math.round((currentMonthlyCost - best.monthlyCost) * 100) / 100 : null;
+  const bestApproxBill = best ? estimateSpanishBillTotal(best.monthlyCost, taxBillingDays, taxConfig) : null;
+  /** Ahorro frente al total factura actual, usando la misma capa IE+IVA+cargos que el Excel (~756 € vs ~585 € base). */
+  const savingsAmount = bestApproxBill != null
+    ? Math.round((currentMonthlyCost - bestApproxBill) * 100) / 100
+    : null;
   const savingsPercent = currentMonthlyCost > 0 && savingsAmount != null
     ? Math.round((savingsAmount / currentMonthlyCost) * 10000) / 100
     : null;
@@ -562,22 +627,32 @@ function ExtractionStep({
 }
 
 function ComparisonView({
-  extraction, offersWithCost, snapshot, thumbnail, selectedOfferId, onSelectOffer, readonly,
+  extraction, offersWithCost, snapshot, thumbnail, selectedOfferId, onSelectOffer, readonly, taxConfig,
 }: {
   extraction: InvoiceExtraction; offersWithCost: OfferWithCost[]; snapshot: ComparisonSnapshot;
   thumbnail?: string | null; selectedOfferId?: string | null;
   onSelectOffer?: (offerId: string) => void; readonly?: boolean;
+  taxConfig: InvoiceEstimateTaxConfig;
 }) {
   const [thumbOpen, setThumbOpen] = useState(false);
   const periodMonths = Math.max(1, extraction.period_months || 1);
+  const billDaysForTax = countBillingDaysInclusive(extraction.period_start, extraction.period_end);
+  const taxBillingDays = billDaysForTax != null && billDaysForTax >= 28 && billDaysForTax <= 370
+    ? billDaysForTax
+    : FALLBACK_POWER_DAYS_PER_MONTH;
   const currentMonthlyCost = snapshot.current_monthly_cost;
   const consumptionMonthly = (extraction.consumption_kwh ?? 0) / periodMonths;
   const currentCompany = extraction.company_name ? normalizeCompany(extraction.company_name) : null;
   const extractedPower = extraction.potencia_contratada_kw
     ?? (extraction.potencia_p1_kw != null && extraction.potencia_p2_kw != null ? (extraction.potencia_p1_kw + extraction.potencia_p2_kw) / 2 : null);
   const best = offersWithCost.find((o) => o.isBest);
-  const savingsAmount = snapshot.savings_amount ?? 0;
-  const savingsPercent = snapshot.savings_percent ?? 0;
+  const displayBestApprox = best ? estimateSpanishBillTotal(best.monthlyCost, taxBillingDays, taxConfig) : null;
+  const displaySavingsAmount = displayBestApprox != null && currentMonthlyCost > displayBestApprox
+    ? Math.round((currentMonthlyCost - displayBestApprox) * 100) / 100
+    : 0;
+  const displaySavingsPercent = currentMonthlyCost > 0 && displaySavingsAmount > 0
+    ? Math.round((displaySavingsAmount / currentMonthlyCost) * 10000) / 100
+    : 0;
   const sorted = [...offersWithCost].sort((a, b) => a.monthlyCost - b.monthlyCost);
   const selected = selectedOfferId ? offersWithCost.find((o) => o.id === selectedOfferId) : null;
 
@@ -608,24 +683,45 @@ function ComparisonView({
               </div>
               {best && (
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-950/20 p-4">
-                  <p className="text-xs text-muted-foreground mb-1">Mejor oferta</p>
+                  <p className="text-xs text-muted-foreground mb-1">Mejor oferta (energía + potencia)</p>
                   <p className="text-2xl font-bold text-emerald-600">{best.monthlyCost.toFixed(2)} €</p>
-                  <p className="text-xs text-muted-foreground mt-1">{best.company_name}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {best.company_name}
+                    {' · '}
+                    ≈ {estimateSpanishBillTotal(best.monthlyCost, taxBillingDays, taxConfig).toFixed(2)} € con IE+IVA (est., {taxBillingDays} d.)
+                  </p>
                 </div>
               )}
-              {best && savingsAmount > 0 && (
+              {best && displaySavingsAmount > 0 && (
                 <div className="rounded-lg border border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-950/20 p-4">
-                  <p className="text-xs text-muted-foreground mb-1">Ahorro estimado</p>
-                  <p className="text-2xl font-bold text-blue-600">{savingsAmount.toFixed(2)} €/mes</p>
+                  <p className="text-xs text-muted-foreground mb-1">Ahorro estimado (total c/ IE+IVA est.)</p>
+                  <p className="text-2xl font-bold text-blue-600">{displaySavingsAmount.toFixed(2)} €/mes</p>
                   <div className="flex items-center gap-1.5 mt-1">
                     <TrendingDown className="h-3 w-3 text-emerald-500" />
-                    <span className="text-xs font-medium text-emerald-600">{savingsPercent.toFixed(1)}%</span>
-                    {savingsPercent > 45 && <Badge variant="secondary" className="text-[10px] px-1.5 py-0"><AlertTriangle className="h-2.5 w-2.5 mr-0.5" />Prudente</Badge>}
+                    <span className="text-xs font-medium text-emerald-600">{displaySavingsPercent.toFixed(1)}%</span>
+                    {displaySavingsPercent > 45 && <Badge variant="secondary" className="text-[10px] px-1.5 py-0"><AlertTriangle className="h-2.5 w-2.5 mr-0.5" />Prudente</Badge>}
                   </div>
                 </div>
               )}
             </div>
           </div>
+          <p className="text-xs text-muted-foreground leading-relaxed pt-1">
+            Coste actual: total de la factura entre meses (IVA, impuesto eléctrico, alquiler, etc.). Las ofertas muestran primero la base comercial (energía + potencia) con los días del periodo de la factura; la columna «≈ Factura» usa coeficientes configurables (por defecto IE
+            {' '}
+            {(taxConfig.electricityTaxRate * 100).toFixed(3)}
+            % sobre esa base, cargos fijos ~
+            {' '}
+            {taxConfig.fixedChargesEurPerDay.toFixed(4)}
+            {' '}
+            €/día, IVA
+            {' '}
+            {(taxConfig.vatRate * 100).toFixed(0)}
+            %). Los coeficientes se configuran en el menú «Simulador: IE / IVA»; si falla la base de datos, se usan variables VITE_INVOICE_* o valores por defecto. En 3.0TD, si en la factura la potencia P6 difiere del resto (p. ej. 33 kW frente a 26 kW), revisa que en la extracción estén
+            {' '}
+            <code className="text-[11px]">potencia_p6_kw</code>
+            {' '}
+            y consumos P1–P6: si faltan, el CRM repite la potencia media y se desvía del Excel.
+          </p>
         </CardContent>
       </Card>
 
@@ -677,11 +773,12 @@ function ComparisonView({
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Todas las ofertas activas</CardTitle>
           <CardDescription>
-            Coste mensual estimado para {consumptionMonthly.toFixed(0)} kWh/mes con {extractedPower ?? DEFAULT_POWER_KW} kW
+            Base comercial (sin IE ni IVA) para {consumptionMonthly.toFixed(0)} kWh/mes; potencia según datos por periodo si existen.
+            «≈ Factura» = base + impuesto eléctrico + cargos fijos estimados ({taxBillingDays} d.) + IVA {(taxConfig.vatRate * 100).toFixed(0)} % (coef. desde backoffice o fallback), criterio tipo Excel.
             {!readonly && <span className="ml-1">· Haz clic en una fila para seleccionar la oferta propuesta</span>}
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -690,15 +787,20 @@ function ComparisonView({
                 <TableHead className="text-right">€/kWh</TableHead>
                 <TableHead className="text-right">P1</TableHead>
                 <TableHead className="text-right">P2</TableHead>
-                <TableHead className="text-right">Coste mensual</TableHead>
-                <TableHead className="text-right">Ahorro</TableHead>
+                <TableHead className="text-right">Energía</TableHead>
+                <TableHead className="text-right">Potencia</TableHead>
+                <TableHead className="text-right">Base</TableHead>
+                <TableHead className="text-right">≈ Factura</TableHead>
+                <TableHead className="text-right">Ahorro*</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sorted.map((o) => {
                 const saving = currentMonthlyCost - o.monthlyCost;
-                const savingPct = currentMonthlyCost > 0 ? (saving / currentMonthlyCost) * 100 : 0;
+                const savingFactura = currentMonthlyCost - estimateSpanishBillTotal(o.monthlyCost, taxBillingDays, taxConfig);
+                const savingFacturaPct = currentMonthlyCost > 0 ? (savingFactura / currentMonthlyCost) * 100 : 0;
                 const isSelected = selectedOfferId === o.id;
+                const approxBill = estimateSpanishBillTotal(o.monthlyCost, taxBillingDays, taxConfig);
                 return (
                   <TableRow
                     key={o.id}
@@ -723,16 +825,26 @@ function ComparisonView({
                     <TableCell className="text-right">{o.price_per_kwh.toFixed(4)}</TableCell>
                     <TableCell className="text-right">{o.p1 != null ? o.p1.toFixed(6) : '—'}</TableCell>
                     <TableCell className="text-right">{o.p2 != null ? o.p2.toFixed(6) : '—'}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">{o.terminoEnergia != null ? `${o.terminoEnergia.toFixed(2)} €` : '—'}</TableCell>
+                    <TableCell className="text-right text-muted-foreground">{o.terminoPotencia != null ? `${o.terminoPotencia.toFixed(2)} €` : '—'}</TableCell>
                     <TableCell className="text-right font-medium">{o.monthlyCost.toFixed(2)} €</TableCell>
-                    <TableCell className="text-right">
-                      {saving > 0 ? <span className="text-emerald-600 font-medium">-{saving.toFixed(2)} € ({savingPct.toFixed(1)}%)</span>
-                        : saving < 0 ? <span className="text-red-500 text-xs">+{Math.abs(saving).toFixed(2)} €</span>
-                        : <span className="text-muted-foreground">—</span>}
+                    <TableCell className="text-right font-medium text-muted-foreground">{approxBill.toFixed(2)} €</TableCell>
+                    <TableCell className="text-right text-xs">
+                      {savingFactura > 0 ? (
+                        <span className="text-emerald-600 font-medium block">-{savingFactura.toFixed(2)} € ({savingFacturaPct.toFixed(1)}%)</span>
+                      ) : savingFactura < 0 ? (
+                        <span className="text-red-500 block">+{Math.abs(savingFactura).toFixed(2)} €</span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                      <span className="text-muted-foreground font-normal block mt-0.5">
+                        base {saving > 0 ? `-${saving.toFixed(2)}` : saving < 0 ? `+${Math.abs(saving).toFixed(2)}` : '—'}
+                      </span>
                     </TableCell>
                   </TableRow>
                 );
               })}
-              {sorted.length === 0 && <TableRow><TableCell colSpan={!readonly ? 7 : 6} className="text-center text-muted-foreground py-8">No hay ofertas activas</TableCell></TableRow>}
+              {sorted.length === 0 && <TableRow><TableCell colSpan={!readonly ? 11 : 10} className="text-center text-muted-foreground py-8">No hay ofertas activas</TableCell></TableRow>}
             </TableBody>
           </Table>
         </CardContent>
@@ -877,6 +989,22 @@ export default function InvoiceSimulator() {
   const [currentSnapshot, setCurrentSnapshot] = useState<ComparisonSnapshot | null>(null);
   const [currentOffersWithCost, setCurrentOffersWithCost] = useState<OfferWithCost[]>([]);
   const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
+  const [taxConfig, setTaxConfig] = useState<InvoiceEstimateTaxConfig>(() => getFallbackInvoiceEstimateTaxConfig());
+
+  const fetchInvoiceEstimateSettings = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('invoice_estimate_settings')
+        .select('electricity_tax_rate, vat_rate, fixed_charges_eur_per_day')
+        .eq('id', 1)
+        .maybeSingle();
+      if (error) throw error;
+      if (data) setTaxConfig(rowToInvoiceEstimateTaxConfig(data));
+      else setTaxConfig(getFallbackInvoiceEstimateTaxConfig());
+    } catch {
+      setTaxConfig(getFallbackInvoiceEstimateTaxConfig());
+    }
+  }, []);
 
   const fetchOffers = useCallback(async () => {
     setLoadingOffers(true);
@@ -935,7 +1063,11 @@ export default function InvoiceSimulator() {
     }
   }, []);
 
-  useEffect(() => { fetchOffers(); fetchSimulations(); }, [fetchOffers, fetchSimulations]);
+  useEffect(() => {
+    fetchOffers();
+    fetchSimulations();
+    fetchInvoiceEstimateSettings();
+  }, [fetchOffers, fetchSimulations, fetchInvoiceEstimateSettings]);
 
   const goToWizard = useCallback(() => {
     setMode('wizard');
@@ -984,12 +1116,12 @@ export default function InvoiceSimulator() {
     if (!extraction) return;
     const tarifaTipo = detectTarifaTipo(extraction);
     const filtered = filterOffersByTarifa(offers, tarifaTipo);
-    const { snapshot, offersWithCost } = buildComparison(extraction, filtered);
+    const { snapshot, offersWithCost } = buildComparison(extraction, filtered, taxConfig);
     setCurrentSnapshot(snapshot);
     setCurrentOffersWithCost(offersWithCost);
     setSelectedOfferId(snapshot.selected_offer_id);
     setStep(3);
-  }, [extraction, offers]);
+  }, [extraction, offers, taxConfig]);
 
   const handleViewSimulation = useCallback((s: SimulationRow) => {
     setExtraction(s.extraction);
@@ -1004,13 +1136,13 @@ export default function InvoiceSimulator() {
     } else {
       const tarifaTipo = detectTarifaTipo(s.extraction);
       const filtered = filterOffersByTarifa(offers, tarifaTipo);
-      const { snapshot, offersWithCost } = buildComparison(s.extraction, filtered);
+      const { snapshot, offersWithCost } = buildComparison(s.extraction, filtered, taxConfig);
       setCurrentSnapshot(snapshot);
       setCurrentOffersWithCost(offersWithCost);
       setSelectedOfferId(snapshot.selected_offer_id);
     }
     setMode('view');
-  }, [offers]);
+  }, [offers, taxConfig]);
 
   const handleEditSimulation = useCallback((s: SimulationRow) => {
     setExtraction(s.extraction);
@@ -1170,6 +1302,7 @@ export default function InvoiceSimulator() {
                     thumbnail={thumbnail}
                     selectedOfferId={selectedOfferId}
                     onSelectOffer={handleSelectOffer}
+                    taxConfig={taxConfig}
                   />
                   <div className="flex items-center justify-between pt-4">
                     <Button variant="outline" onClick={() => setStep(2)}><ArrowLeft className="h-4 w-4 mr-2" />Editar datos</Button>
@@ -1205,6 +1338,7 @@ export default function InvoiceSimulator() {
             thumbnail={thumbnail}
             selectedOfferId={selectedOfferId}
             onSelectOffer={handleSelectOffer}
+            taxConfig={taxConfig}
           />
         </>
       )}

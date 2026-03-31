@@ -1,8 +1,8 @@
 /**
  * Pipeline de extracción de facturas energéticas.
  *
- * Flujo: hash check → caché hit? → devolver / GPT-4o-mini (×2 paralelo) → merge →
- * validación → si baja confianza → GPT-4o fallback → resultado final.
+ * Flujo: caché por hash → si no hay hit, LLM (gpt-4o-mini y opcionalmente gpt-4o) → validación.
+ * TTL caché: INVOICE_CACHE_TTL_MS (ms), por defecto 30 min.
  */
 
 import { createHash } from 'crypto';
@@ -15,7 +15,10 @@ const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
 const PROMPT_VERSION = 'v10-sin-precios-sinteticos';
 const extractionCache = new Map<string, { extraction: InvoiceExtraction; ts: number; pv: string }>();
-const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutos
+const CACHE_TTL_MS = (() => {
+  const n = Number(process.env.INVOICE_CACHE_TTL_MS ?? '');
+  return Number.isFinite(n) && n >= 0 ? n : 30 * 60 * 1000;
+})();
 
 function fileHash(buffer: Buffer): string {
   return createHash('md5').update(buffer).digest('hex');

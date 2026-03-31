@@ -14,8 +14,13 @@ import { emptyExtraction } from './types.js';
 const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
 const MODEL_FAST = 'gpt-4o-mini';
 const MODEL_FULL = 'gpt-4o';
-const CONFIDENCE_THRESHOLD = 0.7;
-const MAX_TOKENS = 1500;
+/** Por debajo: segunda llamada a gpt-4o (más lenta). Subir solo si aceptas más fallos sin fallback. */
+const CONFIDENCE_THRESHOLD = Number(process.env.INVOICE_LLM_CONFIDENCE_THRESHOLD ?? '0.7') || 0.7;
+const MAX_TOKENS = (() => {
+  const raw = process.env.INVOICE_LLM_MAX_OUTPUT_TOKENS;
+  const n = raw != null && raw !== '' ? Number(raw) : 1400;
+  return Math.min(4096, Math.max(800, Number.isFinite(n) ? n : 1400));
+})();
 
 const SYSTEM_PROMPT = `Eres un experto en facturas de energía eléctrica y gas en España. Tu trabajo es extraer datos estructurados de facturas.
 
@@ -197,8 +202,10 @@ function computeConfidence(e: InvoiceExtraction): number {
   if (is30TD(e)) {
     const has6Pot = [e.potencia_p1_kw, e.potencia_p2_kw, e.potencia_p3_kw, e.potencia_p4_kw, e.potencia_p5_kw, e.potencia_p6_kw]
       .filter((v) => v != null).length >= 6;
-    const has6Price = [e.precio_p1_kwh, e.precio_p2_kwh, e.precio_p3_kwh, e.precio_p4_kwh, e.precio_p5_kwh, e.precio_p6_kwh]
-      .filter((v) => v != null).length >= 4;
+    /** En 3.0TD muchas facturas solo muestran precio en periodos con consumo (p. ej. 3 de 6). Exigir ≥3, no 4. */
+    const priceCount = [e.precio_p1_kwh, e.precio_p2_kwh, e.precio_p3_kwh, e.precio_p4_kwh, e.precio_p5_kwh, e.precio_p6_kwh]
+      .filter((v) => v != null).length;
+    const has6Price = priceCount >= 3;
     const hasConsumoBreakdown = [e.consumo_p1_kwh, e.consumo_p2_kwh, e.consumo_p3_kwh, e.consumo_p4_kwh, e.consumo_p5_kwh, e.consumo_p6_kwh]
       .some((v) => v != null && v > 0);
     score += has6Pot ? 0.08 : 0;
@@ -225,7 +232,13 @@ function computeConfidence(e: InvoiceExtraction): number {
 
 /**
  * Extrae datos de una factura energética.
- * Una sola llamada GPT-4o-mini. Si la confianza es baja (< 0.7), fallback a GPT-4o.
+ * Por defecto: gpt-4o-mini y, si la confianza es baja, una segunda llamada a gpt-4o.
+ *
+ * Variables de entorno (opcional):
+ * - INVOICE_LLM_MODEL: si está definida (ej. gpt-4o-mini o gpt-4o), una sola llamada con ese modelo.
+ * - INVOICE_LLM_DISABLE_FALLBACK=1: no llamar a gpt-4o (más rápido; peor en facturas difíciles).
+ * - INVOICE_LLM_CONFIDENCE_THRESHOLD: umbral 0–1 (por defecto 0.7). Más bajo = menos fallbacks.
+ * - INVOICE_LLM_MAX_OUTPUT_TOKENS: límite de salida (por defecto 1200; menos = algo más rápido).
  */
 export async function extractWithLLM(
   fileBuffer: Buffer,
@@ -245,21 +258,40 @@ export async function extractWithLLM(
     return emptyExtraction();
   }
 
+  const singleModel = (process.env.INVOICE_LLM_MODEL ?? '').trim();
+  const noFallback = process.env.INVOICE_LLM_DISABLE_FALLBACK === '1'
+    || process.env.INVOICE_LLM_DISABLE_FALLBACK === 'true';
+
+  if (singleModel) {
+    const t0 = Date.now();
+    const one = await callResponsesAPI(fileBuffer, mimeType, singleModel, apiKey);
+    one.confidence = computeConfidence(one);
+    console.log(`[llm-extract] ${singleModel} single call in ${Date.now() - t0}ms (confidence: ${one.confidence.toFixed(2)})`);
+    return one;
+  }
+
+  const tFast = Date.now();
   const fast = await callResponsesAPI(fileBuffer, mimeType, MODEL_FAST, apiKey);
   fast.confidence = computeConfidence(fast);
+  console.log(`[llm-extract] gpt-4o-mini in ${Date.now() - tFast}ms (confidence: ${fast.confidence.toFixed(2)})`);
 
   if (fast.confidence >= CONFIDENCE_THRESHOLD) {
-    console.log(`[llm-extract] gpt-4o-mini OK (confidence: ${fast.confidence.toFixed(2)})`);
     return fast;
   }
 
-  console.log(`[llm-extract] gpt-4o-mini low confidence (${fast.confidence.toFixed(2)}), fallback to gpt-4o...`);
+  if (noFallback) {
+    console.log('[llm-extract] fallback desactivado (INVOICE_LLM_DISABLE_FALLBACK), devolviendo mini');
+    return fast;
+  }
+
+  console.log(`[llm-extract] gpt-4o-mini bajo umbral (${fast.confidence.toFixed(2)} < ${CONFIDENCE_THRESHOLD}), fallback gpt-4o...`);
+  const tFull = Date.now();
   const full = await callResponsesAPI(fileBuffer, mimeType, MODEL_FULL, apiKey);
   full.confidence = computeConfidence(full);
-  console.log(`[llm-extract] gpt-4o confidence: ${full.confidence.toFixed(2)}`);
+  console.log(`[llm-extract] gpt-4o in ${Date.now() - tFull}ms (confidence: ${full.confidence.toFixed(2)})`);
 
   if (full.confidence >= fast.confidence) return full;
-  console.log(`[llm-extract] gpt-4o worse than mini, returning mini`);
+  console.log('[llm-extract] gpt-4o peor que mini, devolviendo mini');
   return fast;
 }
 

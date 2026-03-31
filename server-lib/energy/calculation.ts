@@ -32,7 +32,21 @@ const MIN_CONSUMPTION_KWH = 50;
 const MAX_CONSUMPTION_KWH = 5000;
 const MIN_OCR_CONFIDENCE = 0.8;
 const DEFAULT_POWER_KW = 4.6;
-const DAYS_PER_MONTH = 30;
+const FALLBACK_POWER_DAYS_PER_MONTH = 30;
+
+function countBillingDaysInclusive(periodStart: string | null, periodEnd: string | null): number | null {
+  if (!periodStart || !periodEnd) return null;
+  try {
+    const s = new Date(`${periodStart}T12:00:00`);
+    const e = new Date(`${periodEnd}T12:00:00`);
+    if (!Number.isFinite(s.getTime()) || !Number.isFinite(e.getTime()) || e < s) return null;
+    const days = Math.round((e.getTime() - s.getTime()) / (86400000)) + 1;
+    if (days < 1 || days > 370) return null;
+    return days;
+  } catch {
+    return null;
+  }
+}
 
 export async function getActiveOffers(supabase: SupabaseClient): Promise<EnergyOffer[]> {
   const { data, error } = await supabase
@@ -60,7 +74,8 @@ export async function getActiveOffers(supabase: SupabaseClient): Promise<EnergyO
 export function monthlyCost(
   consumptionKwh: number,
   offer: EnergyOffer,
-  powerKw?: number | null
+  powerKw?: number | null,
+  powerDaysPerBillMonth: number = FALLBACK_POWER_DAYS_PER_MONTH,
 ): number {
   const terminoEnergia = consumptionKwh * offer.price_per_kwh;
   const p1 = offer.p1 ?? null;
@@ -68,7 +83,7 @@ export function monthlyCost(
   const power = powerKw ?? DEFAULT_POWER_KW;
   const terminoPotencia =
     p1 != null && p2 != null
-      ? power * DAYS_PER_MONTH * ((p1 + p2) / 2)
+      ? power * powerDaysPerBillMonth * ((p1 + p2) / 2)
       : offer.monthly_fixed_cost;
   return terminoEnergia + terminoPotencia;
 }
@@ -125,6 +140,10 @@ export function runComparison(
 
   const currentMonthlyCost = totalFactura / periodMonths;
   const consumptionMonthly = consumption / periodMonths;
+  const billDays = countBillingDaysInclusive(extraction.period_start, extraction.period_end);
+  const powerDaysPerBillMonth = billDays != null && billDays >= 28
+    ? billDays / periodMonths
+    : FALLBACK_POWER_DAYS_PER_MONTH;
 
   const extractedPower = extraction.potencia_contratada_kw
     ?? (extraction.potencia_p1_kw != null && extraction.potencia_p2_kw != null
@@ -140,9 +159,9 @@ export function runComparison(
   if (comparable.length === 0) return null;
 
   let best = comparable[0];
-  let bestCost = monthlyCost(consumptionMonthly, best, extractedPower);
+  let bestCost = monthlyCost(consumptionMonthly, best, extractedPower, powerDaysPerBillMonth);
   for (let i = 1; i < comparable.length; i++) {
-    const cost = monthlyCost(consumptionMonthly, comparable[i], extractedPower);
+    const cost = monthlyCost(consumptionMonthly, comparable[i], extractedPower, powerDaysPerBillMonth);
     if (cost < bestCost) {
       bestCost = cost;
       best = comparable[i];

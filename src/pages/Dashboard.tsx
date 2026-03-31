@@ -15,6 +15,7 @@ import EnergyOffersManagement from '@/components/dashboard/EnergyOffersManagemen
 import InvoiceSimulator from '@/components/dashboard/InvoiceSimulator';
 
 const ClientManagement = lazy(() => import('@/components/dashboard/ClientManagement'));
+const InvoiceEstimateSettingsManagement = lazy(() => import('@/components/dashboard/InvoiceEstimateSettingsManagement'));
 
 export default function Dashboard() {
   const { user, userRole, loading } = useAuth();
@@ -61,6 +62,12 @@ export default function Dashboard() {
         return isAdmin ? <EnergyOffersManagement /> : <CommercialVisitsManager />;
       case 'invoice-simulator':
         return isAdmin ? <InvoiceSimulator /> : <CommercialVisitsManager />;
+      case 'invoice-estimate-settings':
+        return isAdmin ? (
+          <Suspense fallback={<div className="p-6">Cargando…</div>}>
+            <InvoiceEstimateSettingsManagement />
+          </Suspense>
+        ) : <CommercialVisitsManager />;
       case 'stats':
         return <CommercialStatistics />;
       default:
