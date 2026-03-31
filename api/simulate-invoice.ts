@@ -7,7 +7,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Busboy from 'busboy';
-import { extractInvoiceFromBuffer } from '../server-lib/invoice/pipeline.js';
+import { extractInvoiceFromBufferDetailed } from '../server-lib/invoice/pipeline.js';
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const ALLOWED_MIMES = new Set([
@@ -24,7 +24,7 @@ export const config = {
 
 function parseMultipart(
   req: VercelRequest
-): Promise<{ buffer: Buffer; mimeType: string; filename: string }> {
+): Promise<{ buffer: Buffer; mimeType: string; filename: string; pdfText: string | null }> {
   return new Promise((resolve, reject) => {
     const contentType = req.headers['content-type'];
     if (!contentType || !contentType.includes('multipart/form-data')) {
@@ -32,10 +32,14 @@ function parseMultipart(
       return;
     }
 
-    const busboy = Busboy({ headers: req.headers, limits: { fileSize: MAX_FILE_SIZE, files: 1 } });
+    const busboy = Busboy({
+      headers: req.headers,
+      limits: { fileSize: MAX_FILE_SIZE, files: 1, fields: 8, fieldSize: 512 * 1024 },
+    });
     const chunks: Buffer[] = [];
     let mimeType = '';
     let filename = '';
+    let pdfText: string | null = null;
     let fileLimitReached = false;
 
     busboy.on('file', (_fieldname, stream, info) => {
@@ -50,6 +54,12 @@ function parseMultipart(
       });
     });
 
+    busboy.on('field', (fieldname, value) => {
+      if (fieldname === 'pdfText') {
+        pdfText = value.trim() || null;
+      }
+    });
+
     busboy.on('finish', () => {
       if (fileLimitReached) {
         reject(new Error(`El archivo excede el límite de ${MAX_FILE_SIZE / 1024 / 1024} MB`));
@@ -59,7 +69,7 @@ function parseMultipart(
         reject(new Error('No se recibió ningún archivo'));
         return;
       }
-      resolve({ buffer: Buffer.concat(chunks), mimeType, filename });
+      resolve({ buffer: Buffer.concat(chunks), mimeType, filename, pdfText });
     });
 
     busboy.on('error', reject);
@@ -85,7 +95,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   try {
     const tMultipart = Date.now();
-    const { buffer, mimeType, filename } = await parseMultipart(req);
+    const { buffer, mimeType, filename, pdfText } = await parseMultipart(req);
     console.log(`[simulate-invoice] multipart parsed in ${Date.now() - tMultipart}ms (${filename}, ${mimeType}, ${buffer.length} bytes)`);
 
     if (!ALLOWED_MIMES.has(mimeType)) {
@@ -97,12 +107,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
 
     const tExtract = Date.now();
-    const extraction = await extractInvoiceFromBuffer(buffer, mimeType);
+    const { extraction, debug } = await extractInvoiceFromBufferDetailed(buffer, mimeType, { pdfText });
     console.log(`[simulate-invoice] extraction done in ${Date.now() - tExtract}ms`);
+    res.setHeader('x-extraction-path', debug.path);
+    res.setHeader('x-extraction-cache-hit', String(debug.cacheHit));
+    res.setHeader('x-extraction-provided-pdf-text', String(debug.providedPdfText));
+    res.setHeader('x-extraction-used-pdf-parse', String(debug.usedPdfParse));
+    res.setHeader('x-extraction-used-llm', String(debug.usedLLM));
+    res.setHeader('x-extraction-used-retry', String(debug.usedRetry));
+    res.setHeader('Server-Timing', [
+      `total;dur=${debug.timings.totalMs}`,
+      debug.timings.pdfParseMs != null ? `pdfparse;dur=${debug.timings.pdfParseMs}` : null,
+    ].filter(Boolean).join(', '));
 
     res.status(200).json({
       success: true,
       extraction,
+      debug,
       file: { filename, mimeType, sizeBytes: buffer.length },
     });
     console.log(`[simulate-invoice] total ${Date.now() - t0}ms`);

@@ -20,6 +20,39 @@ const CACHE_TTL_MS = (() => {
   return Number.isFinite(n) && n >= 0 ? n : 30 * 60 * 1000;
 })();
 
+export interface InvoiceExtractionDebugMeta {
+  cacheHit: boolean;
+  providedPdfText: boolean;
+  rawDetectedTarifa: '2.0TD' | '3.0TD' | null;
+  detectedTarifaAfterPdfParse: '2.0TD' | '3.0TD' | null;
+  path:
+    | 'cache'
+    | '2.0td-raw-parser'
+    | '2.0td-text-parser'
+    | '2.0td-llm-text'
+    | '2.0td-llm-pdf'
+    | '3.0td-llm'
+    | '3.0td-llm-retry'
+    | 'generic-llm'
+    | 'generic-llm-retry'
+    | 'unsupported'
+    | 'empty'
+    | 'too-large'
+    | 'failed';
+  usedPdfParse: boolean;
+  usedLLM: boolean;
+  usedRetry: boolean;
+  timings: {
+    totalMs: number;
+    pdfParseMs: number | null;
+  };
+}
+
+export interface InvoiceExtractionDetailedResult {
+  extraction: InvoiceExtraction;
+  debug: InvoiceExtractionDebugMeta;
+}
+
 function fileHash(buffer: Buffer): string {
   return createHash('md5').update(buffer).digest('hex');
 }
@@ -32,7 +65,7 @@ function extractRawPdfText(buffer: Buffer): string {
     .replace(/[ \t]{2,}/g, ' ');
 }
 
-async function extractPdfText(buffer: Buffer): Promise<string | null> {
+async function extractPdfText(buffer: Buffer): Promise<{ text: string | null; ms: number }> {
   const t0 = Date.now();
   try {
     const { PDFParse } = await import('pdf-parse');
@@ -40,11 +73,12 @@ async function extractPdfText(buffer: Buffer): Promise<string | null> {
     const result = await parser.getText();
     await parser.destroy();
     const text = result.text?.trim();
-    console.log(`[pipeline] pdf text extracted in ${Date.now() - t0}ms`);
-    return text ? text : null;
+    const ms = Date.now() - t0;
+    console.log(`[pipeline] pdf text extracted in ${ms}ms`);
+    return { text: text ? text : null, ms };
   } catch (err) {
     console.warn('[pipeline] PDF text extraction failed:', err instanceof Error ? err.message : err);
-    return null;
+    return { text: null, ms: Date.now() - t0 };
   }
 }
 
@@ -527,38 +561,61 @@ function quickDetectTarifa(text: string | null, buffer: Buffer, mimeType: string
   return null;
 }
 
-export async function extractInvoiceFromBuffer(
+export async function extractInvoiceFromBufferDetailed(
   buffer: Buffer,
   mimeType: string,
-): Promise<InvoiceExtraction> {
+  opts?: { pdfText?: string | null },
+): Promise<InvoiceExtractionDetailedResult> {
   const t0 = Date.now();
+  const providedPdfText = opts?.pdfText?.trim() ? opts.pdfText.trim() : null;
+  const debug: InvoiceExtractionDebugMeta = {
+    cacheHit: false,
+    providedPdfText: Boolean(providedPdfText),
+    rawDetectedTarifa: null,
+    detectedTarifaAfterPdfParse: null,
+    path: 'failed',
+    usedPdfParse: false,
+    usedLLM: false,
+    usedRetry: false,
+    timings: { totalMs: 0, pdfParseMs: null },
+  };
   const isPdf = mimeType === 'application/pdf';
   const isImage = IMAGE_MIMES.has(mimeType);
 
   if (!isPdf && !isImage) {
     console.warn('[pipeline] Unsupported mime:', mimeType);
-    return emptyExtraction();
+    debug.path = 'unsupported';
+    debug.timings.totalMs = Date.now() - t0;
+    return { extraction: emptyExtraction(), debug };
   }
 
   if (buffer.length > MAX_FILE_SIZE) {
     console.warn('[pipeline] File too large:', buffer.length);
-    return emptyExtraction();
+    debug.path = 'too-large';
+    debug.timings.totalMs = Date.now() - t0;
+    return { extraction: emptyExtraction(), debug };
   }
 
   if (buffer.length === 0) {
     console.warn('[pipeline] Empty buffer');
-    return emptyExtraction();
+    debug.path = 'empty';
+    debug.timings.totalMs = Date.now() - t0;
+    return { extraction: emptyExtraction(), debug };
   }
 
   const hash = fileHash(buffer);
   const cached = extractionCache.get(hash);
   if (cached && cached.pv === PROMPT_VERSION && Date.now() - cached.ts < CACHE_TTL_MS) {
     console.log(`[pipeline] Cache hit for ${hash} (pv=${cached.pv})`);
-    return cached.extraction;
+    debug.cacheHit = true;
+    debug.path = 'cache';
+    debug.timings.totalMs = Date.now() - t0;
+    return { extraction: cached.extraction, debug };
   }
 
-  const rawPdfText = mimeType === 'application/pdf' ? extractRawPdfText(buffer) : null;
+  const rawPdfText = providedPdfText ?? (mimeType === 'application/pdf' ? extractRawPdfText(buffer) : null);
   const rawDetectedTarifa = quickDetectTarifa(rawPdfText, buffer, mimeType);
+  debug.rawDetectedTarifa = rawDetectedTarifa;
   console.log(`[pipeline] Tarifa raw pre-detectada: ${rawDetectedTarifa ?? 'desconocida'}`);
 
   try {
@@ -569,21 +626,36 @@ export async function extractInvoiceFromBuffer(
       const rawParsed = rawPdfText ? parse20TDFromText(rawPdfText) : null;
       if (rawParsed) {
         console.log('[pipeline] 2.0TD parsed locally from raw PDF text (sin pdf-parse, sin LLM)');
+        debug.path = providedPdfText ? '2.0td-text-parser' : '2.0td-raw-parser';
       }
-      const extractedPdfText = rawParsed ? null : (mimeType === 'application/pdf' ? await extractPdfText(buffer) : null);
+      const extractedPdf = rawParsed || providedPdfText
+        ? null
+        : (mimeType === 'application/pdf' ? await extractPdfText(buffer) : null);
+      if (extractedPdf) {
+        debug.usedPdfParse = true;
+        debug.timings.pdfParseMs = extractedPdf.ms;
+      }
+      const extractedPdfText = providedPdfText ?? extractedPdf?.text ?? null;
       const parsed = rawParsed ?? (extractedPdfText ? parse20TDFromText(extractedPdfText) : null);
       if (!rawParsed && parsed) {
         console.log('[pipeline] 2.0TD parsed locally from pdf-parse text (sin LLM)');
+        debug.path = '2.0td-text-parser';
       }
       const extraction = parsed
         ?? (extractedPdfText
           ? await extractWithLLM20TDFromText(extractedPdfText)
           : await extractWithLLM20TD(buffer, mimeType));
+      if (!parsed) {
+        debug.usedLLM = true;
+        debug.path = extractedPdfText ? '2.0td-llm-text' : '2.0td-llm-pdf';
+      }
       validated = validateExtraction(extraction);
       console.log(`[pipeline] 2.0TD path finished in ${Date.now() - tFast20}ms`);
     } else if (rawDetectedTarifa === '3.0TD') {
       const t30 = Date.now();
       let extraction = await extractWithLLM30TD(buffer, mimeType);
+      debug.usedLLM = true;
+      debug.path = '3.0td-llm';
       validated = validateExtraction(extraction);
 
       if (!validated.consumption_kwh && !validated.total_factura) {
@@ -594,6 +666,8 @@ export async function extractInvoiceFromBuffer(
         console.log('[pipeline] 3.0TD consumo sospechoso — reintentando con gpt-4o forzado');
         const retryExtraction = await extractWithLLMForceFull(buffer, mimeType);
         const retryValidated = validateExtraction(retryExtraction);
+        debug.usedRetry = true;
+        debug.path = '3.0td-llm-retry';
 
         if (!needs30TDRetry(retryValidated)) {
           console.log('[pipeline] gpt-4o forzado resolvió el consumo incompleto');
@@ -611,8 +685,16 @@ export async function extractInvoiceFromBuffer(
       console.log(`[pipeline] 3.0TD path finished in ${Date.now() - t30}ms`);
     } else {
       const tGeneric = Date.now();
-      const extractedPdfText = mimeType === 'application/pdf' ? await extractPdfText(buffer) : null;
+      const extractedPdf = providedPdfText
+        ? null
+        : (mimeType === 'application/pdf' ? await extractPdfText(buffer) : null);
+      if (extractedPdf) {
+        debug.usedPdfParse = true;
+        debug.timings.pdfParseMs = extractedPdf.ms;
+      }
+      const extractedPdfText = providedPdfText ?? extractedPdf?.text ?? null;
       const detectedTarifa = quickDetectTarifa(extractedPdfText, buffer, mimeType);
+      debug.detectedTarifaAfterPdfParse = detectedTarifa;
       console.log(`[pipeline] Tarifa tras pdf-parse: ${detectedTarifa ?? 'desconocida (usando prompt genérico)'}`);
 
       if (detectedTarifa === '2.0TD') {
@@ -621,21 +703,32 @@ export async function extractInvoiceFromBuffer(
           ?? (extractedPdfText
             ? await extractWithLLM20TDFromText(extractedPdfText)
             : await extractWithLLM20TD(buffer, mimeType));
+        if (parsed) {
+          debug.path = '2.0td-text-parser';
+        } else {
+          debug.usedLLM = true;
+          debug.path = extractedPdfText ? '2.0td-llm-text' : '2.0td-llm-pdf';
+        }
         validated = validateExtraction(extraction);
         console.log(`[pipeline] fallback 2.0TD path finished in ${Date.now() - tGeneric}ms`);
         extractionCache.set(hash, { extraction: validated, ts: Date.now(), pv: PROMPT_VERSION });
         console.log(`[pipeline] total ${Date.now() - t0}ms`);
-        return validated;
+        debug.timings.totalMs = Date.now() - t0;
+        return { extraction: validated, debug };
       }
 
       if (detectedTarifa === '3.0TD') {
         let extraction = await extractWithLLM30TD(buffer, mimeType);
+        debug.usedLLM = true;
+        debug.path = '3.0td-llm';
         validated = validateExtraction(extraction);
 
         if (needs30TDRetry(validated)) {
           console.log('[pipeline] tarifa detectada por pdf-parse como 3.0TD, retry gpt-4o forzado');
           const retryExtraction = await extractWithLLMForceFull(buffer, mimeType);
           const retryValidated = validateExtraction(retryExtraction);
+          debug.usedRetry = true;
+          debug.path = '3.0td-llm-retry';
           if (!needs30TDRetry(retryValidated) || (retryValidated.confidence ?? 0) >= (validated.confidence ?? 0)) {
             validated = retryValidated;
           }
@@ -643,16 +736,21 @@ export async function extractInvoiceFromBuffer(
         console.log(`[pipeline] fallback 3.0TD path finished in ${Date.now() - tGeneric}ms`);
         extractionCache.set(hash, { extraction: validated, ts: Date.now(), pv: PROMPT_VERSION });
         console.log(`[pipeline] total ${Date.now() - t0}ms`);
-        return validated;
+        debug.timings.totalMs = Date.now() - t0;
+        return { extraction: validated, debug };
       }
 
       const extraction = await extractWithLLMGeneric(buffer, mimeType);
+      debug.usedLLM = true;
+      debug.path = 'generic-llm';
       validated = validateExtraction(extraction);
 
       if (needs30TDRetry(validated)) {
         console.log('[pipeline] tarifa desconocida, pero consumo parece 3.0TD incompleto — reintentando con gpt-4o forzado');
         const retryExtraction = await extractWithLLMForceFull(buffer, mimeType);
         const retryValidated = validateExtraction(retryExtraction);
+        debug.usedRetry = true;
+        debug.path = 'generic-llm-retry';
         if (!needs30TDRetry(retryValidated) || (retryValidated.confidence ?? 0) >= (validated.confidence ?? 0)) {
           validated = retryValidated;
         }
@@ -662,11 +760,22 @@ export async function extractInvoiceFromBuffer(
 
     extractionCache.set(hash, { extraction: validated, ts: Date.now(), pv: PROMPT_VERSION });
     console.log(`[pipeline] total ${Date.now() - t0}ms`);
-    return validated;
+    debug.timings.totalMs = Date.now() - t0;
+    return { extraction: validated, debug };
   } catch (err) {
     console.error('[pipeline] Extraction failed:', err instanceof Error ? err.message : err);
-    return emptyExtraction();
+    debug.path = 'failed';
+    debug.timings.totalMs = Date.now() - t0;
+    return { extraction: emptyExtraction(), debug };
   }
+}
+
+export async function extractInvoiceFromBuffer(
+  buffer: Buffer,
+  mimeType: string,
+): Promise<InvoiceExtraction> {
+  const { extraction } = await extractInvoiceFromBufferDetailed(buffer, mimeType);
+  return extraction;
 }
 
 function needs30TDRetry(e: InvoiceExtraction): boolean {

@@ -393,6 +393,33 @@ async function generateThumbnail(file: File): Promise<string | null> {
   }
 }
 
+async function extractPdfTextForUpload(file: File): Promise<string | null> {
+  if (file.type !== 'application/pdf') return null;
+
+  try {
+    await ensurePdfWorker();
+    const pdfjsLib = await import('pdfjs-dist');
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
+    const pages: string[] = [];
+
+    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+      const page = await pdf.getPage(pageNumber);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items
+        .map((item) => ('str' in item ? item.str : ''))
+        .join(' ')
+        .trim();
+      if (pageText) pages.push(pageText);
+    }
+
+    return pages.join('\n').trim() || null;
+  } catch (err) {
+    console.warn('Client PDF text extraction failed:', err);
+    return null;
+  }
+}
+
 async function prepareUploadFile(file: File): Promise<File> {
   if (!file.type.startsWith('image/')) return file;
 
@@ -495,7 +522,10 @@ function UploadStep({
     setFileName(file.name);
     setLoading(true);
     try {
-      const uploadFile = await prepareUploadFile(file);
+      const [uploadFile, pdfText] = await Promise.all([
+        prepareUploadFile(file),
+        extractPdfTextForUpload(file),
+      ]);
 
       void generateThumbnail(file)
         .then((thumbnail) => {
@@ -508,15 +538,17 @@ function UploadStep({
 
       const form = new FormData();
       form.append('file', uploadFile);
+      if (pdfText) form.append('pdfText', pdfText);
       const res = await fetch(SIMULATE_API, { method: 'POST', body: form });
       const raw = await res.text();
-      let data: { success?: boolean; error?: string; extraction?: InvoiceExtraction };
+      let data: { success?: boolean; error?: string; extraction?: InvoiceExtraction; debug?: unknown };
       try {
         data = JSON.parse(raw);
       } catch {
         throw new Error(raw.slice(0, 180) || 'El servidor devolvió una respuesta no válida');
       }
       if (!res.ok || !data.success) throw new Error(data.error || 'Error procesando la factura');
+      if (data.debug) console.info('[simulate-invoice debug]', data.debug);
       if (uploadSeqRef.current !== uploadSeq) return;
       onExtracted(data.extraction as InvoiceExtraction, file.name);
     } catch (err) {
