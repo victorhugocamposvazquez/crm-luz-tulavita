@@ -6,8 +6,6 @@
 import { useState, useEffect, useRef } from 'react';
 import Lottie, { type LottieRef } from 'lottie-react';
 
-const MIN_PERCENT_TO_SHOW = 8;
-const NEUTRAL_PERCENT_MAX = 10;
 const LEGAL_TEXT = 'Cálculo estimado basado en los datos de tu factura.';
 
 const ENCHUFE_ANIMATION_URL = '/animations/enchufe.json';
@@ -120,6 +118,7 @@ export interface EnergyComparisonData {
   estimated_savings_amount: number | null;
   estimated_savings_percentage: number | null;
   current_monthly_cost?: number | null;
+  best_offer_company?: string | null;
   prudent_mode?: boolean;
 }
 
@@ -165,8 +164,8 @@ export function EnergySavingsResult({ data }: { data: EnergyComparisonData }) {
 
   const percent = resolveSavingsPercent(data);
   const prudent = data.prudent_mode === true;
-  const showExact = percent >= MIN_PERCENT_TO_SHOW && !prudent;
-  const isNeutral = percent > 0 && percent < NEUTRAL_PERCENT_MAX && !prudent;
+  const showExact = percent > 0;
+  const bestCompany = data.best_offer_company?.trim() || null;
 
   return (
     <div className="space-y-4 bg-white rounded-xl p-4 sm:p-6">
@@ -181,24 +180,26 @@ export function EnergySavingsResult({ data }: { data: EnergyComparisonData }) {
                   textShadow: '0 0 20px rgba(5, 150, 105, 0.5), 0 0 40px rgba(5, 150, 105, 0.25)',
                 }}
               >
-                Podrías ahorrar hasta un <strong className="font-bold">{percent}%</strong>
+                Podrías ahorrar hasta un <strong className="font-bold">{percent}%</strong> con una mejor tarifa
+                {bestCompany ? (
+                  <>
+                    {' '}
+                    (oferta de <strong className="font-bold">{bestCompany}</strong>)
+                  </>
+                ) : null}
+                .
               </p>
               <p className="text-sm text-gray-500">{LEGAL_TEXT}</p>
+              {prudent && (
+                <p className="text-sm text-gray-500">
+                  Es una estimación orientativa. Revisaremos contigo el detalle de la mejor oferta.
+                </p>
+              )}
             </div>
           )}
           {/* 2. Ilustración: primero desenchufado → efecto de enchufar → al enchufar se muestra el texto de arriba; debajo queda el enchufe y "Enchufado al ahorro" */}
           <PlugIllustration onPlugged={() => setShowSavingsText(true)} />
         </div>
-      )}
-      {prudent && percent > 0 && (
-        <p className="text-xl sm:text-2xl font-bold text-[#26606b]">
-          Hemos detectado una oportunidad de optimización en tu tarifa
-        </p>
-      )}
-      {isNeutral && (
-        <p className="text-xl sm:text-2xl font-bold text-[#26606b]">
-          Hemos detectado una oportunidad de optimización en tu tarifa
-        </p>
       )}
       {percent === 0 && (
         <p className="text-lg text-gray-600">

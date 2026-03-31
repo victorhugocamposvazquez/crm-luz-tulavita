@@ -7,10 +7,10 @@ import { useState, useCallback, useRef } from 'react';
 
 const PROCESS_API = import.meta.env.VITE_PROCESS_INVOICE_API_URL ?? '/api/process-invoice';
 const COMPARISON_API = import.meta.env.VITE_ENERGY_COMPARISON_API_URL ?? '/api/energy-comparison';
-const POLL_INTERVAL_MS = 2000;
+const POLL_INTERVAL_MS = 1000;
 const POLL_MAX_ATTEMPTS = 30;
 /** Tiempo mínimo mostrando el loader para que se vea la secuencia (no parpadeo). */
-const MIN_LOADER_MS = 2500;
+const MIN_LOADER_MS = 1200;
 
 export interface EnergyComparisonResult {
   id: string;

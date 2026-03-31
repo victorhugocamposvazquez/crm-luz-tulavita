@@ -3,7 +3,7 @@ import { Check, Circle, Loader2, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const BRAND = '#26606b';
-const STEP_INTERVAL_MS = 1800;
+const STEP_INTERVAL_MS = 1000;
 
 export interface InvoiceProcessingLoaderStep {
   label: string;
