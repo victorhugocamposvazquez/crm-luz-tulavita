@@ -6,7 +6,6 @@
  */
 
 import { createHash } from 'crypto';
-import { PDFParse } from 'pdf-parse';
 import type { InvoiceExtraction } from './types.js';
 import { emptyExtraction } from './types.js';
 import { extractWithLLM20TD, extractWithLLM20TDFromText, extractWithLLM30TD, extractWithLLMForceFull } from './llm-extract.js';
@@ -27,6 +26,7 @@ function fileHash(buffer: Buffer): string {
 
 async function extractPdfText(buffer: Buffer): Promise<string | null> {
   try {
+    const { PDFParse } = await import('pdf-parse');
     const parser = new PDFParse({ data: buffer });
     const result = await parser.getText();
     await parser.destroy();

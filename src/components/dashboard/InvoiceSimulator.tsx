@@ -468,7 +468,13 @@ function UploadStep({ onExtracted }: { onExtracted: (data: InvoiceExtraction, fi
           const form = new FormData();
           form.append('file', file);
           const res = await fetch(SIMULATE_API, { method: 'POST', body: form });
-          const data = await res.json();
+          const raw = await res.text();
+          let data: { success?: boolean; error?: string; extraction?: InvoiceExtraction };
+          try {
+            data = JSON.parse(raw);
+          } catch {
+            throw new Error(raw.slice(0, 180) || 'El servidor devolvió una respuesta no válida');
+          }
           if (!res.ok || !data.success) throw new Error(data.error || 'Error procesando la factura');
           return data.extraction as InvoiceExtraction;
         })(),
