@@ -8,12 +8,12 @@
 import { createHash } from 'crypto';
 import type { InvoiceExtraction } from './types.js';
 import { emptyExtraction } from './types.js';
-import { extractWithLLM, extractWithLLMForceFull } from './llm-extract.js';
+import { extractWithLLM20TD, extractWithLLM30TD, extractWithLLMForceFull } from './llm-extract.js';
 
 const IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
-const PROMPT_VERSION = 'v14-importe-energia-crosscheck';
+const PROMPT_VERSION = 'v15-split-20td-30td';
 const extractionCache = new Map<string, { extraction: InvoiceExtraction; ts: number; pv: string }>();
 const CACHE_TTL_MS = (() => {
   const n = Number(process.env.INVOICE_CACHE_TTL_MS ?? '');
@@ -275,9 +275,27 @@ function validateExtraction(e: InvoiceExtraction): InvoiceExtraction {
   return e;
 }
 
+/**
+ * Intenta detectar la tarifa antes de la extracción completa.
+ * Busca "3.0TD", "3.0A", "30TD" en el texto embebido del PDF.
+ * Si no puede leer el texto (imagen), devuelve null y se usa el camino 3.0TD (más seguro).
+ */
+function quickDetectTarifa(buffer: Buffer, mimeType: string): '2.0TD' | '3.0TD' | null {
+  if (mimeType !== 'application/pdf') return null;
+
+  const chunk = buffer.subarray(0, Math.min(buffer.length, 80_000)).toString('latin1');
+  const has30 = /3[\.\s]?0\s*TD/i.test(chunk) || /30TD/i.test(chunk) || /3[\.\s]?0\s*A/i.test(chunk);
+  if (has30) return '3.0TD';
+
+  const has20 = /2[\.\s]?0\s*TD/i.test(chunk) || /20TD/i.test(chunk) || /2[\.\s]?0\s*A/i.test(chunk);
+  if (has20) return '2.0TD';
+
+  return null;
+}
+
 export async function extractInvoiceFromBuffer(
   buffer: Buffer,
-  mimeType: string
+  mimeType: string,
 ): Promise<InvoiceExtraction> {
   const isPdf = mimeType === 'application/pdf';
   const isImage = IMAGE_MIMES.has(mimeType);
@@ -304,30 +322,40 @@ export async function extractInvoiceFromBuffer(
     return cached.extraction;
   }
 
+  const detectedTarifa = quickDetectTarifa(buffer, mimeType);
+  console.log(`[pipeline] Tarifa pre-detectada: ${detectedTarifa ?? 'desconocida (usando 3.0TD)'}`);
+
   try {
-    let extraction = await extractWithLLM(buffer, mimeType);
-    let validated = validateExtraction(extraction);
+    let validated: InvoiceExtraction;
 
-    if (!validated.consumption_kwh && !validated.total_factura) {
-      console.warn('[pipeline] LLM returned no consumption and no total — possible non-energy document');
-    }
+    if (detectedTarifa === '2.0TD') {
+      const extraction = await extractWithLLM20TD(buffer, mimeType);
+      validated = validateExtraction(extraction);
+    } else {
+      let extraction = await extractWithLLM30TD(buffer, mimeType);
+      validated = validateExtraction(extraction);
 
-    if (needs30TDRetry(validated)) {
-      console.log('[pipeline] 3.0TD consumo sospechoso — reintentando con gpt-4o forzado');
-      const retryExtraction = await extractWithLLMForceFull(buffer, mimeType);
-      const retryValidated = validateExtraction(retryExtraction);
+      if (!validated.consumption_kwh && !validated.total_factura) {
+        console.warn('[pipeline] LLM returned no consumption and no total — possible non-energy document');
+      }
 
-      if (!needs30TDRetry(retryValidated)) {
-        console.log('[pipeline] gpt-4o forzado resolvió el consumo incompleto');
-        validated = retryValidated;
-      } else if (
-        retryValidated.consumption_kwh != null && validated.consumption_kwh != null
-        && retryValidated.consumption_kwh > validated.consumption_kwh * 1.3
-      ) {
-        console.log(`[pipeline] gpt-4o forzado extrajo más consumo (${retryValidated.consumption_kwh} vs ${validated.consumption_kwh}), usando retry`);
-        validated = retryValidated;
-      } else {
-        console.log('[pipeline] gpt-4o forzado no mejoró; manteniendo original');
+      if (needs30TDRetry(validated)) {
+        console.log('[pipeline] 3.0TD consumo sospechoso — reintentando con gpt-4o forzado');
+        const retryExtraction = await extractWithLLMForceFull(buffer, mimeType);
+        const retryValidated = validateExtraction(retryExtraction);
+
+        if (!needs30TDRetry(retryValidated)) {
+          console.log('[pipeline] gpt-4o forzado resolvió el consumo incompleto');
+          validated = retryValidated;
+        } else if (
+          retryValidated.consumption_kwh != null && validated.consumption_kwh != null
+          && retryValidated.consumption_kwh > validated.consumption_kwh * 1.3
+        ) {
+          console.log(`[pipeline] gpt-4o forzado extrajo más consumo (${retryValidated.consumption_kwh} vs ${validated.consumption_kwh}), usando retry`);
+          validated = retryValidated;
+        } else {
+          console.log('[pipeline] gpt-4o forzado no mejoró; manteniendo original');
+        }
       }
     }
 
