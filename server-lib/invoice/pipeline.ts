@@ -13,7 +13,7 @@ import { extractWithLLM20TD, extractWithLLM20TDFromText, extractWithLLM30TD, ext
 const IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
-const PROMPT_VERSION = 'v15-split-20td-30td';
+const PROMPT_VERSION = 'v16-raw-pdf-fastpath';
 const extractionCache = new Map<string, { extraction: InvoiceExtraction; ts: number; pv: string }>();
 const CACHE_TTL_MS = (() => {
   const n = Number(process.env.INVOICE_CACHE_TTL_MS ?? '');
@@ -22,6 +22,14 @@ const CACHE_TTL_MS = (() => {
 
 function fileHash(buffer: Buffer): string {
   return createHash('md5').update(buffer).digest('hex');
+}
+
+function extractRawPdfText(buffer: Buffer): string {
+  return buffer
+    .toString('latin1')
+    .replace(/\x00/g, ' ')
+    .replace(/[^\n\r\t\x20-\x7E\u00A0-\u00FF]/g, ' ')
+    .replace(/[ \t]{2,}/g, ' ');
 }
 
 async function extractPdfText(buffer: Buffer): Promise<string | null> {
@@ -549,18 +557,23 @@ export async function extractInvoiceFromBuffer(
     return cached.extraction;
   }
 
-  const extractedPdfText = mimeType === 'application/pdf' ? await extractPdfText(buffer) : null;
-  const detectedTarifa = quickDetectTarifa(extractedPdfText, buffer, mimeType);
-  console.log(`[pipeline] Tarifa pre-detectada: ${detectedTarifa ?? 'desconocida (usando 3.0TD)'}`);
+  const rawPdfText = mimeType === 'application/pdf' ? extractRawPdfText(buffer) : null;
+  const rawDetectedTarifa = quickDetectTarifa(rawPdfText, buffer, mimeType);
+  console.log(`[pipeline] Tarifa raw pre-detectada: ${rawDetectedTarifa ?? 'desconocida'}`);
 
   try {
     let validated: InvoiceExtraction;
 
-    if (detectedTarifa === '2.0TD') {
+    if (rawDetectedTarifa === '2.0TD') {
       const tFast20 = Date.now();
-      const parsed = extractedPdfText ? parse20TDFromText(extractedPdfText) : null;
-      if (parsed) {
-        console.log('[pipeline] 2.0TD parsed locally from PDF text (sin LLM)');
+      const rawParsed = rawPdfText ? parse20TDFromText(rawPdfText) : null;
+      if (rawParsed) {
+        console.log('[pipeline] 2.0TD parsed locally from raw PDF text (sin pdf-parse, sin LLM)');
+      }
+      const extractedPdfText = rawParsed ? null : (mimeType === 'application/pdf' ? await extractPdfText(buffer) : null);
+      const parsed = rawParsed ?? (extractedPdfText ? parse20TDFromText(extractedPdfText) : null);
+      if (!rawParsed && parsed) {
+        console.log('[pipeline] 2.0TD parsed locally from pdf-parse text (sin LLM)');
       }
       const extraction = parsed
         ?? (extractedPdfText
@@ -568,7 +581,7 @@ export async function extractInvoiceFromBuffer(
           : await extractWithLLM20TD(buffer, mimeType));
       validated = validateExtraction(extraction);
       console.log(`[pipeline] 2.0TD path finished in ${Date.now() - tFast20}ms`);
-    } else if (detectedTarifa === '3.0TD') {
+    } else if (rawDetectedTarifa === '3.0TD') {
       const t30 = Date.now();
       let extraction = await extractWithLLM30TD(buffer, mimeType);
       validated = validateExtraction(extraction);
@@ -598,6 +611,41 @@ export async function extractInvoiceFromBuffer(
       console.log(`[pipeline] 3.0TD path finished in ${Date.now() - t30}ms`);
     } else {
       const tGeneric = Date.now();
+      const extractedPdfText = mimeType === 'application/pdf' ? await extractPdfText(buffer) : null;
+      const detectedTarifa = quickDetectTarifa(extractedPdfText, buffer, mimeType);
+      console.log(`[pipeline] Tarifa tras pdf-parse: ${detectedTarifa ?? 'desconocida (usando prompt genérico)'}`);
+
+      if (detectedTarifa === '2.0TD') {
+        const parsed = extractedPdfText ? parse20TDFromText(extractedPdfText) : null;
+        const extraction = parsed
+          ?? (extractedPdfText
+            ? await extractWithLLM20TDFromText(extractedPdfText)
+            : await extractWithLLM20TD(buffer, mimeType));
+        validated = validateExtraction(extraction);
+        console.log(`[pipeline] fallback 2.0TD path finished in ${Date.now() - tGeneric}ms`);
+        extractionCache.set(hash, { extraction: validated, ts: Date.now(), pv: PROMPT_VERSION });
+        console.log(`[pipeline] total ${Date.now() - t0}ms`);
+        return validated;
+      }
+
+      if (detectedTarifa === '3.0TD') {
+        let extraction = await extractWithLLM30TD(buffer, mimeType);
+        validated = validateExtraction(extraction);
+
+        if (needs30TDRetry(validated)) {
+          console.log('[pipeline] tarifa detectada por pdf-parse como 3.0TD, retry gpt-4o forzado');
+          const retryExtraction = await extractWithLLMForceFull(buffer, mimeType);
+          const retryValidated = validateExtraction(retryExtraction);
+          if (!needs30TDRetry(retryValidated) || (retryValidated.confidence ?? 0) >= (validated.confidence ?? 0)) {
+            validated = retryValidated;
+          }
+        }
+        console.log(`[pipeline] fallback 3.0TD path finished in ${Date.now() - tGeneric}ms`);
+        extractionCache.set(hash, { extraction: validated, ts: Date.now(), pv: PROMPT_VERSION });
+        console.log(`[pipeline] total ${Date.now() - t0}ms`);
+        return validated;
+      }
+
       const extraction = await extractWithLLMGeneric(buffer, mimeType);
       validated = validateExtraction(extraction);
 
