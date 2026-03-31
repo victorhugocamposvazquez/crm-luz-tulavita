@@ -448,44 +448,58 @@ function StepIndicator({ step }: { step: number }) {
   );
 }
 
-function UploadStep({ onExtracted }: { onExtracted: (data: InvoiceExtraction, fileName: string, thumbnail: string | null) => void }) {
+function UploadStep({
+  onExtracted,
+  onThumbnailReady,
+}: {
+  onExtracted: (data: InvoiceExtraction, fileName: string) => void;
+  onThumbnailReady: (fileName: string, thumbnail: string | null) => void;
+}) {
   const [dragging, setDragging] = useState(false);
   const [loading, setLoading] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const uploadSeqRef = useRef(0);
 
   const processFile = useCallback(async (file: File) => {
     if (file.size > MAX_SIZE_MB * 1024 * 1024) {
       toast({ title: 'Error', description: `El archivo excede ${MAX_SIZE_MB} MB`, variant: 'destructive' });
       return;
     }
+    const uploadSeq = ++uploadSeqRef.current;
     setFileName(file.name);
     setLoading(true);
     try {
-      const [thumbnail, apiResult] = await Promise.all([
-        generateThumbnail(file),
-        (async () => {
-          const form = new FormData();
-          form.append('file', file);
-          const res = await fetch(SIMULATE_API, { method: 'POST', body: form });
-          const raw = await res.text();
-          let data: { success?: boolean; error?: string; extraction?: InvoiceExtraction };
-          try {
-            data = JSON.parse(raw);
-          } catch {
-            throw new Error(raw.slice(0, 180) || 'El servidor devolvió una respuesta no válida');
-          }
-          if (!res.ok || !data.success) throw new Error(data.error || 'Error procesando la factura');
-          return data.extraction as InvoiceExtraction;
-        })(),
-      ]);
-      onExtracted(apiResult, file.name, thumbnail);
+      void generateThumbnail(file)
+        .then((thumbnail) => {
+          if (uploadSeqRef.current !== uploadSeq) return;
+          onThumbnailReady(file.name, thumbnail);
+        })
+        .catch((err) => {
+          console.warn('Thumbnail background generation failed:', err);
+        });
+
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch(SIMULATE_API, { method: 'POST', body: form });
+      const raw = await res.text();
+      let data: { success?: boolean; error?: string; extraction?: InvoiceExtraction };
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        throw new Error(raw.slice(0, 180) || 'El servidor devolvió una respuesta no válida');
+      }
+      if (!res.ok || !data.success) throw new Error(data.error || 'Error procesando la factura');
+      if (uploadSeqRef.current !== uploadSeq) return;
+      onExtracted(data.extraction as InvoiceExtraction, file.name);
     } catch (err) {
       toast({ title: 'Error al procesar', description: err instanceof Error ? err.message : 'Error desconocido', variant: 'destructive' });
     } finally {
-      setLoading(false);
+      if (uploadSeqRef.current === uploadSeq) {
+        setLoading(false);
+      }
     }
-  }, [onExtracted]);
+  }, [onExtracted, onThumbnailReady]);
 
   return (
     <Card>
@@ -1151,12 +1165,18 @@ export default function InvoiceSimulator() {
     setSelectedOfferId(null);
   }, []);
 
-  const handleExtracted = useCallback((data: InvoiceExtraction, name: string, thumb: string | null) => {
+  const handleExtracted = useCallback((data: InvoiceExtraction, name: string) => {
     setExtraction(data);
     setFileName(name);
-    setThumbnail(thumb);
+    setThumbnail(null);
     setStep(2);
   }, []);
+
+  const handleThumbnailReady = useCallback((name: string, thumb: string | null) => {
+    if (fileName === name) {
+      setThumbnail(thumb);
+    }
+  }, [fileName]);
 
   const handleFieldChange = useCallback((field: keyof InvoiceExtraction, value: string) => {
     setExtraction((prev) => {
@@ -1349,7 +1369,7 @@ export default function InvoiceSimulator() {
           </div>
           <StepIndicator step={step} />
 
-          {step === 1 && <UploadStep onExtracted={handleExtracted} />}
+          {step === 1 && <UploadStep onExtracted={handleExtracted} onThumbnailReady={handleThumbnailReady} />}
 
           {step === 2 && extraction && (
             <ExtractionStep
