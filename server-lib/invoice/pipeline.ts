@@ -8,17 +8,23 @@
 import { createHash } from 'crypto';
 import type { InvoiceExtraction } from './types.js';
 import { emptyExtraction } from './types.js';
-import { extractWithLLM20TD, extractWithLLM20TDFromText, extractWithLLM30TD, extractWithLLMForceFull, extractWithLLMGeneric } from './llm-extract.js';
 
 const IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
-const PROMPT_VERSION = 'v16-raw-pdf-fastpath';
+const PROMPT_VERSION = 'v17-client-text-parser';
 const extractionCache = new Map<string, { extraction: InvoiceExtraction; ts: number; pv: string }>();
 const CACHE_TTL_MS = (() => {
   const n = Number(process.env.INVOICE_CACHE_TTL_MS ?? '');
   return Number.isFinite(n) && n >= 0 ? n : 30 * 60 * 1000;
 })();
+type LLMExtractModule = typeof import('./llm-extract.js');
+let llmExtractModulePromise: Promise<LLMExtractModule> | null = null;
+
+async function loadLLMExtractModule(): Promise<LLMExtractModule> {
+  if (!llmExtractModulePromise) llmExtractModulePromise = import('./llm-extract.js');
+  return llmExtractModulePromise;
+}
 
 export interface InvoiceExtractionDebugMeta {
   cacheHit: boolean;
@@ -129,27 +135,40 @@ function detectCompanyFromText(text: string): string | null {
   return null;
 }
 
+function normalizeSearchText(text: string): string {
+  return text
+    .replace(/\r/g, '\n')
+    .replace(/\u00A0/g, ' ')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/(?<=\d)\s+(?=\d)/g, '')
+    .replace(/[ ]*\n[ ]*/g, '\n')
+    .replace(/\n{2,}/g, '\n')
+    .trim();
+}
+
 function parse20TDFromText(text: string): InvoiceExtraction | null {
   const normalized = text.replace(/\r/g, '');
-  if (!/2[\.\s]?0\s*TD/i.test(normalized) && !/20TD/i.test(normalized)) return null;
+  const searchText = normalizeSearchText(text);
+  if (!/2[\.\s]?0\s*TD/i.test(searchText) && !/20TD/i.test(searchText)) return null;
 
-  const company_name = detectCompanyFromText(normalized);
-  const total_factura = firstNumber(normalized, [
+  const company_name = detectCompanyFromText(searchText);
+  const total_factura = firstNumber(searchText, [
     /Total factura\s+([\d.,]+)\s*€/i,
     /TOTAL IMPORTE FACTURA\s+([\d.,]+)\s*€/i,
     /IMPORTE TOTAL ELECTRICIDAD \+ TASAS E IMPUESTOS\s+([\d.,]+)\s*€/i,
     /TOTAL\s+([\d.,]+)\s*€/i,
     /¿Cuánto tengo que pagar\?\s+([\d.,]+)\s*€/i,
   ]);
-  const consumption_kwh = firstNumber(normalized, [
+  const consumption_kwh = firstNumber(searchText, [
     /Consumo Total\s+([\d.,]+)\s*kWh/i,
     /Consumo en este periodo\s+([\d.,]+)\s*kWh/i,
     /Tu consumo en el periodo facturado ha sido de\s+([\d.,]+)\s*kWh/i,
     /Total:\s*([\d.,]+)\s*kWh/i,
+    /Coste en esta factura[\s\S]{0,120}?Consumo[\s\S]{0,40}?Real[\s\S]{0,40}?Media[\s\S]{0,40}?([\d.,]+)\s*kWh/i,
   ]);
-  const cups = firstString(normalized, [
-    /CUPS[:\s]+(ES[0-9A-Z ]{16,24})/i,
-    /Identificaci[oó]n punto de suministro \(CUPS\):\s*(ES[0-9A-Z ]{16,24})/i,
+  const cups = firstString(searchText, [
+    /CUPS[:\s]+(ES[0-9A-Z]{16,24})\b/i,
+    /Identificaci[oó]n punto de suministro \(CUPS\):\s*(ES[0-9A-Z]{16,24})\b/i,
   ])?.replace(/\s+/g, '') ?? null;
   const titular = firstString(normalized, [
     /Titular del contrato:\s*([^\n]+)/i,
@@ -157,34 +176,34 @@ function parse20TDFromText(text: string): InvoiceExtraction | null {
     /Titular Potencia:\s*([^\n]+)/i,
     /Cliente:\s*([^\n]+)/i,
   ]);
-  const periodRange = normalized.match(/Periodo de facturaci[oó]n(?: elec\.)?:?\s*(?:del\s*)?(\d{2}[./-]\d{2}[./-]\d{4})\s*(?:a|-)\s*(\d{2}[./-]\d{2}[./-]\d{4})/i)
-    ?? normalized.match(/PERIODO DE FACTURACI[ÓO]N:\s*(\d{2}[./-]\d{2}[./-]\d{4})\s*-\s*(\d{2}[./-]\d{2}[./-]\d{4})/i);
+  const periodRange = searchText.match(/Periodo de facturaci[oó]n(?: elec\.)?:?\s*(?:del\s*)?(\d{2}[./-]\d{2}[./-]\d{4})\s*(?:a|-)\s*(\d{2}[./-]\d{2}[./-]\d{4})/i)
+    ?? searchText.match(/PERIODO DE FACTURACI[ÓO]N:\s*(\d{2}[./-]\d{2}[./-]\d{4})\s*-\s*(\d{2}[./-]\d{2}[./-]\d{4})/i);
   const period_start = periodRange ? toIsoDate(periodRange[1]) : null;
   const period_end = periodRange ? toIsoDate(periodRange[2]) : null;
 
-  const powerP1 = firstNumber(normalized, [
+  const powerP1 = firstNumber(searchText, [
     /Potencias contratadas:\s*punta-llano\s*([\d.,]+)\s*kW/i,
     /Potencia punta:\s*([\d.,]+)\s*kW/i,
     /Potencia P1:\s*([\d.,]+)/i,
     /Potencia contratada\s*([\d.,]+)kW/i,
   ]);
-  const powerP2 = firstNumber(normalized, [
+  const powerP2 = firstNumber(searchText, [
     /Potencias contratadas:.*?valle\s*([\d.,]+)\s*kW/i,
     /Potencia valle:\s*([\d.,]+)\s*kW/i,
     /Potencia P2:\s*([\d.,]+)\s*kW/i,
     /Potencia contratada\s*[\d.,]+kW\s*([\d.,]+)kW/i,
   ]) ?? powerP1;
 
-  const precio_p1_kwh = firstNumber(normalized, [
+  const precio_p1_kwh = firstNumber(searchText, [
     /Consumo\s+[\d.,]+\s*kWh\s*x\s*([\d.,]+)\s*Eur\/kWh/i,
     /Horas no promocionadas\s+[\d.,]+\s*kWh\s*x\s*([\d.,]+)\s*€\/kWh/i,
   ]);
   const precio_p2_kwh = (() => {
-    const matches = [...normalized.matchAll(/(?:Consumo|Horas promocionadas|Horas no promocionadas)\s+[\d.,]+\s*kWh\s*x\s*([\d.,]+)\s*(?:Eur|€)\/kWh/gi)];
+    const matches = [...searchText.matchAll(/(?:Consumo|Horas promocionadas|Horas no promocionadas)\s+[\d.,]+\s*kWh\s*x\s*([\d.,]+)\s*(?:Eur|€)\/kWh/gi)];
     if (matches.length >= 2) return parseSpanishNum(matches[1][1]);
     return null;
   })();
-  const consumos = [...normalized.matchAll(/(?:Punta|Llano|Valle|Horas promocionadas|Horas no promocionadas|Consumo)\s*[: ]*([\d.,]+)\s*kWh/gi)]
+  const consumos = [...searchText.matchAll(/(?:Punta|Llano|Valle|Horas promocionadas|Horas no promocionadas|Consumo)\s*[: ]*([\d.,]+)\s*kWh/gi)]
     .map((m) => parseSpanishNum(m[1]))
     .filter((n): n is number => n != null && n >= 0);
   const consumo_p1_kwh = consumos.length >= 2 ? consumos[0] : null;
@@ -194,7 +213,7 @@ function parse20TDFromText(text: string): InvoiceExtraction | null {
   if (consumption_kwh && consumption_kwh > 0 && precio_p1_kwh != null && precio_p2_kwh != null && consumo_p1_kwh != null && consumo_p2_kwh != null) {
     precio_energia_kwh = (consumo_p1_kwh * precio_p1_kwh + consumo_p2_kwh * precio_p2_kwh) / (consumo_p1_kwh + consumo_p2_kwh);
   } else {
-    precio_energia_kwh = firstNumber(normalized, [
+    precio_energia_kwh = firstNumber(searchText, [
       /ha salido a\s*([\d.,]+)\s*€\/kWh/i,
       /precio medio.*?([\d.,]+)\s*€\/kWh/i,
     ]);
@@ -643,8 +662,8 @@ export async function extractInvoiceFromBufferDetailed(
       }
       const extraction = parsed
         ?? (extractedPdfText
-          ? await extractWithLLM20TDFromText(extractedPdfText)
-          : await extractWithLLM20TD(buffer, mimeType));
+          ? await (await loadLLMExtractModule()).extractWithLLM20TDFromText(extractedPdfText)
+          : await (await loadLLMExtractModule()).extractWithLLM20TD(buffer, mimeType));
       if (!parsed) {
         debug.usedLLM = true;
         debug.path = extractedPdfText ? '2.0td-llm-text' : '2.0td-llm-pdf';
@@ -653,7 +672,7 @@ export async function extractInvoiceFromBufferDetailed(
       console.log(`[pipeline] 2.0TD path finished in ${Date.now() - tFast20}ms`);
     } else if (rawDetectedTarifa === '3.0TD') {
       const t30 = Date.now();
-      let extraction = await extractWithLLM30TD(buffer, mimeType);
+      let extraction = await (await loadLLMExtractModule()).extractWithLLM30TD(buffer, mimeType);
       debug.usedLLM = true;
       debug.path = '3.0td-llm';
       validated = validateExtraction(extraction);
@@ -664,7 +683,7 @@ export async function extractInvoiceFromBufferDetailed(
 
       if (needs30TDRetry(validated)) {
         console.log('[pipeline] 3.0TD consumo sospechoso — reintentando con gpt-4o forzado');
-        const retryExtraction = await extractWithLLMForceFull(buffer, mimeType);
+        const retryExtraction = await (await loadLLMExtractModule()).extractWithLLMForceFull(buffer, mimeType);
         const retryValidated = validateExtraction(retryExtraction);
         debug.usedRetry = true;
         debug.path = '3.0td-llm-retry';
@@ -701,8 +720,8 @@ export async function extractInvoiceFromBufferDetailed(
         const parsed = extractedPdfText ? parse20TDFromText(extractedPdfText) : null;
         const extraction = parsed
           ?? (extractedPdfText
-            ? await extractWithLLM20TDFromText(extractedPdfText)
-            : await extractWithLLM20TD(buffer, mimeType));
+            ? await (await loadLLMExtractModule()).extractWithLLM20TDFromText(extractedPdfText)
+            : await (await loadLLMExtractModule()).extractWithLLM20TD(buffer, mimeType));
         if (parsed) {
           debug.path = '2.0td-text-parser';
         } else {
@@ -718,14 +737,14 @@ export async function extractInvoiceFromBufferDetailed(
       }
 
       if (detectedTarifa === '3.0TD') {
-        let extraction = await extractWithLLM30TD(buffer, mimeType);
+        let extraction = await (await loadLLMExtractModule()).extractWithLLM30TD(buffer, mimeType);
         debug.usedLLM = true;
         debug.path = '3.0td-llm';
         validated = validateExtraction(extraction);
 
         if (needs30TDRetry(validated)) {
           console.log('[pipeline] tarifa detectada por pdf-parse como 3.0TD, retry gpt-4o forzado');
-          const retryExtraction = await extractWithLLMForceFull(buffer, mimeType);
+          const retryExtraction = await (await loadLLMExtractModule()).extractWithLLMForceFull(buffer, mimeType);
           const retryValidated = validateExtraction(retryExtraction);
           debug.usedRetry = true;
           debug.path = '3.0td-llm-retry';
@@ -740,14 +759,14 @@ export async function extractInvoiceFromBufferDetailed(
         return { extraction: validated, debug };
       }
 
-      const extraction = await extractWithLLMGeneric(buffer, mimeType);
+      const extraction = await (await loadLLMExtractModule()).extractWithLLMGeneric(buffer, mimeType);
       debug.usedLLM = true;
       debug.path = 'generic-llm';
       validated = validateExtraction(extraction);
 
       if (needs30TDRetry(validated)) {
         console.log('[pipeline] tarifa desconocida, pero consumo parece 3.0TD incompleto — reintentando con gpt-4o forzado');
-        const retryExtraction = await extractWithLLMForceFull(buffer, mimeType);
+        const retryExtraction = await (await loadLLMExtractModule()).extractWithLLMForceFull(buffer, mimeType);
         const retryValidated = validateExtraction(retryExtraction);
         debug.usedRetry = true;
         debug.path = 'generic-llm-retry';
