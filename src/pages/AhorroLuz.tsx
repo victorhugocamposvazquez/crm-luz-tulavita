@@ -21,8 +21,13 @@ import { toast } from '@/hooks/use-toast';
 const BRAND_COLOR = '#26606b';
 const LEAD_ATTACHMENTS_BUCKET = 'lead-attachments';
 const PREVIEW_INVOICE_API = import.meta.env.VITE_PREVIEW_INVOICE_API_URL ?? '/api/preview-invoice';
-/** Loader fijo tras enviar el formulario mientras se persiste la comparativa (el análisis suele ir en prefetch). */
+/**
+ * Loader mínimo tras enviar si el prefetch aún no dejó una comparación lista.
+ * Si el análisis ya vino en preview + caché, forzar 3 s aquí anula por completo la ganancia de tiempo.
+ */
 const LANDING_POST_SUBMIT_LOADER_MS = 3000;
+/** Con prefetch listo, el persist suele ser rápido; casi sin espera artificial. */
+const LANDING_POST_SUBMIT_LOADER_WARM_MS = 0;
 
 function headlineSavingsPercentFromComparison(
   c: EnergyComparisonResult | null | undefined,
@@ -384,6 +389,9 @@ export default function AhorroLuz() {
     const showEnergyFlow = !sinFactura && lastLeadId && lastFacturaPath;
     const prefetchMatch = invoicePrefetch?.path === lastFacturaPath ? invoicePrefetch.comparison : null;
     const headlinePct = headlineSavingsPercentFromComparison(prefetchMatch);
+    const prefetchWarm =
+      invoicePrefetch?.path === lastFacturaPath &&
+      invoicePrefetch.comparison?.status === 'completed';
     return (
       <div className="min-h-screen flex flex-col bg-white">
         <header className="fixed top-0 left-0 right-0 z-40 flex flex-col bg-white/80 backdrop-blur-sm border-b border-gray-200/50">
@@ -428,7 +436,9 @@ export default function AhorroLuz() {
                 attachmentPath={lastFacturaPath!}
                 onReset={handleReset}
                 compactLoader
-                fixedResultLoaderMs={LANDING_POST_SUBMIT_LOADER_MS}
+                fixedResultLoaderMs={
+                  prefetchWarm ? LANDING_POST_SUBMIT_LOADER_WARM_MS : LANDING_POST_SUBMIT_LOADER_MS
+                }
                 prefetchedComparison={
                   invoicePrefetch?.path === lastFacturaPath ? invoicePrefetch.comparison : null
                 }
