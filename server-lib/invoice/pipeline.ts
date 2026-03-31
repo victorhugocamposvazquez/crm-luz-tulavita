@@ -101,9 +101,31 @@ function validateExtraction(e: InvoiceExtraction): InvoiceExtraction {
     warnings.push(`potencia_contratada_kw alta: ${e.potencia_contratada_kw}`);
     e.confidence = Math.max(0, e.confidence - 0.10);
   }
-  if (e.precio_energia_kwh != null && e.precio_energia_kwh > 1) {
-    warnings.push(`precio_energia_kwh > 1 €/kWh: ${e.precio_energia_kwh}`);
-    e.confidence = Math.max(0, e.confidence - 0.10);
+
+  if (e.precio_energia_kwh != null && e.precio_energia_kwh > 0.50) {
+    const pPrices = [e.precio_p1_kwh, e.precio_p2_kwh, e.precio_p3_kwh, e.precio_p4_kwh, e.precio_p5_kwh, e.precio_p6_kwh]
+      .filter((v) => v != null && v > 0 && v < 1) as number[];
+    if (pPrices.length >= 2) {
+      const avg = pPrices.reduce((a, b) => a + b, 0) / pPrices.length;
+      fixes.push(`precio_energia_kwh corregido: ${e.precio_energia_kwh} → ${avg.toFixed(6)} (media de precios por periodo)`);
+      e.precio_energia_kwh = avg;
+    } else {
+      warnings.push(`precio_energia_kwh > 0.50 €/kWh: ${e.precio_energia_kwh}`);
+      e.confidence = Math.max(0, e.confidence - 0.15);
+    }
+  }
+
+  if (e.period_months != null && e.period_months > 3 && e.period_start && e.period_end) {
+    try {
+      const s = new Date(e.period_start);
+      const end = new Date(e.period_end);
+      const diffDays = (end.getTime() - s.getTime()) / (1000 * 60 * 60 * 24);
+      const realMonths = Math.max(1, Math.round(diffDays / 30));
+      if (realMonths !== e.period_months && realMonths <= 3) {
+        fixes.push(`period_months corregido: ${e.period_months} → ${realMonths} (calculado de fechas ${e.period_start} a ${e.period_end})`);
+        e.period_months = realMonths;
+      }
+    } catch { /* ignore */ }
   }
 
   if (fixes.length > 0) {

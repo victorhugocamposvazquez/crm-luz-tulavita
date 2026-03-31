@@ -26,62 +26,72 @@ INSTRUCCIONES:
 4. Si un dato no aparece o no es legible, usa null.
 5. Responde EXCLUSIVAMENTE con un JSON válido, sin texto adicional, sin markdown, sin backticks.
 
-ESQUEMA JSON A DEVOLVER:
+FORMATO NUMÉRICO ESPAÑOL — CRÍTICO:
+En España: PUNTO = separador de miles, COMA = separador decimal.
+- "714,000 kWh" → 714.0 (NO 714000)
+- "1.473,059 kWh" → 1473.059
+- "553,714 kWh" → 553.714
+- "26,000 kW" → 26.0 (NO 26000)
+- "33,000 kW" → 33.0
+- "835,00 €" → 835.00
+- "0,219748" → 0.219748
+- "130,286 kWh" → 130.286
+Regla: si ves "NNN,NNN" con 3 decimales tras la coma, los 3 dígitos tras la coma SON decimales (ej: "714,000" = 714.000 = 714.0).
+
+ESQUEMA JSON:
 {
-  "company_name": "Nombre comercializadora (Iberdrola, Endesa, Naturgy, Repsol...)",
-  "consumption_kwh": 16793.0,
-  "total_factura": 2404.47,
-  "period_start": "2025-01-01",
-  "period_end": "2025-01-31",
-  "period_months": 1,
-  "potencia_contratada_kw": 34.64,
-  "potencia_p1_kw": 34.64,
-  "potencia_p2_kw": 34.64,
-  "potencia_p3_kw": 34.64,
-  "potencia_p4_kw": 34.64,
-  "potencia_p5_kw": 34.64,
-  "potencia_p6_kw": 34.64,
-  "precio_energia_kwh": 0.1349,
-  "precio_p1_kwh": 0.183593,
-  "precio_p2_kwh": 0.158017,
-  "precio_p3_kwh": 0.134925,
-  "precio_p4_kwh": 0.121236,
-  "precio_p5_kwh": 0.114444,
-  "precio_p6_kwh": 0.106808,
-  "tipo_tarifa": "3.0TD",
-  "cups": "ES0021000012345678AB",
-  "titular": "Juan Pérez García",
-  "direccion_suministro": "Calle Mayor 5, 2ºB, 28001 Madrid"
+  "company_name": "string",
+  "consumption_kwh": number,
+  "total_factura": number,
+  "period_start": "YYYY-MM-DD",
+  "period_end": "YYYY-MM-DD",
+  "period_months": number,
+  "potencia_contratada_kw": number,
+  "potencia_p1_kw": number, "potencia_p2_kw": number, "potencia_p3_kw": number,
+  "potencia_p4_kw": number, "potencia_p5_kw": number, "potencia_p6_kw": number,
+  "precio_energia_kwh": number,
+  "precio_p1_kwh": number, "precio_p2_kwh": number, "precio_p3_kwh": number,
+  "precio_p4_kwh": number, "precio_p5_kwh": number, "precio_p6_kwh": number,
+  "tipo_tarifa": "string",
+  "cups": "string",
+  "titular": "string",
+  "direccion_suministro": "string"
 }
 
-FORMATO NUMÉRICO ESPAÑOL — MUY IMPORTANTE:
-- En España el PUNTO es separador de miles y la COMA es separador decimal.
-- "714,000 kWh" = 714.0 kWh (setecientos catorce), NO 714000.
-- "1.473,059 kWh" = 1473.059 kWh (mil cuatrocientos setenta y tres).
-- "26,000 kW" = 26.0 kW (veintiséis), NO 26000.
-- "835,00 €" = 835.00 € (ochocientos treinta y cinco).
-- Convierte SIEMPRE al formato numérico con punto decimal para el JSON.
+PASO 1 — DETERMINA EL TIPO DE TARIFA:
+Busca "2.0TD", "3.0TD", "2.0A", "3.0A", etc. Esto determina cuántos periodos (P1-P2 o P1-P6).
 
-NOTAS IMPORTANTES:
-- "consumption_kwh": consumo TOTAL en kWh del periodo facturado. DEBES SUMAR todos los tramos de energía activa (P1+P2+P3+P4+P5+P6) si la factura los desglosa. En tarifas 3.0TD puede haber hasta 6 tramos. Busca "energía activa", "consumo total", "kWh facturados". Si hay varios bloques temporales dentro del mismo periodo, SUMA TODOS. El resultado debe ser coherente con el total de la factura (ej: para un precio medio de ~0.15 €/kWh, 835€ implican ~3500 kWh, no 714000 kWh).
-- "total_factura": importe TOTAL a pagar (IVA incluido). Busca "total a pagar", "importe total", "total factura".
-- "period_months": 1 para mensual, 2 para bimensual, 3 para trimestral. Calcula a partir de las fechas si las tienes.
-- "potencia_contratada_kw": potencia contratada en kW. Si hay varias (P1, P2...), pon la P1 aquí. Recuerda: "26,000 kW" = 26.0 kW.
-- "potencia_p1_kw" a "potencia_p6_kw": potencia contratada por periodo. Tarifas 2.0TD solo tienen P1 y P2 (P3-P6 = null). Tarifas 3.0TD SIEMPRE tienen 6 periodos P1 a P6: EXTRAE LOS 6. En 3.0TD es frecuente que P1=P2=P3=P4=P5=P6 (misma potencia en todos los periodos). NUNCA dejes P3-P6 como null en una tarifa 3.0TD si la factura tiene sección de potencia.
-- "precio_energia_kwh": precio medio del kWh (€/kWh). Calcula la media ponderada de los precios por periodo si hay desglose. Típicamente entre 0.05 y 0.30 €/kWh.
-- "precio_p1_kwh" a "precio_p6_kwh": precios por tramo horario (€/kWh). Tarifas 2.0TD: solo P1 y P2 (P3-P6 = null). Tarifas 3.0TD SIEMPRE tienen 6 precios P1 a P6: EXTRAE LOS 6. Busca en la sección de "consumo" o "energía activa" los precios unitarios por periodo. NUNCA dejes P3-P6 como null en una tarifa 3.0TD si aparece desglose de consumo.
-- "tipo_tarifa": tipo de tarifa (2.0TD doméstico, 3.0TD >15kW, etc.). DETERMINA PRIMERO el tipo de tarifa para saber cuántos periodos extraer.
-- "cups": código CUPS (empieza por ES seguido de 16 dígitos y 2 letras).
+PASO 2 — POTENCIA CONTRATADA:
+- Busca "Término de potencia", "Potencia facturada", "Potencia contratada".
+- Extrae la potencia (kW) de CADA periodo. En 3.0TD hay 6 líneas (P1 a P6).
+- potencia_contratada_kw = potencia de P1.
+- OJO: P6 puede tener potencia DIFERENTE de P1-P5. Lee CADA línea.
+
+PASO 3 — CONSUMO Y PRECIOS DE ENERGÍA:
+- Busca "Término de energía activa", "Consumo", "Energía activa".
+- IMPORTANTE: Puede haber VARIOS BLOQUES TEMPORALES para el mismo periodo de facturación (ej: "entre 01/12 y 24/12" + "entre 25/12 y 31/12"). Esto pasa por cambios regulatorios. DEBES SUMAR los kWh de todos los bloques para cada periodo.
+- Ejemplo real: si P1 tiene 714.0 kWh en bloque 1 + 168.0 kWh en bloque 2 → consumo P1 total = 882.0 kWh.
+- consumption_kwh = SUMA TOTAL de todos los periodos de todos los bloques.
+- Si un periodo (P3, P4, P5) tiene 0 kWh en todos los bloques, su consumo es 0 — eso es normal en 3.0TD.
+- Para precio_p1_kwh a precio_p6_kwh: usa el precio unitario del PRIMER bloque (el más grande). Si los precios difieren entre bloques, usa el del bloque con más kWh o la media ponderada.
+
+PASO 4 — PRECIO MEDIO:
+- precio_energia_kwh = total del término de energía (sin impuestos, sin potencia) / consumption_kwh.
+- Debe estar entre 0.05 y 0.30 €/kWh. Si te sale > 0.50, algo está mal.
+
+PASO 5 — DATOS GENERALES:
+- "total_factura": importe TOTAL a pagar (IVA incluido). Busca "Total factura", "Total a pagar".
+- "period_months": calcula de las fechas. 01/12/2025 a 31/12/2025 = 1 mes. 01/11 a 31/12 = 2 meses.
+- "cups": código que empieza por ES + 16 dígitos + 2 letras (ej: ES0021000049650681D).
 - "titular": nombre del titular del contrato.
-- "direccion_suministro": dirección del punto de suministro. Busca "dirección de suministro", "punto de suministro", "dirección del contrato". Incluye calle, número, piso, CP y localidad si aparecen.
-- "company_name": normaliza al nombre comercial conocido (Iberdrola, Endesa, Naturgy, Repsol, EDP, Total Energies, Plenitude, Holaluz, Octopus, Cepsa, Viesgo, Fenie Energía, Gaba Energía, Contigo Energía, etc.)
-- Si la factura es de GAS: extrae los mismos campos adaptados.
-- Si NO es de energía: devuelve todos los campos como null.
+- "direccion_suministro": dirección completa del punto de suministro.
+- "company_name": normaliza (Iberdrola, Endesa, Naturgy, Repsol, EDP, Total Energies, Plenitude, Holaluz, Octopus, Cepsa, Viesgo, Fenie Energía, Gaba Energía, Contigo Energía, etc.)
 
-VERIFICACIÓN FINAL:
-1. Comprueba que el precio implícito (total_factura / consumption_kwh) está entre 0.05 y 0.50 €/kWh. Si no, revisa el consumo — probablemente has confundido el formato decimal español.
-2. Si la tarifa es 3.0TD, COMPRUEBA que has rellenado los 6 periodos de potencia (potencia_p1_kw a potencia_p6_kw) y los 6 precios de energía (precio_p1_kwh a precio_p6_kwh). Si alguno es null, vuelve a buscar en la factura.
-3. Si la tarifa es 2.0TD, solo P1 y P2. P3 a P6 deben ser null.`;
+VERIFICACIÓN FINAL — OBLIGATORIA:
+1. precio_implícito = total_factura / consumption_kwh. Debe estar entre 0.05 y 0.50 €/kWh. Si no, HAS SUMADO MAL el consumo o confundido el formato decimal.
+2. Si 3.0TD: ¿tienes los 6 potencia_pX_kw? ¿tienes los 6 precio_pX_kwh? Si falta alguno, VUELVE a buscar.
+3. Si 2.0TD: P3 a P6 deben ser null.
+4. period_months: ¿es coherente con las fechas? Un mes = 1, no 12.`;
 
 const USER_PROMPT = 'Extrae todos los datos de esta factura de energía. Devuelve SOLO el JSON, sin explicaciones.';
 
