@@ -13,7 +13,7 @@ import { extractWithLLM } from './llm-extract.js';
 const IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
-const PROMPT_VERSION = 'v11-consumo-reconcile-ejemplo-anonimo';
+const PROMPT_VERSION = 'v12-consumo-multibloque-3td';
 const extractionCache = new Map<string, { extraction: InvoiceExtraction; ts: number; pv: string }>();
 const CACHE_TTL_MS = (() => {
   const n = Number(process.env.INVOICE_CACHE_TTL_MS ?? '');
@@ -148,6 +148,15 @@ function validateExtraction(e: InvoiceExtraction): InvoiceExtraction {
     } else if (impliedPrice > 2) {
       warnings.push(`precio implícito alto: ${impliedPrice.toFixed(2)} €/kWh — posible error en consumo o total`);
       e.confidence = Math.max(0, e.confidence - 0.10);
+    } else if (impliedPrice > 0.48) {
+      const t = (e.tipo_tarifa ?? '').toUpperCase().replace(/\s+/g, '');
+      const is30 = t.includes('3.0') || t.includes('30TD') || t.includes('30A');
+      if (is30) {
+        warnings.push(
+          `total_factura/consumo = ${impliedPrice.toFixed(2)} €/kWh — posible consumo incompleto (¿falta un segundo bloque de energía 3.0TD?). Comparar kWh con el total explícito en la factura.`,
+        );
+        e.confidence = Math.max(0, e.confidence - 0.12);
+      }
     }
   }
 

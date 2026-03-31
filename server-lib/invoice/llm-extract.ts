@@ -76,7 +76,8 @@ PASO 2 — POTENCIA CONTRATADA:
 
 PASO 3 — CONSUMO Y PRECIOS DE ENERGÍA:
 - Busca "Término de energía activa", "Consumo", "Energía activa".
-- IMPORTANTE: Puede haber VARIOS BLOQUES TEMPORALES para el mismo periodo de facturación (ej: dos tramos en el mismo mes por cambios regulatorios). DEBES SUMAR los kWh de todos los bloques para cada periodo P1…P6.
+- CRÍTICO EN 3.0TD: Es MUY FRECUENTE que haya DOS O MÁS TABLAS o SUBAPARTADOS de energía en el MISMO mes (distintas fechas, ej. días 1–24 y 25–31, o "tramo 1 / tramo 2"). Si solo lees el primero, el consumo quedará INCOMPLETO (~la mitad) y será un error grave. Recorre TODAS las páginas y TODAS las tablas de energía activa del periodo facturado y SUMA cada periodo P1…P6 entre bloques.
+- Busca también una línea resumen tipo "Total energía activa", "Consumo total periodo", "Total kWh" en el apartado energía: ese total debe coincidir (salvo redondeo) con la suma P1+…+P6. Si no, revisa bloques omitidos.
 - Ejemplo SOLO del MÉTODO (cifras inventadas; NO las copies jamás; extrae solo de la factura que ves):
     Bloque A: P1=120 kWh, P2=80 kWh, P6=200 kWh
     Bloque B: P1=30 kWh, P2=20 kWh, P6=50 kWh
@@ -101,7 +102,7 @@ PASO 5 — DATOS GENERALES:
 
 VERIFICACIÓN FINAL — OBLIGATORIA:
 1. consumption_kwh debe ser EXACTAMENTE la suma aritmética de consumo_p1_kwh + … + consumo_p6_kwh (usando 0 si un periodo es null). Si no cuadra, corrige los consumos por periodo o el total según lo que diga explícitamente la factura («consumo total», «energía activa»).
-2. total_factura / consumption_kwh NO es el precio del kWh de energía. Solo úsalo para detectar consumo mal leído: si da > 0.55, revisa consumo y decimales españoles.
+2. total_factura / consumption_kwh incluye potencia, impuestos e IVA, así que NO es €/kWh de energía pura; pero si el cociente supera ~0,50 €/kWh suele indicar consumo SUBESTIMADO (típico: falta un segundo bloque temporal). Vuelve a escanear la factura por más tablas de consumo. Si da > 0,55, revisa también decimales españoles.
 3. precio_energia_kwh debe coincidir con la media ponderada Σ(consumo_pX × precio_pX) / consumption_kwh (periodos con precio null no entran en el numerador).
 4. Si 3.0TD: ¿potencia_p6_kw distinta de P1 si la factura lo indica? ¿Precios solo donde hay dato real?
 5. Si 2.0TD: P3 a P6 null en potencia, consumo y precio.

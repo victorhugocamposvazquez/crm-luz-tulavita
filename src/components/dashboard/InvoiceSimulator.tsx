@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
   Dialog,
   DialogContent,
@@ -245,6 +246,20 @@ function detectTarifaTipo(extraction: InvoiceExtraction): string {
   const t = (extraction.tipo_tarifa ?? '').toUpperCase().replace(/\s+/g, '');
   if (t.includes('3.0') || t.includes('30TD')) return '3.0TD';
   return '2.0TD';
+}
+
+/** Total factura / kWh (todo incluido). En 3.0TD, >~0,47 suele indicar consumo subestimado (bloque temporal omitido). */
+function impliedTotalPerKwh(extraction: InvoiceExtraction): number | null {
+  const c = extraction.consumption_kwh;
+  const tf = extraction.total_factura;
+  if (c == null || c <= 0 || tf == null || tf <= 0) return null;
+  return tf / c;
+}
+
+function suspicious30tdConsumption(extraction: InvoiceExtraction): boolean {
+  if (detectTarifaTipo(extraction) !== '3.0TD') return false;
+  const r = impliedTotalPerKwh(extraction);
+  return r != null && r > 0.47;
 }
 
 function filterOffersByTarifa(offers: EnergyOffer[], tarifaTipo: string): EnergyOffer[] {
@@ -533,6 +548,8 @@ function ExtractionStep({
   );
   const hasMinData = extraction.consumption_kwh != null && extraction.consumption_kwh > 0 && extraction.total_factura != null && extraction.total_factura > 0;
   const is30 = detectTarifaTipo(extraction) === '3.0TD';
+  const implied = impliedTotalPerKwh(extraction);
+  const suspiciousConsumo = suspicious30tdConsumption(extraction);
 
   return (
     <Card>
@@ -546,6 +563,16 @@ function ExtractionStep({
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
+        {suspiciousConsumo && implied != null && (
+          <Alert className="border-amber-500/50 bg-amber-50/80 dark:bg-amber-950/20">
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
+            <AlertTitle className="text-amber-900 dark:text-amber-100">Consumo posiblemente incompleto (3.0TD)</AlertTitle>
+            <AlertDescription className="text-amber-900/90 dark:text-amber-100/90 text-sm">
+              Total factura ÷ consumo ≈ {implied.toFixed(2)} €/kWh. En tarifas 3.0TD suele haber <strong>dos o más tramos</strong> de energía en el mismo mes; si solo se leyó el primero, el kWh queda ~a la mitad y la oferta sale artificialmente barata.
+              Revisa en el PDF todas las tablas de «energía activa» y el <strong>total kWh</strong> del apartado; corrige consumo total y P1–P6 antes de calcular.
+            </AlertDescription>
+          </Alert>
+        )}
         <div>
           <h4 className="text-sm font-medium mb-3 flex items-center gap-1.5"><Building2 className="h-4 w-4" />Comercializadora y titular</h4>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -571,7 +598,7 @@ function ExtractionStep({
             <div className="mt-3">
               <Label className="text-xs text-muted-foreground mb-1 block">Consumo por periodo (kWh)</Label>
               <p className="text-xs text-muted-foreground mb-2 leading-relaxed">
-                En 3.0TD qué periodos (P1–P6) tienen consumo en la factura depende del mes y del calendario horario (estaciones, cambios de periodo): puede haber ceros y líneas que no aparezcan en unos P u otros; no tiene por qué rellenarse siempre el mismo subconjunto.
+                Suma <strong>todos los bloques temporales</strong> del mismo mes (fechas distintas). Los periodos con consumo dependen del calendario horario; puede haber ceros en P3–P5.
               </p>
               <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
                 {numField('P1', 'consumo_p1_kwh', <Zap className="h-3 w-3" />, 'kWh')}
@@ -655,9 +682,29 @@ function ComparisonView({
     : 0;
   const sorted = [...offersWithCost].sort((a, b) => a.monthlyCost - b.monthlyCost);
   const selected = selectedOfferId ? offersWithCost.find((o) => o.id === selectedOfferId) : null;
+  const impliedKwh = impliedTotalPerKwh(extraction);
+  const consumoSospechoso = suspicious30tdConsumption(extraction);
+  const selectedApproxBill = selected
+    ? estimateSpanishBillTotal(selected.monthlyCost, taxBillingDays, taxConfig)
+    : null;
+  const selectedAhorroVsFacturaEst = selectedApproxBill != null
+    ? Math.round((currentMonthlyCost - selectedApproxBill) * 100) / 100
+    : null;
+  const selectedAhorroSoloBase = selected
+    ? Math.round((currentMonthlyCost - selected.monthlyCost) * 100) / 100
+    : null;
 
   return (
     <div className="space-y-4">
+      {consumoSospechoso && impliedKwh != null && (
+        <Alert className="border-amber-500/50 bg-amber-50/80 dark:bg-amber-950/20">
+          <AlertTriangle className="h-4 w-4 text-amber-600" />
+          <AlertTitle className="text-amber-900 dark:text-amber-100">Revisa el consumo (kWh)</AlertTitle>
+          <AlertDescription className="text-amber-900/90 dark:text-amber-100/90 text-sm">
+            Total ÷ consumo ≈ {impliedKwh.toFixed(2)} €/kWh: es habitual cuando en 3.0TD <strong>falta un segundo tramo</strong> de energía en el mismo mes. La oferta se calcula con los kWh extraídos; si son bajos, la base y el ahorro se ven «demasiado buenos». Vuelve al paso anterior y cuadra con el total kWh de la factura.
+          </AlertDescription>
+        </Alert>
+      )}
       <Card>
         <CardContent className="pt-6 space-y-4">
           <div className="flex flex-col sm:flex-row gap-4">
@@ -762,7 +809,13 @@ function ComparisonView({
               <CheckCircle2 className="h-5 w-5 text-primary shrink-0" />
               <div>
                 <p className="text-sm font-medium">Oferta propuesta: <span className="text-primary">{selected.company_name}</span></p>
-                <p className="text-xs text-muted-foreground">{selected.monthlyCost.toFixed(2)} €/mes · Ahorro: {(currentMonthlyCost - selected.monthlyCost).toFixed(2)} €/mes</p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Base {selected.monthlyCost.toFixed(2)} € · ≈ {selectedApproxBill.toFixed(2)} € c/ IE+IVA (est.)
+                  <span className="block mt-0.5">
+                    Ahorro vs tu factura actual: <span className="font-medium text-foreground">{selectedAhorroVsFacturaEst.toFixed(2)} €/mes</span>
+                    {' '}(comparación solo en base comercial: {selectedAhorroSoloBase.toFixed(2)} €/mes)
+                  </span>
+                </p>
               </div>
             </div>
           </CardContent>
