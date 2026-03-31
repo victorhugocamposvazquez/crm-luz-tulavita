@@ -76,10 +76,16 @@ interface InvoiceExtraction {
   potencia_p1_kw: number | null;
   potencia_p2_kw: number | null;
   potencia_p3_kw: number | null;
+  potencia_p4_kw: number | null;
+  potencia_p5_kw: number | null;
+  potencia_p6_kw: number | null;
   precio_energia_kwh: number | null;
   precio_p1_kwh: number | null;
   precio_p2_kwh: number | null;
   precio_p3_kwh: number | null;
+  precio_p4_kwh: number | null;
+  precio_p5_kwh: number | null;
+  precio_p6_kwh: number | null;
   tipo_tarifa: string | null;
   cups: string | null;
   titular: string | null;
@@ -91,6 +97,10 @@ interface EnergyOffer {
   company_name: string;
   p1: number | null;
   p2: number | null;
+  p3: number | null;
+  p4: number | null;
+  p5: number | null;
+  p6: number | null;
   price_per_kwh: number;
   monthly_fixed_cost: number;
   active: boolean;
@@ -131,15 +141,32 @@ interface SimulationRow {
 const DEFAULT_POWER_KW = 4.6;
 const DAYS_PER_MONTH = 30;
 
-function calcMonthlyCost(consumptionKwh: number, offer: EnergyOffer, powerKw: number | null): number {
+function calcMonthlyCost(
+  consumptionKwh: number,
+  offer: EnergyOffer,
+  powerKw: number | null,
+  powersByPeriod?: (number | null)[],
+): number {
   const terminoEnergia = consumptionKwh * offer.price_per_kwh;
-  const p1 = offer.p1 ?? null;
-  const p2 = offer.p2 ?? null;
-  const power = powerKw ?? DEFAULT_POWER_KW;
-  const terminoPotencia =
-    p1 != null && p2 != null
-      ? power * DAYS_PER_MONTH * ((p1 + p2) / 2)
-      : offer.monthly_fixed_cost;
+
+  const offerPeriods = [offer.p1, offer.p2, offer.p3, offer.p4, offer.p5, offer.p6];
+  const activePeriods = offerPeriods.filter((v) => v != null) as number[];
+
+  if (activePeriods.length === 0) return terminoEnergia + offer.monthly_fixed_cost;
+
+  let terminoPotencia = 0;
+  if (powersByPeriod && powersByPeriod.length >= activePeriods.length) {
+    for (let i = 0; i < activePeriods.length; i++) {
+      const pw = powersByPeriod[i] ?? powerKw ?? DEFAULT_POWER_KW;
+      terminoPotencia += pw * DAYS_PER_MONTH * activePeriods[i];
+    }
+  } else {
+    const power = powerKw ?? DEFAULT_POWER_KW;
+    for (const period of activePeriods) {
+      terminoPotencia += power * DAYS_PER_MONTH * period;
+    }
+  }
+
   return terminoEnergia + terminoPotencia;
 }
 
@@ -168,8 +195,13 @@ function buildComparison(extraction: InvoiceExtraction, offers: EnergyOffer[]): 
       ? (extraction.potencia_p1_kw + extraction.potencia_p2_kw) / 2
       : null);
 
+  const powersByPeriod: (number | null)[] = [
+    extraction.potencia_p1_kw, extraction.potencia_p2_kw, extraction.potencia_p3_kw,
+    extraction.potencia_p4_kw, extraction.potencia_p5_kw, extraction.potencia_p6_kw,
+  ];
+
   const offersWithCost: OfferWithCost[] = offers.map((o) => {
-    const cost = calcMonthlyCost(consumptionMonthly, o, extractedPower);
+    const cost = calcMonthlyCost(consumptionMonthly, o, extractedPower, powersByPeriod);
     const isCurrent = currentCompany != null
       && o.company_name.trim().toLowerCase() === currentCompany.trim().toLowerCase();
     return { ...o, monthlyCost: Math.round(cost * 100) / 100, isBest: false, isCurrent };
@@ -404,6 +436,7 @@ function ExtractionStep({
     </div>
   );
   const hasMinData = extraction.consumption_kwh != null && extraction.consumption_kwh > 0 && extraction.total_factura != null && extraction.total_factura > 0;
+  const is30 = detectTarifaTipo(extraction) === '3.0TD';
 
   return (
     <Card>
@@ -447,6 +480,9 @@ function ExtractionStep({
             {numField('P1', 'potencia_p1_kw', <Gauge className="h-3 w-3" />, 'kW')}
             {numField('P2', 'potencia_p2_kw', <Gauge className="h-3 w-3" />, 'kW')}
             {numField('P3', 'potencia_p3_kw', <Gauge className="h-3 w-3" />, 'kW')}
+            {is30 && numField('P4', 'potencia_p4_kw', <Gauge className="h-3 w-3" />, 'kW')}
+            {is30 && numField('P5', 'potencia_p5_kw', <Gauge className="h-3 w-3" />, 'kW')}
+            {is30 && numField('P6', 'potencia_p6_kw', <Gauge className="h-3 w-3" />, 'kW')}
           </div>
         </div>
         <Separator />
@@ -457,6 +493,9 @@ function ExtractionStep({
             {numField('P1', 'precio_p1_kwh', <Euro className="h-3 w-3" />, '€/kWh')}
             {numField('P2', 'precio_p2_kwh', <Euro className="h-3 w-3" />, '€/kWh')}
             {numField('P3', 'precio_p3_kwh', <Euro className="h-3 w-3" />, '€/kWh')}
+            {is30 && numField('P4', 'precio_p4_kwh', <Euro className="h-3 w-3" />, '€/kWh')}
+            {is30 && numField('P5', 'precio_p5_kwh', <Euro className="h-3 w-3" />, '€/kWh')}
+            {is30 && numField('P6', 'precio_p6_kwh', <Euro className="h-3 w-3" />, '€/kWh')}
           </div>
         </div>
         <Separator />
@@ -792,7 +831,7 @@ export default function InvoiceSimulator() {
     try {
       const { data, error } = await (supabase as any)
         .from('energy_offers')
-        .select('id, company_name, p1, p2, price_per_kwh, monthly_fixed_cost, active, tarifa_tipo')
+        .select('id, company_name, p1, p2, p3, p4, p5, p6, price_per_kwh, monthly_fixed_cost, active, tarifa_tipo')
         .eq('active', true)
         .order('company_name');
       if (error) throw error;
@@ -801,6 +840,10 @@ export default function InvoiceSimulator() {
         company_name: r.company_name as string,
         p1: r.p1 != null ? Number(r.p1) : null,
         p2: r.p2 != null ? Number(r.p2) : null,
+        p3: r.p3 != null ? Number(r.p3) : null,
+        p4: r.p4 != null ? Number(r.p4) : null,
+        p5: r.p5 != null ? Number(r.p5) : null,
+        p6: r.p6 != null ? Number(r.p6) : null,
         price_per_kwh: Number(r.price_per_kwh),
         monthly_fixed_cost: Number(r.monthly_fixed_cost),
         active: r.active as boolean,

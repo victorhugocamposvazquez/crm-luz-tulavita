@@ -78,6 +78,16 @@ function validateExtraction(e: InvoiceExtraction): InvoiceExtraction {
       e.potencia_p2_kw = fixed;
     }
   }
+  for (const pKey of ['potencia_p3_kw', 'potencia_p4_kw', 'potencia_p5_kw', 'potencia_p6_kw'] as const) {
+    const val = e[pKey];
+    if (val != null && val > 500) {
+      const fixed = val / 1000;
+      if (fixed >= 1 && fixed <= 500) {
+        fixes.push(`${pKey} corregida: ${val} → ${fixed}`);
+        (e as Record<string, unknown>)[pKey] = fixed;
+      }
+    }
+  }
 
   if (e.consumption_kwh != null && e.consumption_kwh > 100_000) {
     warnings.push(`consumption_kwh extremo: ${e.consumption_kwh}`);

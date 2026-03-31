@@ -376,6 +376,10 @@ export type Database = {
           monthly_fixed_cost: number
           p1: number | null
           p2: number | null
+          p3: number | null
+          p4: number | null
+          p5: number | null
+          p6: number | null
           active: boolean
           tarifa_tipo: string
           created_at: string
@@ -388,6 +392,10 @@ export type Database = {
           monthly_fixed_cost?: number
           p1?: number | null
           p2?: number | null
+          p3?: number | null
+          p4?: number | null
+          p5?: number | null
+          p6?: number | null
           active?: boolean
           tarifa_tipo?: string
           created_at?: string
@@ -400,6 +408,10 @@ export type Database = {
           monthly_fixed_cost?: number
           p1?: number | null
           p2?: number | null
+          p3?: number | null
+          p4?: number | null
+          p5?: number | null
+          p6?: number | null
           active?: boolean
           tarifa_tipo?: string
           created_at?: string

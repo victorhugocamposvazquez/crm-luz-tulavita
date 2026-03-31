@@ -38,10 +38,16 @@ ESQUEMA JSON A DEVOLVER:
   "potencia_p1_kw": 4.6,
   "potencia_p2_kw": 4.6,
   "potencia_p3_kw": null,
+  "potencia_p4_kw": null,
+  "potencia_p5_kw": null,
+  "potencia_p6_kw": null,
   "precio_energia_kwh": 0.15,
   "precio_p1_kwh": 0.18,
   "precio_p2_kwh": 0.12,
   "precio_p3_kwh": null,
+  "precio_p4_kwh": null,
+  "precio_p5_kwh": null,
+  "precio_p6_kwh": null,
   "tipo_tarifa": "2.0TD",
   "cups": "ES0021000012345678AB",
   "titular": "Juan Pérez García",
@@ -60,9 +66,10 @@ NOTAS IMPORTANTES:
 - "consumption_kwh": consumo TOTAL en kWh del periodo facturado. DEBES SUMAR todos los tramos de energía activa (P1+P2+P3+P4+P5+P6) si la factura los desglosa. En tarifas 3.0TD puede haber hasta 6 tramos. Busca "energía activa", "consumo total", "kWh facturados". Si hay varios bloques temporales dentro del mismo periodo, SUMA TODOS. El resultado debe ser coherente con el total de la factura (ej: para un precio medio de ~0.15 €/kWh, 835€ implican ~3500 kWh, no 714000 kWh).
 - "total_factura": importe TOTAL a pagar (IVA incluido). Busca "total a pagar", "importe total", "total factura".
 - "period_months": 1 para mensual, 2 para bimensual, 3 para trimestral. Calcula a partir de las fechas si las tienes.
-- "potencia_contratada_kw": potencia contratada en kW. Si hay varias (P1, P2, P3...), pon la P1 aquí. Recuerda: "26,000 kW" = 26.0 kW.
+- "potencia_contratada_kw": potencia contratada en kW. Si hay varias (P1, P2...), pon la P1 aquí. Recuerda: "26,000 kW" = 26.0 kW.
+- "potencia_p1_kw" a "potencia_p6_kw": potencia contratada por periodo. Tarifas 2.0TD solo tienen P1 y P2. Tarifas 3.0TD tienen P1 a P6 (6 periodos). Rellena solo los que aparezcan.
 - "precio_energia_kwh": precio medio del kWh (€/kWh). Si hay tramos, calcula la media ponderada o usa el general. Típicamente entre 0.05 y 0.30 €/kWh.
-- "precio_p1_kwh", "precio_p2_kwh", "precio_p3_kwh": precios por tramo horario (€/kWh) si aparecen.
+- "precio_p1_kwh" a "precio_p6_kwh": precios por tramo horario (€/kWh). Tarifas 2.0TD: P1 y P2. Tarifas 3.0TD: P1 a P6. Rellena solo los que aparezcan.
 - "tipo_tarifa": tipo de tarifa (2.0TD doméstico, 3.0TD >15kW, etc.).
 - "cups": código CUPS (empieza por ES seguido de 16 dígitos y 2 letras).
 - "titular": nombre del titular del contrato.
@@ -285,10 +292,16 @@ function parseLLMResponse(raw: string): InvoiceExtraction {
     potencia_p1_kw: safePositiveNumber(parsed.potencia_p1_kw),
     potencia_p2_kw: safePositiveNumber(parsed.potencia_p2_kw),
     potencia_p3_kw: safePositiveNumber(parsed.potencia_p3_kw),
+    potencia_p4_kw: safePositiveNumber(parsed.potencia_p4_kw),
+    potencia_p5_kw: safePositiveNumber(parsed.potencia_p5_kw),
+    potencia_p6_kw: safePositiveNumber(parsed.potencia_p6_kw),
     precio_energia_kwh: safePositiveNumber(parsed.precio_energia_kwh),
     precio_p1_kwh: safePositiveNumber(parsed.precio_p1_kwh),
     precio_p2_kwh: safePositiveNumber(parsed.precio_p2_kwh),
     precio_p3_kwh: safePositiveNumber(parsed.precio_p3_kwh),
+    precio_p4_kwh: safePositiveNumber(parsed.precio_p4_kwh),
+    precio_p5_kwh: safePositiveNumber(parsed.precio_p5_kwh),
+    precio_p6_kwh: safePositiveNumber(parsed.precio_p6_kwh),
     tipo_tarifa: safeString(parsed.tipo_tarifa),
     cups: safeCups(parsed.cups),
     titular: safeString(parsed.titular),
