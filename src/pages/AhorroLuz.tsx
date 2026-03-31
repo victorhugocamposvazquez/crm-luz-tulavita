@@ -21,6 +21,17 @@ import { toast } from '@/hooks/use-toast';
 const BRAND_COLOR = '#26606b';
 const LEAD_ATTACHMENTS_BUCKET = 'lead-attachments';
 const PREVIEW_INVOICE_API = import.meta.env.VITE_PREVIEW_INVOICE_API_URL ?? '/api/preview-invoice';
+/** Solo tras un momento en contacto con intención (evita preview en abandonos tras subir archivo). */
+const PREFETCH_CONTACT_DEBOUNCE_MS = 650;
+
+/** Email mínimo creíble o teléfono con dígitos suficientes antes de gastar extracción. */
+function hasContactPrefetchIntent(contact: Record<string, string>): boolean {
+  const email = (contact.email ?? '').trim();
+  const phone = (contact.phone ?? contact.telefono ?? '').replace(/\D/g, '');
+  const emailOk = email.length > 5 && email.includes('@') && /\.[^@]+/.test(email);
+  const phoneOk = phone.length >= 6;
+  return emailOk || phoneOk;
+}
 /**
  * Loader mínimo tras enviar si el prefetch aún no dejó una comparación lista.
  * Si el análisis ya vino en preview + caché, forzar 3 s aquí anula por completo la ganancia de tiempo.
@@ -207,50 +218,78 @@ export default function AhorroLuz() {
     return null;
   }, [answers.adjuntar_factura]);
 
-  /** Prefetch: analizar factura en cuanto está en storage y el usuario sigue el formulario (contacto, etc.). */
+  /**
+   * Prefetch solo en paso contacto (1) y si hay señal de intención: email creíble o teléfono con bastantes dígitos (2).
+   * Debounce: no dispara en el mismo instante de entrar en contacto ni en cada tecla.
+   */
+  const contactEmail = answers.contacto && typeof answers.contacto === 'object' && answers.contacto !== null
+    ? String((answers.contacto as Record<string, string>).email ?? '')
+    : '';
+  const contactPhone = answers.contacto && typeof answers.contacto === 'object' && answers.contacto !== null
+    ? String((answers.contacto as Record<string, string>).phone ?? (answers.contacto as Record<string, string>).telefono ?? '')
+    : '';
+
   useEffect(() => {
     if (!attachmentStoragePath || submitStatus === 'success') {
       return;
     }
-    let cancelled = false;
-    setInvoicePrefetch((prev) =>
-      prev?.path === attachmentStoragePath
-        ? prev
-        : { path: attachmentStoragePath, comparison: null },
-    );
+    if (currentQuestion?.id !== 'contacto') {
+      return;
+    }
 
-    fetch(PREVIEW_INVOICE_API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ attachment_path: attachmentStoragePath }),
-    })
-      .then((res) => res.json())
-      .then((data: { success?: boolean; comparison?: EnergyComparisonResult }) => {
-        if (cancelled) return;
-        if (data.success && data.comparison) {
-          setInvoicePrefetch({
-            path: attachmentStoragePath,
-            comparison: data.comparison,
-          });
-        } else {
+    const fromState =
+      answers.contacto && typeof answers.contacto === 'object' && answers.contacto !== null
+        ? (answers.contacto as Record<string, string>)
+        : {};
+    const merged: Record<string, string> = { ...contactValuesRef.current, ...fromState };
+    if (!hasContactPrefetchIntent(merged)) {
+      return;
+    }
+
+    let cancelled = false;
+    const debounceId = window.setTimeout(() => {
+      if (cancelled) return;
+
+      setInvoicePrefetch((prev) =>
+        prev?.path === attachmentStoragePath
+          ? prev
+          : { path: attachmentStoragePath, comparison: null },
+      );
+
+      fetch(PREVIEW_INVOICE_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ attachment_path: attachmentStoragePath }),
+      })
+        .then((res) => res.json())
+        .then((data: { success?: boolean; comparison?: EnergyComparisonResult }) => {
+          if (cancelled) return;
+          if (data.success && data.comparison) {
+            setInvoicePrefetch({
+              path: attachmentStoragePath,
+              comparison: data.comparison,
+            });
+          } else {
+            setInvoicePrefetch({
+              path: attachmentStoragePath,
+              comparison: null,
+            });
+          }
+        })
+        .catch(() => {
+          if (cancelled) return;
           setInvoicePrefetch({
             path: attachmentStoragePath,
             comparison: null,
           });
-        }
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setInvoicePrefetch({
-          path: attachmentStoragePath,
-          comparison: null,
         });
-      });
+    }, PREFETCH_CONTACT_DEBOUNCE_MS);
 
     return () => {
       cancelled = true;
+      window.clearTimeout(debounceId);
     };
-  }, [attachmentStoragePath, submitStatus]);
+  }, [attachmentStoragePath, submitStatus, currentQuestion?.id, contactEmail, contactPhone]);
 
   const uploadLeadAttachment = useCallback(async (file: File): Promise<{ name: string; path: string }> => {
     let fileToUpload = file;
