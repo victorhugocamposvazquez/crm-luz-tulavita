@@ -25,7 +25,7 @@ const MAX_TOKENS = (() => {
 const SYSTEM_PROMPT = `Eres un experto en facturas de energía eléctrica y gas en España. Tu trabajo es extraer datos estructurados de facturas.
 
 INSTRUCCIONES:
-1. Analiza TODAS las páginas de la factura.
+1. Analiza TODAS las páginas de la factura de principio a fin, sin saltarte ninguna tabla.
 2. Extrae los datos con la mayor precisión posible.
 3. Los decimales en España usan COMA (ej: "1.234,56" = 1234.56). Convierte siempre a formato numérico con punto decimal.
 4. Si un dato no aparece o no es legible, usa null.
@@ -40,7 +40,6 @@ En España: PUNTO = separador de miles, COMA = separador decimal.
 - "33,000 kW" → 33.0
 - "835,00 €" → 835.00
 - "0,219748" → 0.219748
-- "130,286 kWh" → 130.286
 Regla: si ves "NNN,NNN" con 3 decimales tras la coma, los 3 dígitos tras la coma SON decimales (ej: "714,000" = 714.000 = 714.0).
 
 ESQUEMA JSON:
@@ -48,6 +47,8 @@ ESQUEMA JSON:
   "company_name": "string",
   "consumption_kwh": number,
   "total_factura": number,
+  "importe_energia_activa": number,
+  "importe_potencia": number,
   "period_start": "YYYY-MM-DD",
   "period_end": "YYYY-MM-DD",
   "period_months": number,
@@ -70,43 +71,57 @@ Busca "2.0TD", "3.0TD", "2.0A", "3.0A", etc. Esto determina cuántos periodos (P
 
 PASO 2 — POTENCIA CONTRATADA:
 - Busca "Término de potencia", "Potencia facturada", "Potencia contratada".
-- Extrae la potencia (kW) de CADA FILA P1…P6. NO copies el mismo valor a los 6 sin leer: es un error típico.
+- Extrae la potencia (kW) de CADA FILA P1…P6. Lee cada fila individualmente.
 - potencia_contratada_kw = potencia de P1.
-- Ejemplo frecuente en 3.0TD: P1=P2=P3=P4=P5=26.0 kW y P6=33.0 kW (u otro distinto). Si la fila P6 dice 33,000 kW → 33.0, no 26.0.
+- En 3.0TD frecuentemente P1=P2=P3=P4=P5 tienen un valor (ej. 26 kW) y P6 tiene otro distinto (ej. 33 kW). Lee cada fila.
 
-PASO 3 — CONSUMO Y PRECIOS DE ENERGÍA:
-- Busca "Término de energía activa", "Consumo", "Energía activa".
-- CRÍTICO EN 3.0TD: Es MUY FRECUENTE que haya DOS O MÁS TABLAS o SUBAPARTADOS de energía en el MISMO mes (distintas fechas, ej. días 1–24 y 25–31, o "tramo 1 / tramo 2"). Si solo lees el primero, el consumo quedará INCOMPLETO (~la mitad) y será un error grave. Recorre TODAS las páginas y TODAS las tablas de energía activa del periodo facturado y SUMA cada periodo P1…P6 entre bloques.
-- Busca también una línea resumen tipo "Total energía activa", "Consumo total periodo", "Total kWh" en el apartado energía: ese total debe coincidir (salvo redondeo) con la suma P1+…+P6. Si no, revisa bloques omitidos.
-- Ejemplo SOLO del MÉTODO (cifras inventadas; NO las copies jamás; extrae solo de la factura que ves):
-    Bloque A: P1=120 kWh, P2=80 kWh, P6=200 kWh
-    Bloque B: P1=30 kWh, P2=20 kWh, P6=50 kWh
-    → consumo_p1_kwh = 150, p2 = 100, p3–p5 = 0, p6 = 250 → consumption_kwh = 500 (= suma de los seis).
-- NUNCA rellenes consumo con números que recuerdes de ejemplos: si no ves la cifra en la factura, null o 0.
-- consumption_kwh = SUMA TOTAL de consumo_p1 a consumo_p6.
-- consumo_p1_kwh a consumo_p6_kwh: consumo en kWh por periodo, SUMANDO todos los bloques temporales. En 3.0TD el calendario horario (mes, estación) determina qué periodos tienen energía en ese mes: cualquier P puede ser 0 o no aparecer en factura — pon 0 (NO null) si no hay consumo.
-- Para precio_p1_kwh a precio_p6_kwh: extrae €/kWh solo donde la factura muestre línea de energía activa para ese periodo. Si hay 2 bloques temporales, prioriza precios del bloque con más días. Si un periodo no tiene fila (consumo 0 en ese mes), null salvo que el otro bloque aporte precio útil.
+PASO 3 — CONSUMO DE ENERGÍA (EL MÁS IMPORTANTE):
+- Busca TODAS las secciones de "Término de energía activa", "Energía activa", "Consumo" en TODA la factura.
+
+*** REGLA CRÍTICA PARA 3.0TD — MÚLTIPLES BLOQUES ***
+Las facturas 3.0TD casi siempre tienen DOS O MÁS BLOQUES de energía activa en el mismo periodo de facturación, separados por fechas distintas. Típicamente:
+  - Bloque 1: "Del 01/12/2025 al 24/12/2025" (o similar)
+  - Bloque 2: "Del 25/12/2025 al 31/12/2025" (cambio de precio regulado)
+Estos bloques pueden estar en la MISMA página (uno debajo del otro) o en páginas DISTINTAS.
+Cada bloque tiene su propia tabla con filas P1, P2, ..., P6 con kWh, €/kWh e importe.
+
+PROCEDIMIENTO OBLIGATORIO EN 3.0TD:
+1. Recorre TODAS las páginas buscando TODAS las tablas de energía activa.
+2. Para cada periodo Px: SUMA los kWh de TODOS los bloques.
+   Si el bloque 1 dice P1=600 kWh y el bloque 2 dice P1=282 kWh → consumo_p1_kwh = 882.
+3. Para precios (precio_pX_kwh): usa el precio del bloque con MÁS kWh o más días.
+4. Si un periodo Px no aparece en ningún bloque (o dice 0 kWh), pon 0 (NO null).
+
+- "importe_energia_activa": suma de TODOS los importes (€) de energía activa de todos los bloques y periodos. Busca "Total energía activa" o suma los importes de cada fila. Sirve como control: importe_energia_activa / consumption_kwh ≈ precio_energia_kwh (±5%).
+- consumption_kwh = consumo_p1_kwh + consumo_p2_kwh + ... + consumo_p6_kwh.
 
 PASO 4 — PRECIO MEDIO:
-- precio_energia_kwh = suma(consumo_pX_kwh × precio_pX_kwh) / consumption_kwh (media ponderada por periodo). Si falta algún precio para un periodo con consumo > 0, no inventes.
-- Debe quedar entre 0.05 y 0.35 €/kWh aprox. NO uses total_factura/consumption_kwh (eso mezcla potencia, impuestos e IVA).
+- precio_energia_kwh = Σ(consumo_pX_kwh × precio_pX_kwh) / consumption_kwh (media ponderada). Solo incluye periodos con consumo > 0 y precio > 0.
+- Debe quedar entre 0.05 y 0.35 €/kWh. NO uses total_factura/consumption_kwh (eso incluye potencia, impuestos, IVA).
+- Contraverificación: importe_energia_activa / consumption_kwh también debe dar aprox. ese valor.
 
-PASO 5 — DATOS GENERALES:
+PASO 5 — POTENCIA (IMPORTE):
+- "importe_potencia": suma de todos los importes del "Término de potencia" (todas las filas P1-P6). Busca el total o suma las filas.
+
+PASO 6 — DATOS GENERALES:
 - "total_factura": importe TOTAL a pagar (IVA incluido). Busca "Total factura", "Total a pagar".
-- "period_start" y "period_end": fechas del periodo facturado (ej. 2025-12-01 a 2025-12-31). NO confundas con fechas de lectura ni con "30/11" si el periodo es diciembre completo: el inicio suele ser día 1 del mes facturado.
-- "period_months": calcula de las fechas. 01/12/2025 a 31/12/2025 = 1 mes. 01/11 a 31/12 = 2 meses.
-- "cups": código que empieza por ES + 16 dígitos + 2 letras (ej: ES0021000049650681D).
+- "period_start" y "period_end": fechas del periodo facturado.
+- "period_months": calcula de las fechas (01/12/2025–31/12/2025 = 1).
+- "cups": código ES + 16 dígitos + 2 letras.
 - "titular": nombre del titular del contrato.
 - "direccion_suministro": dirección completa del punto de suministro.
-- "company_name": normaliza (Iberdrola, Endesa, Naturgy, Repsol, EDP, Total Energies, Plenitude, Holaluz, Octopus, Cepsa, Viesgo, Fenie Energía, Gaba Energía, Contigo Energía, etc.)
+- "company_name": nombre comercial de la comercializadora.
 
-VERIFICACIÓN FINAL — OBLIGATORIA:
-1. consumption_kwh debe ser EXACTAMENTE la suma aritmética de consumo_p1_kwh + … + consumo_p6_kwh (usando 0 si un periodo es null). Si no cuadra, corrige los consumos por periodo o el total según lo que diga explícitamente la factura («consumo total», «energía activa»).
-2. total_factura / consumption_kwh incluye potencia, impuestos e IVA, así que NO es €/kWh de energía pura; pero si el cociente supera ~0,50 €/kWh suele indicar consumo SUBESTIMADO (típico: falta un segundo bloque temporal). Vuelve a escanear la factura por más tablas de consumo. Si da > 0,55, revisa también decimales españoles.
-3. precio_energia_kwh debe coincidir con la media ponderada Σ(consumo_pX × precio_pX) / consumption_kwh (periodos con precio null no entran en el numerador).
-4. Si 3.0TD: ¿potencia_p6_kw distinta de P1 si la factura lo indica? ¿Precios solo donde hay dato real?
-5. Si 2.0TD: P3 a P6 null en potencia, consumo y precio.
-6. period_start: ¿primer día del periodo facturado y no víspera errónea (30/11)?`;
+VERIFICACIÓN FINAL — OBLIGATORIA (haz estas comprobaciones antes de responder):
+1. consumption_kwh == consumo_p1_kwh + … + consumo_p6_kwh (usando 0 para null). Si no cuadra, corrige.
+2. COMPROBACIÓN DE CONSUMO COMPLETO:
+   - Calcula: importe_energia_activa / consumption_kwh. Debe dar ≈ precio_energia_kwh (entre 0.05 y 0.35).
+   - Calcula: total_factura / consumption_kwh. Si supera 0.40 €/kWh, ES MUY PROBABLE que falte un bloque de energía. Vuelve a escanear TODA la factura buscando más tablas de "energía activa" con otras fechas.
+   - En una factura de luz española típica, el coste total (con IVA, potencia, IE) dividido entre kWh suele estar entre 0.18 y 0.40 €/kWh. Si te da > 0.45, casi seguro falta consumo.
+3. precio_energia_kwh ≈ Σ(consumo_pX × precio_pX) / consumption_kwh.
+4. Si 3.0TD: ¿leíste TODOS los bloques de energía (suelen ser 2-3 por cambio de precios regulados)? ¿potencia_p6_kw puede ser distinta de P1?
+5. Si 2.0TD: P3 a P6 deben ser null en potencia, consumo y precio.
+6. period_start: ¿primer día del periodo facturado, no la víspera (30/11 cuando es diciembre)?`;
 
 const USER_PROMPT = 'Extrae todos los datos de esta factura de energía. Devuelve SOLO el JSON, sin explicaciones.';
 
@@ -391,6 +406,8 @@ function parseLLMResponse(raw: string): InvoiceExtraction {
     company_name: safeString(parsed.company_name),
     consumption_kwh: safePositiveNumber(parsed.consumption_kwh),
     total_factura: safePositiveNumber(parsed.total_factura),
+    importe_energia_activa: safePositiveNumber(parsed.importe_energia_activa),
+    importe_potencia: safeNonNegativeNumber(parsed.importe_potencia),
     period_start: safeString(parsed.period_start),
     period_end: safeString(parsed.period_end),
     period_months: safePeriodMonths(parsed.period_months, safeString(parsed.period_start), safeString(parsed.period_end)),

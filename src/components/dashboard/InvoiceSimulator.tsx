@@ -75,6 +75,8 @@ interface InvoiceExtraction {
   company_name: string | null;
   consumption_kwh: number | null;
   total_factura: number | null;
+  importe_energia_activa?: number | null;
+  importe_potencia?: number | null;
   period_start: string | null;
   period_end: string | null;
   period_months: number;

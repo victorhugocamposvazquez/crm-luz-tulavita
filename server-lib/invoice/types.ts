@@ -7,6 +7,10 @@ export interface InvoiceExtraction {
   company_name: string | null;
   consumption_kwh: number | null;
   total_factura: number | null;
+  /** Suma de importes (€) de energía activa (sin potencia, sin impuestos). Útil como control cruzado. */
+  importe_energia_activa: number | null;
+  /** Suma de importes (€) del término de potencia. */
+  importe_potencia: number | null;
   period_start: string | null;
   period_end: string | null;
   period_months: number;
@@ -48,6 +52,8 @@ export function emptyExtraction(): InvoiceExtraction {
     company_name: null,
     consumption_kwh: null,
     total_factura: null,
+    importe_energia_activa: null,
+    importe_potencia: null,
     period_start: null,
     period_end: null,
     period_months: 1,

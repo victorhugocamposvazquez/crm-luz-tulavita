@@ -13,7 +13,7 @@ import { extractWithLLM, extractWithLLMForceFull } from './llm-extract.js';
 const IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
-const PROMPT_VERSION = 'v13-auto-retry-30td';
+const PROMPT_VERSION = 'v14-importe-energia-crosscheck';
 const extractionCache = new Map<string, { extraction: InvoiceExtraction; ts: number; pv: string }>();
 const CACHE_TTL_MS = (() => {
   const n = Number(process.env.INVOICE_CACHE_TTL_MS ?? '');
@@ -94,6 +94,36 @@ function reconcileConsumoPorPeriodo(e: InvoiceExtraction, fixes: string[]): void
   fixes.push(
     `consumo por periodo escalado (×${factor.toFixed(4)}) para alinear suma ${sum.toFixed(1)} kWh con consumption_kwh ${e.consumption_kwh}`,
   );
+}
+
+/**
+ * Si tenemos importe_energia_activa y consumption_kwh, podemos estimar el consumo real:
+ * consumo_real ≈ importe_energia_activa / precio_energia_kwh.
+ * Si consumption_kwh es mucho menor que esa estimación, faltan bloques.
+ */
+function crossCheckWithImporteEnergia(e: InvoiceExtraction, warnings: string[]): void {
+  if (e.importe_energia_activa == null || e.importe_energia_activa <= 0) return;
+  if (e.consumption_kwh == null || e.consumption_kwh <= 0) return;
+
+  const impliedPriceFromImporte = e.importe_energia_activa / e.consumption_kwh;
+
+  if (impliedPriceFromImporte > 0.35 && impliedPriceFromImporte < 1.5) {
+    warnings.push(
+      `importe_energia_activa (${e.importe_energia_activa.toFixed(2)} €) / consumption_kwh (${e.consumption_kwh}) = ${impliedPriceFromImporte.toFixed(4)} €/kWh — demasiado alto; probablemente falta consumo (bloque temporal no leído).`,
+    );
+    e.confidence = Math.max(0, e.confidence - 0.15);
+  }
+
+  if (e.precio_energia_kwh != null && e.precio_energia_kwh > 0.04 && e.precio_energia_kwh < 0.40) {
+    const estimatedConsumption = e.importe_energia_activa / e.precio_energia_kwh;
+    const ratio = e.consumption_kwh / estimatedConsumption;
+    if (ratio < 0.60) {
+      warnings.push(
+        `consumption_kwh (${e.consumption_kwh}) es solo ${(ratio * 100).toFixed(0)}% del consumo estimado por importe (${estimatedConsumption.toFixed(0)} kWh = ${e.importe_energia_activa.toFixed(2)} € / ${e.precio_energia_kwh.toFixed(6)} €/kWh). Faltan bloques de energía.`,
+      );
+      e.confidence = Math.max(0, e.confidence - 0.20);
+    }
+  }
 }
 
 /** precio_energia_kwh = media ponderada por consumo por periodo (no total factura / kWh). */
@@ -232,6 +262,7 @@ function validateExtraction(e: InvoiceExtraction): InvoiceExtraction {
   }
 
   fixPeriodStartEveBeforeMonth(e, fixes);
+  crossCheckWithImporteEnergia(e, warnings);
   reconcileConsumoPorPeriodo(e, fixes);
   recomputeWeightedPrecioEnergia(e, fixes);
 
