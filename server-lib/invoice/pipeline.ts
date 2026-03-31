@@ -146,7 +146,46 @@ function normalizeSearchText(text: string): string {
     .trim();
 }
 
-function parse20TDFromText(text: string): InvoiceExtraction | null {
+function cleanCapturedText(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const cleaned = value
+    .replace(/\r/g, ' ')
+    .replace(/\n+/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/^[\s:;,.()-]+/, '')
+    .trim();
+  return cleaned || null;
+}
+
+function extractBetweenLabels(
+  text: string,
+  startPatterns: RegExp[],
+  endPatterns: RegExp[],
+  maxChars = 180,
+): string | null {
+  for (const startPattern of startPatterns) {
+    const startMatch = text.match(startPattern);
+    if (!startMatch || startMatch.index == null) continue;
+
+    const startIndex = startMatch.index + startMatch[0].length;
+    const tail = text.slice(startIndex);
+    let endIndex = tail.length;
+
+    for (const endPattern of endPatterns) {
+      const endMatch = tail.match(endPattern);
+      if (endMatch?.index != null && endMatch.index < endIndex) {
+        endIndex = endMatch.index;
+      }
+    }
+
+    const value = cleanCapturedText(tail.slice(0, Math.min(endIndex, maxChars)));
+    if (value) return value;
+  }
+
+  return null;
+}
+
+export function parse20TDFromText(text: string): InvoiceExtraction | null {
   const normalized = text.replace(/\r/g, '');
   const searchText = normalizeSearchText(text);
   if (!/2[\.\s]?0\s*TD/i.test(searchText) && !/20TD/i.test(searchText)) return null;
@@ -170,12 +209,24 @@ function parse20TDFromText(text: string): InvoiceExtraction | null {
     /CUPS[:\s]+(ES[0-9A-Z]{16,24})\b/i,
     /Identificaci[oó]n punto de suministro \(CUPS\):\s*(ES[0-9A-Z]{16,24})\b/i,
   ])?.replace(/\s+/g, '') ?? null;
-  const titular = firstString(normalized, [
-    /Titular del contrato:\s*([^\n]+)/i,
-    /Nombre y Apellidos del titular\s*([^\n]+)/i,
-    /Titular Potencia:\s*([^\n]+)/i,
-    /Cliente:\s*([^\n]+)/i,
-  ]);
+  const titular = extractBetweenLabels(searchText, [
+    /Esta es tu factura de luz,\s*/i,
+    /Nombre y Apellidos del titular[:\s]*/i,
+    /Titular del contrato[:\s]*/i,
+    /Titular Potencia[:\s]*/i,
+    /Cliente[:\s]*/i,
+  ], [
+    /\n/,
+    /\bDNI\b/i,
+    /Cuenta bancaria/i,
+    /CUPS[:\s]/i,
+    /N[ºo]\s*de factura/i,
+    /Forma de pago/i,
+    /Fecha de emisi[oó]n/i,
+    /Fecha de cobro/i,
+    /Direcci[oó]n de suministro/i,
+    /Total factura/i,
+  ], 120);
   const periodRange = searchText.match(/Periodo de facturaci[oó]n(?: elec\.)?:?\s*(?:del\s*)?(\d{2}[./-]\d{2}[./-]\d{4})\s*(?:a|-)\s*(\d{2}[./-]\d{2}[./-]\d{4})/i)
     ?? searchText.match(/PERIODO DE FACTURACI[ÓO]N:\s*(\d{2}[./-]\d{2}[./-]\d{4})\s*-\s*(\d{2}[./-]\d{2}[./-]\d{4})/i);
   const period_start = periodRange ? toIsoDate(periodRange[1]) : null;
@@ -219,10 +270,19 @@ function parse20TDFromText(text: string): InvoiceExtraction | null {
     ]);
   }
 
-  const direccion_suministro = firstString(normalized, [
-    /Direcci[oó]n de suministro:\s*([^\n]+(?:\n[^\n]+)?)/i,
-    /Direcci[oó]n suministro\s*([^\n]+)/i,
-  ])?.replace(/\n+/g, ' ').trim() ?? null;
+  const direccion_suministro = extractBetweenLabels(searchText, [
+    /Direcci[oó]n de suministro[:\s]*/i,
+    /Direcci[oó]n suministro[:\s]*/i,
+  ], [
+    /\n/,
+    /Total factura/i,
+    /T[eé]rmino fijo/i,
+    /Periodo de facturaci[oó]n/i,
+    /D[ií]as facturados/i,
+    /Consumo en este periodo/i,
+    /Fecha de cobro/i,
+    /N[ºo]\s*de factura/i,
+  ], 220);
 
   const minOk = total_factura != null && consumption_kwh != null && cups != null;
   if (!minOk) return null;
