@@ -29,26 +29,26 @@ INSTRUCCIONES:
 ESQUEMA JSON A DEVOLVER:
 {
   "company_name": "Nombre comercializadora (Iberdrola, Endesa, Naturgy, Repsol...)",
-  "consumption_kwh": 123.45,
-  "total_factura": 89.50,
+  "consumption_kwh": 16793.0,
+  "total_factura": 2404.47,
   "period_start": "2025-01-01",
   "period_end": "2025-01-31",
   "period_months": 1,
-  "potencia_contratada_kw": 4.6,
-  "potencia_p1_kw": 4.6,
-  "potencia_p2_kw": 4.6,
-  "potencia_p3_kw": null,
-  "potencia_p4_kw": null,
-  "potencia_p5_kw": null,
-  "potencia_p6_kw": null,
-  "precio_energia_kwh": 0.15,
-  "precio_p1_kwh": 0.18,
-  "precio_p2_kwh": 0.12,
-  "precio_p3_kwh": null,
-  "precio_p4_kwh": null,
-  "precio_p5_kwh": null,
-  "precio_p6_kwh": null,
-  "tipo_tarifa": "2.0TD",
+  "potencia_contratada_kw": 34.64,
+  "potencia_p1_kw": 34.64,
+  "potencia_p2_kw": 34.64,
+  "potencia_p3_kw": 34.64,
+  "potencia_p4_kw": 34.64,
+  "potencia_p5_kw": 34.64,
+  "potencia_p6_kw": 34.64,
+  "precio_energia_kwh": 0.1349,
+  "precio_p1_kwh": 0.183593,
+  "precio_p2_kwh": 0.158017,
+  "precio_p3_kwh": 0.134925,
+  "precio_p4_kwh": 0.121236,
+  "precio_p5_kwh": 0.114444,
+  "precio_p6_kwh": 0.106808,
+  "tipo_tarifa": "3.0TD",
   "cups": "ES0021000012345678AB",
   "titular": "Juan Pérez García",
   "direccion_suministro": "Calle Mayor 5, 2ºB, 28001 Madrid"
@@ -67,10 +67,10 @@ NOTAS IMPORTANTES:
 - "total_factura": importe TOTAL a pagar (IVA incluido). Busca "total a pagar", "importe total", "total factura".
 - "period_months": 1 para mensual, 2 para bimensual, 3 para trimestral. Calcula a partir de las fechas si las tienes.
 - "potencia_contratada_kw": potencia contratada en kW. Si hay varias (P1, P2...), pon la P1 aquí. Recuerda: "26,000 kW" = 26.0 kW.
-- "potencia_p1_kw" a "potencia_p6_kw": potencia contratada por periodo. Tarifas 2.0TD solo tienen P1 y P2. Tarifas 3.0TD tienen P1 a P6 (6 periodos). Rellena solo los que aparezcan.
-- "precio_energia_kwh": precio medio del kWh (€/kWh). Si hay tramos, calcula la media ponderada o usa el general. Típicamente entre 0.05 y 0.30 €/kWh.
-- "precio_p1_kwh" a "precio_p6_kwh": precios por tramo horario (€/kWh). Tarifas 2.0TD: P1 y P2. Tarifas 3.0TD: P1 a P6. Rellena solo los que aparezcan.
-- "tipo_tarifa": tipo de tarifa (2.0TD doméstico, 3.0TD >15kW, etc.).
+- "potencia_p1_kw" a "potencia_p6_kw": potencia contratada por periodo. Tarifas 2.0TD solo tienen P1 y P2 (P3-P6 = null). Tarifas 3.0TD SIEMPRE tienen 6 periodos P1 a P6: EXTRAE LOS 6. En 3.0TD es frecuente que P1=P2=P3=P4=P5=P6 (misma potencia en todos los periodos). NUNCA dejes P3-P6 como null en una tarifa 3.0TD si la factura tiene sección de potencia.
+- "precio_energia_kwh": precio medio del kWh (€/kWh). Calcula la media ponderada de los precios por periodo si hay desglose. Típicamente entre 0.05 y 0.30 €/kWh.
+- "precio_p1_kwh" a "precio_p6_kwh": precios por tramo horario (€/kWh). Tarifas 2.0TD: solo P1 y P2 (P3-P6 = null). Tarifas 3.0TD SIEMPRE tienen 6 precios P1 a P6: EXTRAE LOS 6. Busca en la sección de "consumo" o "energía activa" los precios unitarios por periodo. NUNCA dejes P3-P6 como null en una tarifa 3.0TD si aparece desglose de consumo.
+- "tipo_tarifa": tipo de tarifa (2.0TD doméstico, 3.0TD >15kW, etc.). DETERMINA PRIMERO el tipo de tarifa para saber cuántos periodos extraer.
 - "cups": código CUPS (empieza por ES seguido de 16 dígitos y 2 letras).
 - "titular": nombre del titular del contrato.
 - "direccion_suministro": dirección del punto de suministro. Busca "dirección de suministro", "punto de suministro", "dirección del contrato". Incluye calle, número, piso, CP y localidad si aparecen.
@@ -79,7 +79,9 @@ NOTAS IMPORTANTES:
 - Si NO es de energía: devuelve todos los campos como null.
 
 VERIFICACIÓN FINAL:
-Antes de responder, comprueba que el precio implícito (total_factura / consumption_kwh) está entre 0.05 y 0.50 €/kWh. Si no, revisa el consumo — probablemente has confundido el formato decimal español.`;
+1. Comprueba que el precio implícito (total_factura / consumption_kwh) está entre 0.05 y 0.50 €/kWh. Si no, revisa el consumo — probablemente has confundido el formato decimal español.
+2. Si la tarifa es 3.0TD, COMPRUEBA que has rellenado los 6 periodos de potencia (potencia_p1_kw a potencia_p6_kw) y los 6 precios de energía (precio_p1_kwh a precio_p6_kwh). Si alguno es null, vuelve a buscar en la factura.
+3. Si la tarifa es 2.0TD, solo P1 y P2. P3 a P6 deben ser null.`;
 
 const USER_PROMPT = 'Extrae todos los datos de esta factura de energía. Devuelve SOLO el JSON, sin explicaciones.';
 
