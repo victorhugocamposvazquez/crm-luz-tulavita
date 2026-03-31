@@ -16,10 +16,23 @@ import { emptyExtraction } from '../server-lib/invoice/types.js';
 
 const BUCKET = 'lead-attachments';
 const TIMEOUT_MS = 55000;
-const RATE_LIMIT_ENABLED = true;
-const RATE_LIMIT_LEAD_PER_HOUR = 3;
-const RATE_LIMIT_IP_PER_HOUR = 20;
 const RATE_LIMIT_WINDOW_HOURS = 1;
+
+function parseEnvInt(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw == null || raw === '') return fallback;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+
+/** Desactivar con PROCESS_INVOICE_RATE_LIMIT_ENABLED=false (p. ej. desarrollo local). */
+const RATE_LIMIT_ENABLED =
+  process.env.PROCESS_INVOICE_RATE_LIMIT_ENABLED !== 'false' &&
+  process.env.PROCESS_INVOICE_RATE_LIMIT_ENABLED !== '0';
+
+/** Límites por hora (ventana deslizante ~1h). Ajustables por env en Vercel. */
+const RATE_LIMIT_LEAD_PER_HOUR = parseEnvInt('PROCESS_INVOICE_RATE_LIMIT_LEAD_PER_HOUR', 5);
+const RATE_LIMIT_IP_PER_HOUR = parseEnvInt('PROCESS_INVOICE_RATE_LIMIT_IP_PER_HOUR', 120);
 
 function getClientIp(req: VercelRequest): string {
   const forwarded = req.headers['x-forwarded-for'];
