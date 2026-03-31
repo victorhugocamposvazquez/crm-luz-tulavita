@@ -380,6 +380,12 @@ export type Database = {
           p4: number | null
           p5: number | null
           p6: number | null
+          price_p1: number | null
+          price_p2: number | null
+          price_p3: number | null
+          price_p4: number | null
+          price_p5: number | null
+          price_p6: number | null
           active: boolean
           tarifa_tipo: string
           created_at: string
@@ -396,6 +402,12 @@ export type Database = {
           p4?: number | null
           p5?: number | null
           p6?: number | null
+          price_p1?: number | null
+          price_p2?: number | null
+          price_p3?: number | null
+          price_p4?: number | null
+          price_p5?: number | null
+          price_p6?: number | null
           active?: boolean
           tarifa_tipo?: string
           created_at?: string
@@ -412,6 +424,12 @@ export type Database = {
           p4?: number | null
           p5?: number | null
           p6?: number | null
+          price_p1?: number | null
+          price_p2?: number | null
+          price_p3?: number | null
+          price_p4?: number | null
+          price_p5?: number | null
+          price_p6?: number | null
           active?: boolean
           tarifa_tipo?: string
           created_at?: string

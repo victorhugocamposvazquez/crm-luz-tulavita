@@ -1,5 +1,7 @@
 /**
- * Configuración de ofertas energéticas: P1-P6, Precio consumo, separado por tarifa 2.0TD / 3.0TD.
+ * Configuración de ofertas energéticas separado por tarifa 2.0TD / 3.0TD.
+ * 2.0TD: P1-P2 potencia, precio consumo único.
+ * 3.0TD: P1-P6 potencia + P1-P6 precio consumo.
  */
 
 import { useState, useEffect, useMemo } from 'react';
@@ -31,6 +33,12 @@ export interface EnergyOfferRow {
   p5: number | null;
   p6: number | null;
   price_per_kwh: number;
+  price_p1: number | null;
+  price_p2: number | null;
+  price_p3: number | null;
+  price_p4: number | null;
+  price_p5: number | null;
+  price_p6: number | null;
   monthly_fixed_cost: number;
   active: boolean;
   tarifa_tipo: string;
@@ -38,7 +46,10 @@ export interface EnergyOfferRow {
   updated_at: string;
 }
 
-const PERIOD_KEYS = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'] as const;
+const POT_KEYS = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'] as const;
+const PRICE_KEYS = ['price_p1', 'price_p2', 'price_p3', 'price_p4', 'price_p5', 'price_p6'] as const;
+
+type OfferNumericKey = typeof POT_KEYS[number] | typeof PRICE_KEYS[number];
 
 export default function EnergyOffersManagement() {
   const [offers, setOffers] = useState<EnergyOfferRow[]>([]);
@@ -47,7 +58,7 @@ export default function EnergyOffersManagement() {
   const [editingOffer, setEditingOffer] = useState<EnergyOfferRow | null>(null);
   const [saving, setSaving] = useState(false);
   const [formName, setFormName] = useState('');
-  const [formPeriods, setFormPeriods] = useState<Record<string, string>>({});
+  const [formFields, setFormFields] = useState<Record<string, string>>({});
   const [formPriceKwh, setFormPriceKwh] = useState('');
   const [formActive, setFormActive] = useState(true);
   const [formTarifaTipo, setFormTarifaTipo] = useState<'2.0TD' | '3.0TD'>('2.0TD');
@@ -56,13 +67,17 @@ export default function EnergyOffersManagement() {
   const offers20 = useMemo(() => offers.filter((o) => o.tarifa_tipo === '2.0TD'), [offers]);
   const offers30 = useMemo(() => offers.filter((o) => o.tarifa_tipo === '3.0TD'), [offers]);
 
-  const periodsForTipo = (tipo: string) => tipo === '3.0TD' ? PERIOD_KEYS : PERIOD_KEYS.slice(0, 2);
+  const potPeriodsForTipo = (tipo: string) => tipo === '3.0TD' ? POT_KEYS : POT_KEYS.slice(0, 2);
+  const pricePeriodsForTipo = (tipo: string) => tipo === '3.0TD' ? PRICE_KEYS : ([] as typeof PRICE_KEYS[number][]);
+  const is30 = (tipo: string) => tipo === '3.0TD';
+
+  const allFieldKeys: OfferNumericKey[] = [...POT_KEYS, ...PRICE_KEYS];
 
   const fetchOffers = async () => {
     try {
       const { data, error } = await supabase
         .from('energy_offers')
-        .select('id, company_name, p1, p2, p3, p4, p5, p6, price_per_kwh, monthly_fixed_cost, active, tarifa_tipo, created_at, updated_at')
+        .select('id, company_name, p1, p2, p3, p4, p5, p6, price_p1, price_p2, price_p3, price_p4, price_p5, price_p6, price_per_kwh, monthly_fixed_cost, active, tarifa_tipo, created_at, updated_at')
         .order('tarifa_tipo')
         .order('company_name');
 
@@ -78,19 +93,19 @@ export default function EnergyOffersManagement() {
 
   useEffect(() => { fetchOffers(); }, []);
 
-  const resetFormPeriods = (offer?: EnergyOfferRow | null) => {
+  const resetFormFields = (offer?: EnergyOfferRow | null) => {
     const vals: Record<string, string> = {};
-    for (const k of PERIOD_KEYS) {
+    for (const k of allFieldKeys) {
       vals[k] = offer && offer[k] != null ? String(offer[k]) : '';
     }
-    setFormPeriods(vals);
+    setFormFields(vals);
   };
 
   const openEdit = (offer: EnergyOfferRow) => {
     setIsNew(false);
     setEditingOffer(offer);
     setFormName(offer.company_name);
-    resetFormPeriods(offer);
+    resetFormFields(offer);
     setFormPriceKwh(String(offer.price_per_kwh));
     setFormActive(offer.active);
     setFormTarifaTipo(offer.tarifa_tipo as '2.0TD' | '3.0TD');
@@ -101,7 +116,7 @@ export default function EnergyOffersManagement() {
     setIsNew(true);
     setEditingOffer(null);
     setFormName('');
-    resetFormPeriods();
+    resetFormFields();
     setFormPriceKwh('');
     setFormActive(true);
     setFormTarifaTipo(tipo);
@@ -113,7 +128,7 @@ export default function EnergyOffersManagement() {
     setEditingOffer(null);
     setIsNew(false);
     setFormName('');
-    resetFormPeriods();
+    resetFormFields();
     setFormPriceKwh('');
     setFormActive(true);
   };
@@ -139,7 +154,7 @@ export default function EnergyOffersManagement() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const price = parseNum(formPriceKwh);
-    if (price === null || price < 0) {
+    if (!is30(formTarifaTipo) && (price === null || price < 0)) {
       toast({ title: 'Datos inválidos', description: 'Precio consumo debe ser un número ≥ 0', variant: 'destructive' });
       return;
     }
@@ -148,18 +163,25 @@ export default function EnergyOffersManagement() {
       return;
     }
 
-    const periodData: Record<string, number | null> = {};
-    for (const k of periodsForTipo(formTarifaTipo)) {
-      periodData[k] = parseNum(formPeriods[k] ?? '') ?? null;
+    const fieldData: Record<string, number | null> = {};
+    for (const k of potPeriodsForTipo(formTarifaTipo)) {
+      fieldData[k] = parseNum(formFields[k] ?? '') ?? null;
     }
+    for (const k of pricePeriodsForTipo(formTarifaTipo)) {
+      fieldData[k] = parseNum(formFields[k] ?? '') ?? null;
+    }
+
+    const priceKwh = is30(formTarifaTipo)
+      ? computeAvgPrice(fieldData)
+      : (price ?? 0);
 
     setSaving(true);
     try {
       if (isNew) {
         const { error } = await supabase.from('energy_offers').insert({
           company_name: formName.trim(),
-          ...periodData,
-          price_per_kwh: price,
+          ...fieldData,
+          price_per_kwh: priceKwh,
           active: formActive,
           tarifa_tipo: formTarifaTipo,
         });
@@ -170,8 +192,8 @@ export default function EnergyOffersManagement() {
           .from('energy_offers')
           .update({
             company_name: formName.trim(),
-            ...periodData,
-            price_per_kwh: price,
+            ...fieldData,
+            price_per_kwh: priceKwh,
             active: formActive,
           })
           .eq('id', editingOffer.id);
@@ -188,10 +210,17 @@ export default function EnergyOffersManagement() {
     }
   };
 
+  const computeAvgPrice = (data: Record<string, number | null>): number => {
+    const vals = PRICE_KEYS.map((k) => data[k]).filter((v) => v != null) as number[];
+    return vals.length > 0 ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
+  };
+
   const fmtNum = (v: number | null) => v != null ? Number(v).toFixed(6) : '–';
 
   const renderTable = (items: EnergyOfferRow[], tipo: '2.0TD' | '3.0TD') => {
-    const periods = periodsForTipo(tipo);
+    const potPeriods = potPeriodsForTipo(tipo);
+    const pricePeriods = pricePeriodsForTipo(tipo);
+    const showSinglePrice = !is30(tipo);
     return (
       <div className="space-y-3">
         <div className="flex items-center justify-between">
@@ -209,10 +238,16 @@ export default function EnergyOffersManagement() {
             <TableHeader>
               <TableRow>
                 <TableHead>Empresa</TableHead>
-                {periods.map((p) => (
-                  <TableHead key={p} className="text-right">{p.toUpperCase()}</TableHead>
+                {potPeriods.map((p) => (
+                  <TableHead key={p} className="text-right text-xs">Pot {p.toUpperCase()}</TableHead>
                 ))}
-                <TableHead className="text-right">€/kWh</TableHead>
+                {showSinglePrice ? (
+                  <TableHead className="text-right">€/kWh</TableHead>
+                ) : (
+                  pricePeriods.map((p) => (
+                    <TableHead key={p} className="text-right text-xs">€ {p.replace('price_', '').toUpperCase()}</TableHead>
+                  ))
+                )}
                 <TableHead>Activa</TableHead>
                 <TableHead className="w-[100px]"></TableHead>
               </TableRow>
@@ -220,7 +255,7 @@ export default function EnergyOffersManagement() {
             <TableBody>
               {items.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={periods.length + 4} className="text-center text-muted-foreground">
+                  <TableCell colSpan={1 + potPeriods.length + (showSinglePrice ? 1 : pricePeriods.length) + 2} className="text-center text-muted-foreground">
                     No hay ofertas {tipo}. Pulsa "Añadir" para crear una.
                   </TableCell>
                 </TableRow>
@@ -228,10 +263,16 @@ export default function EnergyOffersManagement() {
                 items.map((offer) => (
                   <TableRow key={offer.id}>
                     <TableCell className="font-medium">{offer.company_name}</TableCell>
-                    {periods.map((p) => (
+                    {potPeriods.map((p) => (
                       <TableCell key={p} className="text-right tabular-nums text-xs">{fmtNum(offer[p])}</TableCell>
                     ))}
-                    <TableCell className="text-right tabular-nums">{Number(offer.price_per_kwh).toFixed(4)}</TableCell>
+                    {showSinglePrice ? (
+                      <TableCell className="text-right tabular-nums">{Number(offer.price_per_kwh).toFixed(4)}</TableCell>
+                    ) : (
+                      pricePeriods.map((p) => (
+                        <TableCell key={p} className="text-right tabular-nums text-xs">{fmtNum(offer[p])}</TableCell>
+                      ))
+                    )}
                     <TableCell>{offer.active ? 'Sí' : 'No'}</TableCell>
                     <TableCell>
                       <div className="flex gap-1">
@@ -253,8 +294,8 @@ export default function EnergyOffersManagement() {
     );
   };
 
-  const dialogPeriods = periodsForTipo(formTarifaTipo);
-  const cols = dialogPeriods.length <= 2 ? 2 : 3;
+  const dialogPotPeriods = potPeriodsForTipo(formTarifaTipo);
+  const dialogPricePeriods = pricePeriodsForTipo(formTarifaTipo);
 
   return (
     <Card>
@@ -279,15 +320,15 @@ export default function EnergyOffersManagement() {
         )}
 
         <Dialog open={dialogOpen} onOpenChange={(open) => !open && closeDialog()}>
-          <DialogContent className="sm:max-w-lg">
+          <DialogContent className={is30(formTarifaTipo) ? 'sm:max-w-2xl' : 'sm:max-w-lg'}>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                {isNew ? `Nueva oferta` : 'Editar oferta'}
+                {isNew ? 'Nueva oferta' : 'Editar oferta'}
                 <Badge variant={formTarifaTipo === '3.0TD' ? 'secondary' : 'default'}>{formTarifaTipo}</Badge>
               </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit}>
-              <div className="grid gap-4 py-4">
+              <div className="grid gap-4 py-4 max-h-[70vh] overflow-y-auto pr-1">
                 <div className="grid gap-2">
                   <Label htmlFor="energy-company-name">Nombre empresa</Label>
                   <Input
@@ -298,36 +339,60 @@ export default function EnergyOffersManagement() {
                     required
                   />
                 </div>
+
                 <div>
                   <Label className="text-xs text-muted-foreground mb-2 block">Término de potencia (€/kW/día)</Label>
-                  <div className={`grid gap-3 grid-cols-${cols}`} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
-                    {dialogPeriods.map((p) => (
+                  <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${is30(formTarifaTipo) ? 3 : 2}, 1fr)` }}>
+                    {dialogPotPeriods.map((p) => (
                       <div key={p} className="grid gap-1">
                         <Label htmlFor={`energy-${p}`} className="text-xs">{p.toUpperCase()}</Label>
                         <Input
                           id={`energy-${p}`}
                           type="text"
                           inputMode="decimal"
-                          value={formPeriods[p] ?? ''}
-                          onChange={(e) => setFormPeriods((prev) => ({ ...prev, [p]: e.target.value }))}
+                          value={formFields[p] ?? ''}
+                          onChange={(e) => setFormFields((prev) => ({ ...prev, [p]: e.target.value }))}
                           placeholder="0.xxxxxx"
                         />
                       </div>
                     ))}
                   </div>
                 </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="energy-price-kwh">Precio consumo (€/kWh)</Label>
-                  <Input
-                    id="energy-price-kwh"
-                    type="text"
-                    inputMode="decimal"
-                    value={formPriceKwh}
-                    onChange={(e) => setFormPriceKwh(e.target.value)}
-                    placeholder="0.145"
-                    required
-                  />
-                </div>
+
+                {is30(formTarifaTipo) ? (
+                  <div>
+                    <Label className="text-xs text-muted-foreground mb-2 block">Precio consumo por periodo (€/kWh)</Label>
+                    <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(3, 1fr)' }}>
+                      {dialogPricePeriods.map((p) => (
+                        <div key={p} className="grid gap-1">
+                          <Label htmlFor={`energy-${p}`} className="text-xs">{p.replace('price_', '').toUpperCase()}</Label>
+                          <Input
+                            id={`energy-${p}`}
+                            type="text"
+                            inputMode="decimal"
+                            value={formFields[p] ?? ''}
+                            onChange={(e) => setFormFields((prev) => ({ ...prev, [p]: e.target.value }))}
+                            placeholder="0.xxxxxx"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid gap-2">
+                    <Label htmlFor="energy-price-kwh">Precio consumo (€/kWh)</Label>
+                    <Input
+                      id="energy-price-kwh"
+                      type="text"
+                      inputMode="decimal"
+                      value={formPriceKwh}
+                      onChange={(e) => setFormPriceKwh(e.target.value)}
+                      placeholder="0.145"
+                      required
+                    />
+                  </div>
+                )}
+
                 <div className="flex items-center gap-2">
                   <Switch
                     id="energy-active"

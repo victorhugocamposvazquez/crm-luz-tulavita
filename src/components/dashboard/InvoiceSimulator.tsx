@@ -102,6 +102,12 @@ interface EnergyOffer {
   p5: number | null;
   p6: number | null;
   price_per_kwh: number;
+  price_p1: number | null;
+  price_p2: number | null;
+  price_p3: number | null;
+  price_p4: number | null;
+  price_p5: number | null;
+  price_p6: number | null;
   monthly_fixed_cost: number;
   active: boolean;
   tarifa_tipo: string;
@@ -146,23 +152,37 @@ function calcMonthlyCost(
   offer: EnergyOffer,
   powerKw: number | null,
   powersByPeriod?: (number | null)[],
+  consumptionByPeriod?: (number | null)[],
 ): number {
-  const terminoEnergia = consumptionKwh * offer.price_per_kwh;
+  const offerPrices = [offer.price_p1, offer.price_p2, offer.price_p3, offer.price_p4, offer.price_p5, offer.price_p6];
+  const hasPeriodPrices = offerPrices.some((v) => v != null);
 
-  const offerPeriods = [offer.p1, offer.p2, offer.p3, offer.p4, offer.p5, offer.p6];
-  const activePeriods = offerPeriods.filter((v) => v != null) as number[];
+  let terminoEnergia: number;
+  if (hasPeriodPrices && consumptionByPeriod && consumptionByPeriod.some((v) => v != null && v > 0)) {
+    terminoEnergia = 0;
+    for (let i = 0; i < 6; i++) {
+      const cons = consumptionByPeriod[i] ?? 0;
+      const price = offerPrices[i] ?? offer.price_per_kwh;
+      terminoEnergia += cons * price;
+    }
+  } else {
+    terminoEnergia = consumptionKwh * offer.price_per_kwh;
+  }
 
-  if (activePeriods.length === 0) return terminoEnergia + offer.monthly_fixed_cost;
+  const offerPotPeriods = [offer.p1, offer.p2, offer.p3, offer.p4, offer.p5, offer.p6];
+  const activePotPeriods = offerPotPeriods.filter((v) => v != null) as number[];
+
+  if (activePotPeriods.length === 0) return terminoEnergia + offer.monthly_fixed_cost;
 
   let terminoPotencia = 0;
-  if (powersByPeriod && powersByPeriod.length >= activePeriods.length) {
-    for (let i = 0; i < activePeriods.length; i++) {
+  if (powersByPeriod && powersByPeriod.length >= activePotPeriods.length) {
+    for (let i = 0; i < activePotPeriods.length; i++) {
       const pw = powersByPeriod[i] ?? powerKw ?? DEFAULT_POWER_KW;
-      terminoPotencia += pw * DAYS_PER_MONTH * activePeriods[i];
+      terminoPotencia += pw * DAYS_PER_MONTH * activePotPeriods[i];
     }
   } else {
     const power = powerKw ?? DEFAULT_POWER_KW;
-    for (const period of activePeriods) {
+    for (const period of activePotPeriods) {
       terminoPotencia += power * DAYS_PER_MONTH * period;
     }
   }
@@ -201,7 +221,7 @@ function buildComparison(extraction: InvoiceExtraction, offers: EnergyOffer[]): 
   ];
 
   const offersWithCost: OfferWithCost[] = offers.map((o) => {
-    const cost = calcMonthlyCost(consumptionMonthly, o, extractedPower, powersByPeriod);
+    const cost = calcMonthlyCost(consumptionMonthly, o, extractedPower, powersByPeriod, undefined);
     const isCurrent = currentCompany != null
       && o.company_name.trim().toLowerCase() === currentCompany.trim().toLowerCase();
     return { ...o, monthlyCost: Math.round(cost * 100) / 100, isBest: false, isCurrent };
@@ -831,7 +851,7 @@ export default function InvoiceSimulator() {
     try {
       const { data, error } = await (supabase as any)
         .from('energy_offers')
-        .select('id, company_name, p1, p2, p3, p4, p5, p6, price_per_kwh, monthly_fixed_cost, active, tarifa_tipo')
+        .select('id, company_name, p1, p2, p3, p4, p5, p6, price_per_kwh, price_p1, price_p2, price_p3, price_p4, price_p5, price_p6, monthly_fixed_cost, active, tarifa_tipo')
         .eq('active', true)
         .order('company_name');
       if (error) throw error;
@@ -845,6 +865,12 @@ export default function InvoiceSimulator() {
         p5: r.p5 != null ? Number(r.p5) : null,
         p6: r.p6 != null ? Number(r.p6) : null,
         price_per_kwh: Number(r.price_per_kwh),
+        price_p1: r.price_p1 != null ? Number(r.price_p1) : null,
+        price_p2: r.price_p2 != null ? Number(r.price_p2) : null,
+        price_p3: r.price_p3 != null ? Number(r.price_p3) : null,
+        price_p4: r.price_p4 != null ? Number(r.price_p4) : null,
+        price_p5: r.price_p5 != null ? Number(r.price_p5) : null,
+        price_p6: r.price_p6 != null ? Number(r.price_p6) : null,
         monthly_fixed_cost: Number(r.monthly_fixed_cost),
         active: r.active as boolean,
         tarifa_tipo: (r.tarifa_tipo as string) || '2.0TD',
