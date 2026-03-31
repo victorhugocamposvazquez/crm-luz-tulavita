@@ -115,6 +115,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     res.setHeader('x-extraction-used-pdf-parse', String(debug.usedPdfParse));
     res.setHeader('x-extraction-used-llm', String(debug.usedLLM));
     res.setHeader('x-extraction-used-retry', String(debug.usedRetry));
+    res.setHeader('x-extraction-20td-parser-accepted', String(debug.parser20td?.accepted ?? false));
+    if (debug.parser20td?.score != null) {
+      res.setHeader('x-extraction-20td-parser-score', String(debug.parser20td.score));
+    }
     res.setHeader('Server-Timing', [
       `total;dur=${debug.timings.totalMs}`,
       debug.timings.pdfParseMs != null ? `pdfparse;dur=${debug.timings.pdfParseMs}` : null,
