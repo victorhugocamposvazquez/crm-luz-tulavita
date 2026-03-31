@@ -145,7 +145,6 @@ export function EnergySavingsFlow({
             estimated_savings_amount: comparison.estimated_savings_amount,
             estimated_savings_percentage: comparison.estimated_savings_percentage,
             current_monthly_cost: comparison.current_monthly_cost,
-            best_offer_company: comparison.best_offer_company,
             prudent_mode: comparison.prudent_mode ?? false,
           }}
         />

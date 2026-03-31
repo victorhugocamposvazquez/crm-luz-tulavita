@@ -118,7 +118,6 @@ export interface EnergyComparisonData {
   estimated_savings_amount: number | null;
   estimated_savings_percentage: number | null;
   current_monthly_cost?: number | null;
-  best_offer_company?: string | null;
   prudent_mode?: boolean;
 }
 
@@ -165,7 +164,6 @@ export function EnergySavingsResult({ data }: { data: EnergyComparisonData }) {
   const percent = resolveSavingsPercent(data);
   const prudent = data.prudent_mode === true;
   const showExact = percent > 0;
-  const bestCompany = data.best_offer_company?.trim() || null;
 
   return (
     <div className="space-y-4 bg-white rounded-xl p-4 sm:p-6">
@@ -180,19 +178,12 @@ export function EnergySavingsResult({ data }: { data: EnergyComparisonData }) {
                   textShadow: '0 0 20px rgba(5, 150, 105, 0.5), 0 0 40px rgba(5, 150, 105, 0.25)',
                 }}
               >
-                Podrías ahorrar hasta un <strong className="font-bold">{percent}%</strong> con una mejor tarifa
-                {bestCompany ? (
-                  <>
-                    {' '}
-                    (oferta de <strong className="font-bold">{bestCompany}</strong>)
-                  </>
-                ) : null}
-                .
+                Podrías ahorrar hasta un <strong className="font-bold">{percent}%</strong> con una mejor tarifa.
               </p>
               <p className="text-sm text-gray-500">{LEGAL_TEXT}</p>
               {prudent && (
                 <p className="text-sm text-gray-500">
-                  Es una estimación orientativa. Revisaremos contigo el detalle de la mejor oferta.
+                  Es una estimación orientativa. Revisaremos contigo el detalle en privado.
                 </p>
               )}
             </div>
