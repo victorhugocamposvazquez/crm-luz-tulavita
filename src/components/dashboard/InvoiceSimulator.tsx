@@ -504,7 +504,10 @@ function ExtractionStep({
           </div>
           {is30 && (
             <div className="mt-3">
-              <Label className="text-xs text-muted-foreground mb-2 block">Consumo por periodo (kWh)</Label>
+              <Label className="text-xs text-muted-foreground mb-1 block">Consumo por periodo (kWh)</Label>
+              <p className="text-xs text-muted-foreground mb-2 leading-relaxed">
+                En 3.0TD qué periodos (P1–P6) tienen consumo en la factura depende del mes y del calendario horario (estaciones, cambios de periodo): puede haber ceros y líneas que no aparezcan en unos P u otros; no tiene por qué rellenarse siempre el mismo subconjunto.
+              </p>
               <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
                 {numField('P1', 'consumo_p1_kwh', <Zap className="h-3 w-3" />, 'kWh')}
                 {numField('P2', 'consumo_p2_kwh', <Zap className="h-3 w-3" />, 'kWh')}
@@ -532,6 +535,11 @@ function ExtractionStep({
         <Separator />
         <div>
           <h4 className="text-sm font-medium mb-3 flex items-center gap-1.5"><Euro className="h-4 w-4" />Precios energía</h4>
+          {is30 && (
+            <p className="text-xs text-muted-foreground mb-2 leading-relaxed">
+              Los precios €/kWh por periodo siguen la misma lógica: solo suelen figurar los periodos con energía facturada en ese mes. Donde no hay línea en factura puede usarse un precio de referencia para la comparativa (no cambia el coste si el consumo de ese periodo es 0).
+            </p>
+          )}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {numField('Precio medio', 'precio_energia_kwh', <Euro className="h-3 w-3" />, '€/kWh')}
             {numField('P1', 'precio_p1_kwh', <Euro className="h-3 w-3" />, '€/kWh')}

@@ -65,33 +65,29 @@ Busca "2.0TD", "3.0TD", "2.0A", "3.0A", etc. Esto determina cuántos periodos (P
 
 PASO 2 — POTENCIA CONTRATADA:
 - Busca "Término de potencia", "Potencia facturada", "Potencia contratada".
-- Extrae la potencia (kW) de CADA periodo. En 3.0TD hay 6 líneas (P1 a P6).
+- Extrae la potencia (kW) de CADA FILA P1…P6. NO copies el mismo valor a los 6 sin leer: es un error típico.
 - potencia_contratada_kw = potencia de P1.
-- OJO: P6 puede tener potencia DIFERENTE de P1-P5. Lee CADA línea.
+- Ejemplo frecuente en 3.0TD: P1=P2=P3=P4=P5=26.0 kW y P6=33.0 kW (u otro distinto). Si la fila P6 dice 33,000 kW → 33.0, no 26.0.
 
 PASO 3 — CONSUMO Y PRECIOS DE ENERGÍA:
 - Busca "Término de energía activa", "Consumo", "Energía activa".
 - IMPORTANTE: Puede haber VARIOS BLOQUES TEMPORALES para el mismo periodo de facturación (ej: "entre 01/12 y 24/12" + "entre 25/12 y 31/12"). Esto pasa por cambios regulatorios. DEBES SUMAR los kWh de todos los bloques para cada periodo.
-- Ejemplo REAL de esta factura con 2 bloques:
+- Ejemplo con 2 bloques (un mes dado; otro mes puede activar otros periodos):
     Bloque 1 (01/12-24/12): P1=714.0, P2=553.714, P6=1473.059
     Bloque 2 (25/12-31/12): P1=168.0, P2=130.286, P6=503.941
-    → consumo_p1_kwh = 714.0 + 168.0 = 882.0
-    → consumo_p2_kwh = 553.714 + 130.286 = 684.0
-    → consumo_p3_kwh = 0 (no aparece en ningún bloque)
-    → consumo_p4_kwh = 0
-    → consumo_p5_kwh = 0
-    → consumo_p6_kwh = 1473.059 + 503.941 = 1977.0
-    → consumption_kwh = 882 + 684 + 0 + 0 + 0 + 1977 = 3543.0
+    → consumo_p1_kwh = 882.0, p2 = 684.0, p3–p5 = 0 (no aplican ese mes), p6 = 1977.0
+    → consumption_kwh = suma de los seis = 3543.0
 - consumption_kwh = SUMA TOTAL de consumo_p1 a consumo_p6.
-- consumo_p1_kwh a consumo_p6_kwh: consumo en kWh de cada periodo, SUMANDO todos los bloques temporales. Si un periodo (P3, P4, P5) tiene 0 kWh o no aparece, pon 0 (NO null). En 3.0TD dependiendo de la estación, algunos periodos pueden tener 0 consumo — es normal.
-- Para precio_p1_kwh a precio_p6_kwh: usa el precio unitario del PRIMER bloque (el más largo). Si los precios difieren entre bloques, usa el del bloque con más kWh.
+- consumo_p1_kwh a consumo_p6_kwh: consumo en kWh por periodo, SUMANDO todos los bloques temporales. En 3.0TD el calendario horario (mes, estación) determina qué periodos tienen energía en ese mes: cualquier P puede ser 0 o no aparecer en factura — pon 0 (NO null) si no hay consumo.
+- Para precio_p1_kwh a precio_p6_kwh: extrae €/kWh solo donde la factura muestre línea de energía activa para ese periodo. Si hay 2 bloques temporales, prioriza precios del bloque con más días. Si un periodo no tiene fila (consumo 0 en ese mes), null salvo que el otro bloque aporte precio útil.
 
 PASO 4 — PRECIO MEDIO:
-- precio_energia_kwh = total del término de energía (sin impuestos, sin potencia) / consumption_kwh.
-- Debe estar entre 0.05 y 0.30 €/kWh. Si te sale > 0.50, algo está mal.
+- precio_energia_kwh = suma(consumo_pX_kwh × precio_pX_kwh) / consumption_kwh (media ponderada por periodo). Si falta algún precio para un periodo con consumo > 0, no inventes.
+- Debe quedar entre 0.05 y 0.35 €/kWh aprox. NO uses total_factura/consumption_kwh (eso mezcla potencia, impuestos e IVA).
 
 PASO 5 — DATOS GENERALES:
 - "total_factura": importe TOTAL a pagar (IVA incluido). Busca "Total factura", "Total a pagar".
+- "period_start" y "period_end": fechas del periodo facturado (ej. 2025-12-01 a 2025-12-31). NO confundas con fechas de lectura ni con "30/11" si el periodo es diciembre completo: el inicio suele ser día 1 del mes facturado.
 - "period_months": calcula de las fechas. 01/12/2025 a 31/12/2025 = 1 mes. 01/11 a 31/12 = 2 meses.
 - "cups": código que empieza por ES + 16 dígitos + 2 letras (ej: ES0021000049650681D).
 - "titular": nombre del titular del contrato.
@@ -99,10 +95,11 @@ PASO 5 — DATOS GENERALES:
 - "company_name": normaliza (Iberdrola, Endesa, Naturgy, Repsol, EDP, Total Energies, Plenitude, Holaluz, Octopus, Cepsa, Viesgo, Fenie Energía, Gaba Energía, Contigo Energía, etc.)
 
 VERIFICACIÓN FINAL — OBLIGATORIA:
-1. precio_implícito = total_factura / consumption_kwh. Debe estar entre 0.05 y 0.50 €/kWh. Si no, HAS SUMADO MAL el consumo o confundido el formato decimal.
-2. Si 3.0TD: ¿tienes los 6 potencia_pX_kw? ¿tienes los 6 precio_pX_kwh? Si falta alguno, VUELVE a buscar.
-3. Si 2.0TD: P3 a P6 deben ser null.
-4. period_months: ¿es coherente con las fechas? Un mes = 1, no 12.`;
+1. total_factura / consumption_kwh NO es el precio del kWh de energía (incluye potencia, impuestos, IVA). Solo úsalo para detectar consumo mal sumado: si da > 0.55, revisa consumo y decimales españoles.
+2. precio_energia_kwh debe coincidir con la media ponderada Σ(consumo_pX × precio_pX) / consumption_kwh (periodos con precio null no entran en la suma del numerador).
+3. Si 3.0TD: ¿potencia_p6_kw es distinta de P1 si la factura lo indica? ¿Los 6 precios o null solo donde no hay dato en factura?
+4. Si 2.0TD: P3 a P6 null en potencia, consumo y precio.
+5. period_start: ¿es el primer día del periodo facturado (ej. 01/12) y no víspera errónea (30/11)?`;
 
 const USER_PROMPT = 'Extrae todos los datos de esta factura de energía. Devuelve SOLO el JSON, sin explicaciones.';
 
