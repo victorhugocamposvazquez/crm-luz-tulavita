@@ -25,12 +25,14 @@ function fileHash(buffer: Buffer): string {
 }
 
 async function extractPdfText(buffer: Buffer): Promise<string | null> {
+  const t0 = Date.now();
   try {
     const { PDFParse } = await import('pdf-parse');
     const parser = new PDFParse({ data: buffer });
     const result = await parser.getText();
     await parser.destroy();
     const text = result.text?.trim();
+    console.log(`[pipeline] pdf text extracted in ${Date.now() - t0}ms`);
     return text ? text : null;
   } catch (err) {
     console.warn('[pipeline] PDF text extraction failed:', err instanceof Error ? err.message : err);
@@ -521,6 +523,7 @@ export async function extractInvoiceFromBuffer(
   buffer: Buffer,
   mimeType: string,
 ): Promise<InvoiceExtraction> {
+  const t0 = Date.now();
   const isPdf = mimeType === 'application/pdf';
   const isImage = IMAGE_MIMES.has(mimeType);
 
@@ -554,6 +557,7 @@ export async function extractInvoiceFromBuffer(
     let validated: InvoiceExtraction;
 
     if (detectedTarifa === '2.0TD') {
+      const tFast20 = Date.now();
       const parsed = extractedPdfText ? parse20TDFromText(extractedPdfText) : null;
       if (parsed) {
         console.log('[pipeline] 2.0TD parsed locally from PDF text (sin LLM)');
@@ -563,7 +567,9 @@ export async function extractInvoiceFromBuffer(
           ? await extractWithLLM20TDFromText(extractedPdfText)
           : await extractWithLLM20TD(buffer, mimeType));
       validated = validateExtraction(extraction);
+      console.log(`[pipeline] 2.0TD path finished in ${Date.now() - tFast20}ms`);
     } else if (detectedTarifa === '3.0TD') {
+      const t30 = Date.now();
       let extraction = await extractWithLLM30TD(buffer, mimeType);
       validated = validateExtraction(extraction);
 
@@ -589,7 +595,9 @@ export async function extractInvoiceFromBuffer(
           console.log('[pipeline] gpt-4o forzado no mejoró; manteniendo original');
         }
       }
+      console.log(`[pipeline] 3.0TD path finished in ${Date.now() - t30}ms`);
     } else {
+      const tGeneric = Date.now();
       const extraction = await extractWithLLMGeneric(buffer, mimeType);
       validated = validateExtraction(extraction);
 
@@ -601,9 +609,11 @@ export async function extractInvoiceFromBuffer(
           validated = retryValidated;
         }
       }
+      console.log(`[pipeline] generic path finished in ${Date.now() - tGeneric}ms`);
     }
 
     extractionCache.set(hash, { extraction: validated, ts: Date.now(), pv: PROMPT_VERSION });
+    console.log(`[pipeline] total ${Date.now() - t0}ms`);
     return validated;
   } catch (err) {
     console.error('[pipeline] Extraction failed:', err instanceof Error ? err.message : err);

@@ -68,6 +68,7 @@ function parseMultipart(
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const t0 = Date.now();
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -83,7 +84,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   try {
+    const tMultipart = Date.now();
     const { buffer, mimeType, filename } = await parseMultipart(req);
+    console.log(`[simulate-invoice] multipart parsed in ${Date.now() - tMultipart}ms (${filename}, ${mimeType}, ${buffer.length} bytes)`);
 
     if (!ALLOWED_MIMES.has(mimeType)) {
       res.status(400).json({
@@ -93,13 +96,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return;
     }
 
+    const tExtract = Date.now();
     const extraction = await extractInvoiceFromBuffer(buffer, mimeType);
+    console.log(`[simulate-invoice] extraction done in ${Date.now() - tExtract}ms`);
 
     res.status(200).json({
       success: true,
       extraction,
       file: { filename, mimeType, sizeBytes: buffer.length },
     });
+    console.log(`[simulate-invoice] total ${Date.now() - t0}ms`);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Error procesando factura';
     console.error('[simulate-invoice]', message);

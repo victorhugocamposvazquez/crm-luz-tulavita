@@ -393,6 +393,31 @@ async function generateThumbnail(file: File): Promise<string | null> {
   }
 }
 
+async function prepareUploadFile(file: File): Promise<File> {
+  if (!file.type.startsWith('image/')) return file;
+
+  try {
+    const compressed = await imageCompression(file, {
+      maxSizeMB: 0.6,
+      maxWidthOrHeight: 1800,
+      useWebWorker: true,
+      fileType: 'image/jpeg',
+      initialQuality: 0.82,
+    });
+
+    if (compressed.size >= file.size) return file;
+
+    const nextName = file.name.replace(/\.[^.]+$/, '') || 'factura';
+    return new File([compressed], `${nextName}.jpg`, {
+      type: 'image/jpeg',
+      lastModified: Date.now(),
+    });
+  } catch (err) {
+    console.warn('Image upload compression failed:', err);
+    return file;
+  }
+}
+
 function formatDate(iso: string): string {
   try {
     return new Date(iso).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -470,6 +495,8 @@ function UploadStep({
     setFileName(file.name);
     setLoading(true);
     try {
+      const uploadFile = await prepareUploadFile(file);
+
       void generateThumbnail(file)
         .then((thumbnail) => {
           if (uploadSeqRef.current !== uploadSeq) return;
@@ -480,7 +507,7 @@ function UploadStep({
         });
 
       const form = new FormData();
-      form.append('file', file);
+      form.append('file', uploadFile);
       const res = await fetch(SIMULATE_API, { method: 'POST', body: form });
       const raw = await res.text();
       let data: { success?: boolean; error?: string; extraction?: InvoiceExtraction };
