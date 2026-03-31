@@ -14,14 +14,13 @@ import { EnergySavingsFlow } from '@/components/energy-savings/EnergySavingsFlow
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
-import { pdfFirstTwoPagesToImageBlob } from '@/lib/pdfFirstPageToImage';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
 const BRAND_COLOR = '#26606b';
 const LEAD_ATTACHMENTS_BUCKET = 'lead-attachments';
 
-/** Compresión fuerte para que Document AI responda en <10s (límite Vercel Hobby). */
+/** Comprimimos imágenes antes de subirlas para mantener uploads ligeros. */
 const IMAGE_COMPRESSION_OPTIONS = {
   maxSizeMB: 0.6,
   maxWidthOrHeight: 1200,
@@ -161,17 +160,7 @@ export default function AhorroLuz() {
 
   const uploadLeadAttachment = useCallback(async (file: File): Promise<{ name: string; path: string }> => {
     let fileToUpload = file;
-    if (file.type === 'application/pdf') {
-      try {
-        const blob = await pdfFirstTwoPagesToImageBlob(file);
-        fileToUpload = new File([blob], 'factura-paginas-1-2.jpg', { type: 'image/jpeg' });
-        fileToUpload = await imageCompression(fileToUpload, IMAGE_COMPRESSION_OPTIONS);
-      } catch (e) {
-        console.warn('Conversión PDF a imagen fallida:', e);
-        toast({ title: 'Error al procesar el PDF', description: 'Prueba con una foto o captura de la factura.', variant: 'destructive' });
-        throw e;
-      }
-    } else if (file.type.startsWith('image/')) {
+    if (file.type.startsWith('image/')) {
       try {
         fileToUpload = await imageCompression(file, IMAGE_COMPRESSION_OPTIONS);
       } catch (e) {
