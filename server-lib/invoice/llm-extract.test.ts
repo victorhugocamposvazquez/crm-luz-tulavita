@@ -6,6 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { emptyExtraction } from './types.js';
+import { select20TDTextForLLM } from './llm-extract.js';
 
 /**
  * Re-implementación local de parseLLMResponse para testear sin exportar la privada.
@@ -180,6 +181,40 @@ describe('parseLLMResponse - parsing de respuesta JSON', () => {
     expect(result.consumption_kwh).toBeNull();
     expect(result.titular).toBeNull();
     expect(result.cups).toBeNull();
+  });
+});
+
+describe('select20TDTextForLLM', () => {
+  it('recorta texto largo conservando bloques relevantes de 2.0TD', () => {
+    const noise = 'texto irrelevante de publicidad y condiciones generales '.repeat(220);
+    const text = [
+      noise,
+      'Factura de luz Repsol 2.0TD CUPS ES0022000004140388AF1P',
+      noise,
+      'Periodo de facturación 21/12/2025 - 21/01/2026 Total factura 201,96 € Consumo en este periodo 936,39 kWh',
+      noise,
+      'Potencias contratadas: punta-llano 6,928 kW; valle 6,928 kW',
+      'En esta factura el consumo ha salido a 0,157740 €/kWh',
+      'Titular Iria Lozano Fuentes Dirección de suministro LU Aldea coiro 28 BAJO Bj 15175 ABRIGOSA',
+      noise,
+    ].join('\n');
+
+    const reduced = select20TDTextForLLM(text);
+
+    expect(reduced.length).toBeLessThan(text.length);
+    expect(reduced.length).toBeLessThanOrEqual(12000);
+    expect(reduced).toContain('2.0TD');
+    expect(reduced).toContain('CUPS ES0022000004140388AF1P');
+    expect(reduced).toContain('Total factura 201,96 €');
+    expect(reduced).toContain('Consumo en este periodo 936,39 kWh');
+    expect(reduced).toContain('Potencias contratadas: punta-llano 6,928 kW; valle 6,928 kW');
+  });
+
+  it('mantiene un texto corto prácticamente intacto', () => {
+    const text = '  Factura 2.0TD\n\nCUPS ES0022000004140388AF1P\nTotal factura 201,96 €  ';
+    const reduced = select20TDTextForLLM(text);
+
+    expect(reduced).toBe('Factura 2.0TD\nCUPS ES0022000004140388AF1P\nTotal factura 201,96 €');
   });
 });
 

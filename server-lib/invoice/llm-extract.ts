@@ -16,8 +16,9 @@ const MODEL_FAST = 'gpt-4o-mini';
 const MODEL_FULL = 'gpt-4o';
 const CONFIDENCE_THRESHOLD = Number(process.env.INVOICE_LLM_CONFIDENCE_THRESHOLD ?? '0.7') || 0.7;
 
-const MAX_TOKENS_20TD = 1000;
+const MAX_TOKENS_20TD = 500;
 const MAX_TOKENS_30TD = 2000;
+const MAX_TEXT_CHARS_20TD = 12_000;
 
 // ────────────────────────────────────────────────────────────
 // Sección compartida de formato numérico
@@ -213,6 +214,83 @@ interface ResponsesAPIInput {
 interface CallOptions {
   systemPrompt: string;
   maxTokens: number;
+}
+
+const KEYWORDS_20TD = [
+  /2[\.\s]?0\s*TD/gi,
+  /CUPS/gi,
+  /Total factura/gi,
+  /TOTAL IMPORTE FACTURA/gi,
+  /IMPORTE TOTAL/gi,
+  /Consumo Total/gi,
+  /Consumo en este periodo/gi,
+  /Periodo de facturaci[oó]n/gi,
+  /Potencias contratadas/gi,
+  /Potencia contratada/gi,
+  /Potencia punta/gi,
+  /Potencia valle/gi,
+  /(?:€|Eur)\/kWh/gi,
+  /ha salido a/gi,
+  /Titular/gi,
+  /Nombre y Apellidos del titular/gi,
+  /Direcci[oó]n de suministro/gi,
+  /Peaje de transporte y distribuci[oó]n/gi,
+];
+
+function normalize20TDInputText(text: string): string {
+  return text
+    .replace(/\r/g, '\n')
+    .replace(/\u00A0/g, ' ')
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/[ ]*\n[ ]*/g, '\n')
+    .replace(/\n{2,}/g, '\n')
+    .trim();
+}
+
+function mergeRanges(ranges: Array<[number, number]>, maxLength: number): Array<[number, number]> {
+  if (ranges.length === 0) return [];
+  const sorted = [...ranges]
+    .map(([start, end]) => [Math.max(0, start), Math.min(maxLength, end)] as [number, number])
+    .sort((a, b) => a[0] - b[0]);
+
+  const merged: Array<[number, number]> = [sorted[0]];
+  for (let i = 1; i < sorted.length; i++) {
+    const current = sorted[i];
+    const last = merged[merged.length - 1];
+    if (current[0] <= last[1] + 1) {
+      last[1] = Math.max(last[1], current[1]);
+    } else {
+      merged.push([...current] as [number, number]);
+    }
+  }
+  return merged;
+}
+
+export function select20TDTextForLLM(text: string): string {
+  const normalized = normalize20TDInputText(text);
+  if (normalized.length <= MAX_TEXT_CHARS_20TD) return normalized;
+
+  const ranges: Array<[number, number]> = [[0, Math.min(normalized.length, 1800)]];
+  for (const regex of KEYWORDS_20TD) {
+    for (const match of normalized.matchAll(regex)) {
+      if (match.index == null) continue;
+      const start = Math.max(0, match.index - 260);
+      const end = Math.min(normalized.length, match.index + match[0].length + 520);
+      ranges.push([start, end]);
+    }
+  }
+
+  const merged = mergeRanges(ranges, normalized.length);
+  const selected = merged
+    .map(([start, end]) => normalized.slice(start, end).trim())
+    .filter(Boolean)
+    .join('\n...\n');
+
+  if (selected.length >= 1600) {
+    return selected.length > MAX_TEXT_CHARS_20TD ? selected.slice(0, MAX_TEXT_CHARS_20TD) : selected;
+  }
+
+  return normalized.slice(0, MAX_TEXT_CHARS_20TD);
 }
 
 function readResponseOutput(
@@ -428,11 +506,12 @@ export async function extractWithLLM20TDFromText(
   }
   const opts: CallOptions = { systemPrompt: SYSTEM_PROMPT_20TD, maxTokens: MAX_TOKENS_20TD };
   const t0 = Date.now();
-  const result = await callResponsesAPIText(text, MODEL_FAST, apiKey, opts);
+  const preparedText = select20TDTextForLLM(text);
+  const result = await callResponsesAPIText(preparedText, MODEL_FAST, apiKey, opts);
   result.confidence = computeConfidence(result);
   if (!result.tipo_tarifa) result.tipo_tarifa = '2.0TD';
   nullify30TDFields(result);
-  console.log(`[llm-extract] 2.0TD text gpt-4o-mini in ${Date.now() - t0}ms (confidence: ${result.confidence.toFixed(2)})`);
+  console.log(`[llm-extract] 2.0TD text gpt-4o-mini in ${Date.now() - t0}ms (confidence: ${result.confidence.toFixed(2)}, chars=${preparedText.length})`);
   return result;
 }
 
