@@ -168,21 +168,48 @@ async function callResponsesAPI(
   return parseLLMResponse(raw.trim());
 }
 
-/**
- * Calcula un score de confianza real basado en cuántos campos clave se extrajeron.
- */
+function is30TD(e: InvoiceExtraction): boolean {
+  const t = (e.tipo_tarifa ?? '').toUpperCase().replace(/\s+/g, '');
+  return t.includes('3.0') || t.includes('30TD') || t.includes('30A');
+}
+
 function computeConfidence(e: InvoiceExtraction): number {
-  const fields: [boolean, number][] = [
-    [e.consumption_kwh != null && e.consumption_kwh > 0, 0.25],
-    [e.total_factura != null && e.total_factura > 0, 0.25],
+  const base: [boolean, number][] = [
+    [e.consumption_kwh != null && e.consumption_kwh > 0, 0.20],
+    [e.total_factura != null && e.total_factura > 0, 0.20],
     [e.company_name != null, 0.10],
-    [e.titular != null, 0.10],
-    [e.cups != null, 0.10],
-    [e.potencia_contratada_kw != null || e.potencia_p1_kw != null, 0.10],
+    [e.titular != null, 0.05],
+    [e.cups != null, 0.05],
+    [e.potencia_contratada_kw != null || e.potencia_p1_kw != null, 0.05],
     [e.tipo_tarifa != null, 0.05],
     [e.direccion_suministro != null, 0.05],
   ];
-  return fields.reduce((sum, [ok, weight]) => sum + (ok ? weight : 0), 0);
+  let score = base.reduce((sum, [ok, weight]) => sum + (ok ? weight : 0), 0);
+
+  if (is30TD(e)) {
+    const has6Pot = [e.potencia_p1_kw, e.potencia_p2_kw, e.potencia_p3_kw, e.potencia_p4_kw, e.potencia_p5_kw, e.potencia_p6_kw]
+      .filter((v) => v != null).length >= 6;
+    const has6Price = [e.precio_p1_kwh, e.precio_p2_kwh, e.precio_p3_kwh, e.precio_p4_kwh, e.precio_p5_kwh, e.precio_p6_kwh]
+      .filter((v) => v != null).length >= 4;
+    score += has6Pot ? 0.125 : 0;
+    score += has6Price ? 0.125 : 0;
+    if (!has6Pot || !has6Price) {
+      console.log(`[llm-extract] 3.0TD incomplete: 6pot=${has6Pot}, 6price=${has6Price} — forcing low confidence`);
+      score = Math.min(score, 0.5);
+    }
+  } else {
+    score += 0.25;
+  }
+
+  if (e.consumption_kwh != null && e.total_factura != null && e.consumption_kwh > 0) {
+    const implied = e.total_factura / e.consumption_kwh;
+    if (implied < 0.05 || implied > 0.80) {
+      console.log(`[llm-extract] implied price ${implied.toFixed(4)} out of range — penalizing confidence`);
+      score = Math.min(score, 0.4);
+    }
+  }
+
+  return Math.min(score, 1);
 }
 
 /**
@@ -219,7 +246,10 @@ export async function extractWithLLM(
   const full = await callResponsesAPI(fileBuffer, mimeType, MODEL_FULL, apiKey);
   full.confidence = computeConfidence(full);
   console.log(`[llm-extract] gpt-4o confidence: ${full.confidence.toFixed(2)}`);
-  return full;
+
+  if (full.confidence >= fast.confidence) return full;
+  console.log(`[llm-extract] gpt-4o worse than mini, returning mini`);
+  return fast;
 }
 
 /**

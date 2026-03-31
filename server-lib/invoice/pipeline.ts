@@ -13,7 +13,7 @@ import { extractWithLLM } from './llm-extract.js';
 const IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
-const PROMPT_VERSION = 'v5-3.0TD-6periods';
+const PROMPT_VERSION = 'v6-3.0TD-force-fallback';
 const extractionCache = new Map<string, { extraction: InvoiceExtraction; ts: number; pv: string }>();
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutos
 
