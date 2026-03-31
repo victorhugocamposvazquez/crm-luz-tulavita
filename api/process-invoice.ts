@@ -184,7 +184,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const { data: inserted, error: insertError } = await supabase
         .from('energy_comparisons')
         .insert(row)
-        .select('id, status, estimated_savings_amount, estimated_savings_percentage, best_offer_company, error_message')
+        .select('id, lead_id, current_company, current_monthly_cost, best_offer_company, estimated_savings_amount, estimated_savings_percentage, status, ocr_confidence, prudent_mode, error_message, created_at')
         .single();
       if (insertError) throw insertError;
       cors();
@@ -251,7 +251,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const { data: inserted, error: insertError } = await supabase
         .from('energy_comparisons')
         .insert(row)
-        .select('id, status, estimated_savings_amount, estimated_savings_percentage, best_offer_company, error_message')
+        .select('id, lead_id, current_company, current_monthly_cost, best_offer_company, estimated_savings_amount, estimated_savings_percentage, status, ocr_confidence, prudent_mode, error_message, created_at')
         .single();
 
       if (insertError) throw insertError;

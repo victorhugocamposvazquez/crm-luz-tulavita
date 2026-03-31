@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { LucideIcon } from 'lucide-react';
+import { Check, Circle, Loader2, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const BRAND = '#26606b';
@@ -30,12 +30,12 @@ export function InvoiceProcessingLoader({
   const [stepIndex, setStepIndex] = useState(0);
 
   useEffect(() => {
-    if (steps.length <= 1) return;
-    const interval = window.setInterval(() => {
-      setStepIndex((current) => (current + 1) % steps.length);
+    if (steps.length <= 1 || stepIndex >= steps.length - 1) return;
+    const timeout = window.setTimeout(() => {
+      setStepIndex((current) => Math.min(current + 1, steps.length - 1));
     }, STEP_INTERVAL_MS);
-    return () => window.clearInterval(interval);
-  }, [steps.length]);
+    return () => window.clearTimeout(timeout);
+  }, [stepIndex, steps.length]);
 
   const currentStep = steps[stepIndex] ?? steps[0];
   const CurrentIcon = currentStep?.icon;
@@ -132,13 +132,31 @@ export function InvoiceProcessingLoader({
                 </span>
                 <span
                   className={cn(
-                    'text-sm font-medium leading-tight',
+                    'flex-1 text-sm font-medium leading-tight',
                     active && 'text-slate-900',
                     completed && 'text-emerald-700',
                     !active && !completed && 'text-slate-500',
                   )}
                 >
                   {step.label}
+                </span>
+                <span
+                  className={cn(
+                    'ml-auto flex shrink-0 items-center justify-center rounded-full border',
+                    compact ? 'h-6 w-6' : 'h-7 w-7',
+                    completed && 'border-emerald-600 bg-emerald-600 text-white',
+                    active && 'border-[#26606b]/25 bg-[#26606b]/10 text-[#26606b]',
+                    !active && !completed && 'border-slate-200 bg-slate-50 text-slate-300',
+                  )}
+                  aria-hidden
+                >
+                  {completed ? (
+                    <Check className={cn(compact ? 'h-3.5 w-3.5' : 'h-4 w-4')} strokeWidth={2.5} />
+                  ) : active ? (
+                    <Loader2 className={cn('animate-spin', compact ? 'h-3.5 w-3.5' : 'h-4 w-4')} strokeWidth={2} />
+                  ) : (
+                    <Circle className={cn(compact ? 'h-3 w-3' : 'h-3.5 w-3.5')} strokeWidth={2} />
+                  )}
                 </span>
               </div>
             );

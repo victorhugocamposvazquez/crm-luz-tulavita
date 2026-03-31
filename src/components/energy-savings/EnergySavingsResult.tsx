@@ -119,6 +119,7 @@ export interface EnergyComparisonData {
   status: string;
   estimated_savings_amount: number | null;
   estimated_savings_percentage: number | null;
+  current_monthly_cost?: number | null;
   prudent_mode?: boolean;
 }
 
@@ -127,7 +128,33 @@ function roundDownPercent(value: number | null): number {
   return Math.floor(value);
 }
 
+function resolveSavingsPercent(data: EnergyComparisonData): number {
+  if (
+    data.estimated_savings_percentage != null &&
+    Number.isFinite(data.estimated_savings_percentage) &&
+    data.estimated_savings_percentage > 0
+  ) {
+    return roundDownPercent(data.estimated_savings_percentage);
+  }
+
+  const currentMonthlyCost = data.current_monthly_cost;
+  const savingsAmount = data.estimated_savings_amount;
+  if (
+    currentMonthlyCost != null &&
+    savingsAmount != null &&
+    Number.isFinite(currentMonthlyCost) &&
+    Number.isFinite(savingsAmount) &&
+    currentMonthlyCost > 0
+  ) {
+    return Math.max(0, Math.floor((savingsAmount / currentMonthlyCost) * 100));
+  }
+
+  return roundDownPercent(data.estimated_savings_percentage);
+}
+
 export function EnergySavingsResult({ data }: { data: EnergyComparisonData }) {
+  const [showSavingsText, setShowSavingsText] = useState(false);
+
   if (data.status !== 'completed') {
     return (
       <p className="text-lg text-gray-600">
@@ -136,12 +163,10 @@ export function EnergySavingsResult({ data }: { data: EnergyComparisonData }) {
     );
   }
 
-  const percent = roundDownPercent(data.estimated_savings_percentage);
+  const percent = resolveSavingsPercent(data);
   const prudent = data.prudent_mode === true;
   const showExact = percent >= MIN_PERCENT_TO_SHOW && !prudent;
   const isNeutral = percent > 0 && percent < NEUTRAL_PERCENT_MAX && !prudent;
-
-  const [showSavingsText, setShowSavingsText] = useState(false);
 
   return (
     <div className="space-y-4 bg-white rounded-xl p-4 sm:p-6">
