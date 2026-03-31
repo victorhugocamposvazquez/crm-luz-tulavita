@@ -52,6 +52,8 @@ ESQUEMA JSON:
   "precio_energia_kwh": number,
   "precio_p1_kwh": number, "precio_p2_kwh": number, "precio_p3_kwh": number,
   "precio_p4_kwh": number, "precio_p5_kwh": number, "precio_p6_kwh": number,
+  "consumo_p1_kwh": number, "consumo_p2_kwh": number, "consumo_p3_kwh": number,
+  "consumo_p4_kwh": number, "consumo_p5_kwh": number, "consumo_p6_kwh": number,
   "tipo_tarifa": "string",
   "cups": "string",
   "titular": "string",
@@ -70,10 +72,19 @@ PASO 2 — POTENCIA CONTRATADA:
 PASO 3 — CONSUMO Y PRECIOS DE ENERGÍA:
 - Busca "Término de energía activa", "Consumo", "Energía activa".
 - IMPORTANTE: Puede haber VARIOS BLOQUES TEMPORALES para el mismo periodo de facturación (ej: "entre 01/12 y 24/12" + "entre 25/12 y 31/12"). Esto pasa por cambios regulatorios. DEBES SUMAR los kWh de todos los bloques para cada periodo.
-- Ejemplo real: si P1 tiene 714.0 kWh en bloque 1 + 168.0 kWh en bloque 2 → consumo P1 total = 882.0 kWh.
-- consumption_kwh = SUMA TOTAL de todos los periodos de todos los bloques.
-- Si un periodo (P3, P4, P5) tiene 0 kWh en todos los bloques, su consumo es 0 — eso es normal en 3.0TD.
-- Para precio_p1_kwh a precio_p6_kwh: usa el precio unitario del PRIMER bloque (el más grande). Si los precios difieren entre bloques, usa el del bloque con más kWh o la media ponderada.
+- Ejemplo REAL de esta factura con 2 bloques:
+    Bloque 1 (01/12-24/12): P1=714.0, P2=553.714, P6=1473.059
+    Bloque 2 (25/12-31/12): P1=168.0, P2=130.286, P6=503.941
+    → consumo_p1_kwh = 714.0 + 168.0 = 882.0
+    → consumo_p2_kwh = 553.714 + 130.286 = 684.0
+    → consumo_p3_kwh = 0 (no aparece en ningún bloque)
+    → consumo_p4_kwh = 0
+    → consumo_p5_kwh = 0
+    → consumo_p6_kwh = 1473.059 + 503.941 = 1977.0
+    → consumption_kwh = 882 + 684 + 0 + 0 + 0 + 1977 = 3543.0
+- consumption_kwh = SUMA TOTAL de consumo_p1 a consumo_p6.
+- consumo_p1_kwh a consumo_p6_kwh: consumo en kWh de cada periodo, SUMANDO todos los bloques temporales. Si un periodo (P3, P4, P5) tiene 0 kWh o no aparece, pon 0 (NO null). En 3.0TD dependiendo de la estación, algunos periodos pueden tener 0 consumo — es normal.
+- Para precio_p1_kwh a precio_p6_kwh: usa el precio unitario del PRIMER bloque (el más largo). Si los precios difieren entre bloques, usa el del bloque con más kWh.
 
 PASO 4 — PRECIO MEDIO:
 - precio_energia_kwh = total del término de energía (sin impuestos, sin potencia) / consumption_kwh.
@@ -191,10 +202,13 @@ function computeConfidence(e: InvoiceExtraction): number {
       .filter((v) => v != null).length >= 6;
     const has6Price = [e.precio_p1_kwh, e.precio_p2_kwh, e.precio_p3_kwh, e.precio_p4_kwh, e.precio_p5_kwh, e.precio_p6_kwh]
       .filter((v) => v != null).length >= 4;
-    score += has6Pot ? 0.125 : 0;
-    score += has6Price ? 0.125 : 0;
-    if (!has6Pot || !has6Price) {
-      console.log(`[llm-extract] 3.0TD incomplete: 6pot=${has6Pot}, 6price=${has6Price} — forcing low confidence`);
+    const hasConsumoBreakdown = [e.consumo_p1_kwh, e.consumo_p2_kwh, e.consumo_p3_kwh, e.consumo_p4_kwh, e.consumo_p5_kwh, e.consumo_p6_kwh]
+      .some((v) => v != null && v > 0);
+    score += has6Pot ? 0.08 : 0;
+    score += has6Price ? 0.08 : 0;
+    score += hasConsumoBreakdown ? 0.09 : 0;
+    if (!has6Pot || !has6Price || !hasConsumoBreakdown) {
+      console.log(`[llm-extract] 3.0TD incomplete: 6pot=${has6Pot}, 6price=${has6Price}, consumoBreakdown=${hasConsumoBreakdown} — forcing low confidence`);
       score = Math.min(score, 0.5);
     }
   } else {
@@ -344,6 +358,12 @@ function parseLLMResponse(raw: string): InvoiceExtraction {
     precio_p4_kwh: safePositiveNumber(parsed.precio_p4_kwh),
     precio_p5_kwh: safePositiveNumber(parsed.precio_p5_kwh),
     precio_p6_kwh: safePositiveNumber(parsed.precio_p6_kwh),
+    consumo_p1_kwh: safeNonNegativeNumber(parsed.consumo_p1_kwh),
+    consumo_p2_kwh: safeNonNegativeNumber(parsed.consumo_p2_kwh),
+    consumo_p3_kwh: safeNonNegativeNumber(parsed.consumo_p3_kwh),
+    consumo_p4_kwh: safeNonNegativeNumber(parsed.consumo_p4_kwh),
+    consumo_p5_kwh: safeNonNegativeNumber(parsed.consumo_p5_kwh),
+    consumo_p6_kwh: safeNonNegativeNumber(parsed.consumo_p6_kwh),
     tipo_tarifa: safeString(parsed.tipo_tarifa),
     cups: safeCups(parsed.cups),
     titular: safeString(parsed.titular),
@@ -361,6 +381,15 @@ function safePositiveNumber(v: unknown): number | null {
   if (typeof v === 'string') {
     const n = parseFloat(v.replace(',', '.'));
     if (Number.isFinite(n) && n > 0) return n;
+  }
+  return null;
+}
+
+function safeNonNegativeNumber(v: unknown): number | null {
+  if (typeof v === 'number' && Number.isFinite(v) && v >= 0) return v;
+  if (typeof v === 'string') {
+    const n = parseFloat(v.replace(',', '.'));
+    if (Number.isFinite(n) && n >= 0) return n;
   }
   return null;
 }

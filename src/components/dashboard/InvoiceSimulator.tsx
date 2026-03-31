@@ -86,6 +86,12 @@ interface InvoiceExtraction {
   precio_p4_kwh: number | null;
   precio_p5_kwh: number | null;
   precio_p6_kwh: number | null;
+  consumo_p1_kwh: number | null;
+  consumo_p2_kwh: number | null;
+  consumo_p3_kwh: number | null;
+  consumo_p4_kwh: number | null;
+  consumo_p5_kwh: number | null;
+  consumo_p6_kwh: number | null;
   tipo_tarifa: string | null;
   cups: string | null;
   titular: string | null;
@@ -220,8 +226,13 @@ function buildComparison(extraction: InvoiceExtraction, offers: EnergyOffer[]): 
     extraction.potencia_p4_kw, extraction.potencia_p5_kw, extraction.potencia_p6_kw,
   ];
 
+  const consumptionByPeriod: (number | null)[] = [
+    extraction.consumo_p1_kwh, extraction.consumo_p2_kwh, extraction.consumo_p3_kwh,
+    extraction.consumo_p4_kwh, extraction.consumo_p5_kwh, extraction.consumo_p6_kwh,
+  ].map((v) => v != null ? v / periodMonths : null);
+
   const offersWithCost: OfferWithCost[] = offers.map((o) => {
-    const cost = calcMonthlyCost(consumptionMonthly, o, extractedPower, powersByPeriod, undefined);
+    const cost = calcMonthlyCost(consumptionMonthly, o, extractedPower, powersByPeriod, consumptionByPeriod);
     const isCurrent = currentCompany != null
       && o.company_name.trim().toLowerCase() === currentCompany.trim().toLowerCase();
     return { ...o, monthlyCost: Math.round(cost * 100) / 100, isBest: false, isCurrent };
@@ -491,6 +502,19 @@ function ExtractionStep({
             {numField('Meses periodo', 'period_months', <Calendar className="h-3 w-3" />)}
             {textField('Inicio periodo', 'period_start', <Calendar className="h-3 w-3" />)}
           </div>
+          {is30 && (
+            <div className="mt-3">
+              <Label className="text-xs text-muted-foreground mb-2 block">Consumo por periodo (kWh)</Label>
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+                {numField('P1', 'consumo_p1_kwh', <Zap className="h-3 w-3" />, 'kWh')}
+                {numField('P2', 'consumo_p2_kwh', <Zap className="h-3 w-3" />, 'kWh')}
+                {numField('P3', 'consumo_p3_kwh', <Zap className="h-3 w-3" />, 'kWh')}
+                {numField('P4', 'consumo_p4_kwh', <Zap className="h-3 w-3" />, 'kWh')}
+                {numField('P5', 'consumo_p5_kwh', <Zap className="h-3 w-3" />, 'kWh')}
+                {numField('P6', 'consumo_p6_kwh', <Zap className="h-3 w-3" />, 'kWh')}
+              </div>
+            </div>
+          )}
         </div>
         <Separator />
         <div>

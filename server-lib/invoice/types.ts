@@ -28,6 +28,13 @@ export interface InvoiceExtraction {
   precio_p5_kwh: number | null;
   precio_p6_kwh: number | null;
 
+  consumo_p1_kwh: number | null;
+  consumo_p2_kwh: number | null;
+  consumo_p3_kwh: number | null;
+  consumo_p4_kwh: number | null;
+  consumo_p5_kwh: number | null;
+  consumo_p6_kwh: number | null;
+
   tipo_tarifa: string | null;
   cups: string | null;
   titular: string | null;
@@ -59,6 +66,12 @@ export function emptyExtraction(): InvoiceExtraction {
     precio_p4_kwh: null,
     precio_p5_kwh: null,
     precio_p6_kwh: null,
+    consumo_p1_kwh: null,
+    consumo_p2_kwh: null,
+    consumo_p3_kwh: null,
+    consumo_p4_kwh: null,
+    consumo_p5_kwh: null,
+    consumo_p6_kwh: null,
     tipo_tarifa: null,
     cups: null,
     titular: null,
