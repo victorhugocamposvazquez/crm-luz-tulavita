@@ -13,7 +13,7 @@ import { extractWithLLM } from './llm-extract.js';
 const IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
-const PROMPT_VERSION = 'v9-calendario-3.0-generico';
+const PROMPT_VERSION = 'v10-sin-precios-sinteticos';
 const extractionCache = new Map<string, { extraction: InvoiceExtraction; ts: number; pv: string }>();
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutos
 
@@ -33,12 +33,6 @@ function tryFixSpanishDecimal(value: number, total: number | null): number | nul
   return null;
 }
 
-function is30Tarifa(tipo: string | null): boolean {
-  if (!tipo) return false;
-  const u = tipo.toUpperCase().replace(/\s+/g, '');
-  return u.includes('3.0') || u.includes('30TD') || u.includes('30A');
-}
-
 /** Corrige inicio 30/11 cuando el periodo es diciembre completo (error frecuente del OCR/LLM). */
 function fixPeriodStartEveBeforeMonth(e: InvoiceExtraction, fixes: string[]): void {
   const start = e.period_start;
@@ -50,38 +44,6 @@ function fixPeriodStartEveBeforeMonth(e: InvoiceExtraction, fixes: string[]): vo
     const y = mStart[1];
     e.period_start = `${y}-12-01`;
     fixes.push(`period_start: ${start} → ${e.period_start}`);
-  }
-}
-
-/**
- * 3.0TD: qué P1–P6 tienen consumo/precio en factura varía con fechas y estación (calendario horario).
- * Donde consumo=0 y no hay precio en extracción, rellenamos €/kWh de referencia para UI/ofertas.
- */
-function fillMissing30PricesWhenZeroConsumo(e: InvoiceExtraction, fixes: string[]): void {
-  if (!is30Tarifa(e.tipo_tarifa)) return;
-  const prices = [
-    e.precio_p1_kwh, e.precio_p2_kwh, e.precio_p3_kwh,
-    e.precio_p4_kwh, e.precio_p5_kwh, e.precio_p6_kwh,
-  ];
-  const consumos = [
-    e.consumo_p1_kwh, e.consumo_p2_kwh, e.consumo_p3_kwh,
-    e.consumo_p4_kwh, e.consumo_p5_kwh, e.consumo_p6_kwh,
-  ];
-  const known = prices.filter((p): p is number => p != null && p > 0 && p < 1.5);
-  if (known.length === 0) return;
-  const ref = known.reduce((a, b) => a + b, 0) / known.length;
-  const keys = ['precio_p1_kwh', 'precio_p2_kwh', 'precio_p3_kwh', 'precio_p4_kwh', 'precio_p5_kwh', 'precio_p6_kwh'] as const;
-  let filled = 0;
-  for (let i = 0; i < 6; i++) {
-    const c = consumos[i];
-    const zeroish = c == null || c === 0;
-    if (prices[i] == null && zeroish) {
-      (e as Record<string, unknown>)[keys[i]] = Math.round(ref * 1e6) / 1e6;
-      filled += 1;
-    }
-  }
-  if (filled > 0) {
-    fixes.push(`precios sin fila en factura (consumo 0): ${filled} periodo(s) con referencia €/kWh ${ref.toFixed(6)}`);
   }
 }
 
@@ -212,7 +174,6 @@ function validateExtraction(e: InvoiceExtraction): InvoiceExtraction {
   }
 
   fixPeriodStartEveBeforeMonth(e, fixes);
-  fillMissing30PricesWhenZeroConsumo(e, fixes);
   recomputeWeightedPrecioEnergia(e, fixes);
 
   if (fixes.length > 0) {

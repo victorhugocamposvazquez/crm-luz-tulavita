@@ -537,7 +537,7 @@ function ExtractionStep({
           <h4 className="text-sm font-medium mb-3 flex items-center gap-1.5"><Euro className="h-4 w-4" />Precios energía</h4>
           {is30 && (
             <p className="text-xs text-muted-foreground mb-2 leading-relaxed">
-              Los precios €/kWh por periodo siguen la misma lógica: solo suelen figurar los periodos con energía facturada en ese mes. Donde no hay línea en factura puede usarse un precio de referencia para la comparativa (no cambia el coste si el consumo de ese periodo es 0).
+              Los €/kWh por periodo solo se rellenan si la factura los muestra. Si un periodo no tiene consumo ese mes, suele no haber precio en papel: el campo puede quedar vacío; el precio medio y la comparativa usan solo los periodos con consumo y precio.
             </p>
           )}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
