@@ -76,12 +76,12 @@ PASO 2 — POTENCIA CONTRATADA:
 
 PASO 3 — CONSUMO Y PRECIOS DE ENERGÍA:
 - Busca "Término de energía activa", "Consumo", "Energía activa".
-- IMPORTANTE: Puede haber VARIOS BLOQUES TEMPORALES para el mismo periodo de facturación (ej: "entre 01/12 y 24/12" + "entre 25/12 y 31/12"). Esto pasa por cambios regulatorios. DEBES SUMAR los kWh de todos los bloques para cada periodo.
-- Ejemplo con 2 bloques (un mes dado; otro mes puede activar otros periodos):
-    Bloque 1 (01/12-24/12): P1=714.0, P2=553.714, P6=1473.059
-    Bloque 2 (25/12-31/12): P1=168.0, P2=130.286, P6=503.941
-    → consumo_p1_kwh = 882.0, p2 = 684.0, p3–p5 = 0 (no aplican ese mes), p6 = 1977.0
-    → consumption_kwh = suma de los seis = 3543.0
+- IMPORTANTE: Puede haber VARIOS BLOQUES TEMPORALES para el mismo periodo de facturación (ej: dos tramos en el mismo mes por cambios regulatorios). DEBES SUMAR los kWh de todos los bloques para cada periodo P1…P6.
+- Ejemplo SOLO del MÉTODO (cifras inventadas; NO las copies jamás; extrae solo de la factura que ves):
+    Bloque A: P1=120 kWh, P2=80 kWh, P6=200 kWh
+    Bloque B: P1=30 kWh, P2=20 kWh, P6=50 kWh
+    → consumo_p1_kwh = 150, p2 = 100, p3–p5 = 0, p6 = 250 → consumption_kwh = 500 (= suma de los seis).
+- NUNCA rellenes consumo con números que recuerdes de ejemplos: si no ves la cifra en la factura, null o 0.
 - consumption_kwh = SUMA TOTAL de consumo_p1 a consumo_p6.
 - consumo_p1_kwh a consumo_p6_kwh: consumo en kWh por periodo, SUMANDO todos los bloques temporales. En 3.0TD el calendario horario (mes, estación) determina qué periodos tienen energía en ese mes: cualquier P puede ser 0 o no aparecer en factura — pon 0 (NO null) si no hay consumo.
 - Para precio_p1_kwh a precio_p6_kwh: extrae €/kWh solo donde la factura muestre línea de energía activa para ese periodo. Si hay 2 bloques temporales, prioriza precios del bloque con más días. Si un periodo no tiene fila (consumo 0 en ese mes), null salvo que el otro bloque aporte precio útil.
@@ -100,11 +100,12 @@ PASO 5 — DATOS GENERALES:
 - "company_name": normaliza (Iberdrola, Endesa, Naturgy, Repsol, EDP, Total Energies, Plenitude, Holaluz, Octopus, Cepsa, Viesgo, Fenie Energía, Gaba Energía, Contigo Energía, etc.)
 
 VERIFICACIÓN FINAL — OBLIGATORIA:
-1. total_factura / consumption_kwh NO es el precio del kWh de energía (incluye potencia, impuestos, IVA). Solo úsalo para detectar consumo mal sumado: si da > 0.55, revisa consumo y decimales españoles.
-2. precio_energia_kwh debe coincidir con la media ponderada Σ(consumo_pX × precio_pX) / consumption_kwh (periodos con precio null no entran en la suma del numerador).
-3. Si 3.0TD: ¿potencia_p6_kw es distinta de P1 si la factura lo indica? ¿Los 6 precios o null solo donde no hay dato en factura?
-4. Si 2.0TD: P3 a P6 null en potencia, consumo y precio.
-5. period_start: ¿es el primer día del periodo facturado (ej. 01/12) y no víspera errónea (30/11)?`;
+1. consumption_kwh debe ser EXACTAMENTE la suma aritmética de consumo_p1_kwh + … + consumo_p6_kwh (usando 0 si un periodo es null). Si no cuadra, corrige los consumos por periodo o el total según lo que diga explícitamente la factura («consumo total», «energía activa»).
+2. total_factura / consumption_kwh NO es el precio del kWh de energía. Solo úsalo para detectar consumo mal leído: si da > 0.55, revisa consumo y decimales españoles.
+3. precio_energia_kwh debe coincidir con la media ponderada Σ(consumo_pX × precio_pX) / consumption_kwh (periodos con precio null no entran en el numerador).
+4. Si 3.0TD: ¿potencia_p6_kw distinta de P1 si la factura lo indica? ¿Precios solo donde hay dato real?
+5. Si 2.0TD: P3 a P6 null en potencia, consumo y precio.
+6. period_start: ¿primer día del periodo facturado y no víspera errónea (30/11)?`;
 
 const USER_PROMPT = 'Extrae todos los datos de esta factura de energía. Devuelve SOLO el JSON, sin explicaciones.';
 
@@ -405,11 +406,27 @@ function safeString(v: unknown): string | null {
   return null;
 }
 
+/** "1.473,059" → 1473.059 ; "553,714" → 553.714 ; "714,000" → 714 */
+function parseSpanishNumberString(s: string): number | null {
+  const t = s.trim().replace(/\s/g, '');
+  if (t === '' || t === '-') return null;
+  const hasComma = t.includes(',');
+  const hasDot = t.includes('.');
+  let norm = t;
+  if (hasComma && hasDot) {
+    norm = t.replace(/\./g, '').replace(',', '.');
+  } else if (hasComma) {
+    norm = t.replace(',', '.');
+  }
+  const n = Number(norm);
+  return Number.isFinite(n) ? n : null;
+}
+
 function safePositiveNumber(v: unknown): number | null {
   if (typeof v === 'number' && Number.isFinite(v) && v > 0) return v;
   if (typeof v === 'string') {
-    const n = parseFloat(v.replace(',', '.'));
-    if (Number.isFinite(n) && n > 0) return n;
+    const n = parseSpanishNumberString(v);
+    if (n != null && n > 0) return n;
   }
   return null;
 }
@@ -417,8 +434,8 @@ function safePositiveNumber(v: unknown): number | null {
 function safeNonNegativeNumber(v: unknown): number | null {
   if (typeof v === 'number' && Number.isFinite(v) && v >= 0) return v;
   if (typeof v === 'string') {
-    const n = parseFloat(v.replace(',', '.'));
-    if (Number.isFinite(n) && n >= 0) return n;
+    const n = parseSpanishNumberString(v);
+    if (n != null && n >= 0) return n;
   }
   return null;
 }

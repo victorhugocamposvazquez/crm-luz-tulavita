@@ -13,7 +13,7 @@ import { extractWithLLM } from './llm-extract.js';
 const IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
-const PROMPT_VERSION = 'v10-sin-precios-sinteticos';
+const PROMPT_VERSION = 'v11-consumo-reconcile-ejemplo-anonimo';
 const extractionCache = new Map<string, { extraction: InvoiceExtraction; ts: number; pv: string }>();
 const CACHE_TTL_MS = (() => {
   const n = Number(process.env.INVOICE_CACHE_TTL_MS ?? '');
@@ -48,6 +48,52 @@ function fixPeriodStartEveBeforeMonth(e: InvoiceExtraction, fixes: string[]): vo
     e.period_start = `${y}-12-01`;
     fixes.push(`period_start: ${start} → ${e.period_start}`);
   }
+}
+
+/**
+ * Si la suma P1–P6 no cuadra con consumption_kwh (error típico: copiar números de ejemplo del prompt),
+ * escala proporcionalmente o anula el desglose si el desvío es enorme.
+ */
+function reconcileConsumoPorPeriodo(e: InvoiceExtraction, fixes: string[]): void {
+  if (e.consumption_kwh == null || e.consumption_kwh <= 0) return;
+
+  const keys = ['consumo_p1_kwh', 'consumo_p2_kwh', 'consumo_p3_kwh', 'consumo_p4_kwh', 'consumo_p5_kwh', 'consumo_p6_kwh'] as const;
+  let sum = 0;
+  let anyPositive = false;
+  for (const k of keys) {
+    const v = e[k];
+    if (v != null && v > 0) {
+      sum += v;
+      anyPositive = true;
+    }
+  }
+  if (!anyPositive) return;
+
+  const diff = Math.abs(sum - e.consumption_kwh);
+  const tol = Math.max(5, 0.02 * e.consumption_kwh);
+  if (diff <= tol) return;
+
+  const rel = diff / e.consumption_kwh;
+  if (rel > 0.50) {
+    for (const k of keys) {
+      (e as Record<string, unknown>)[k] = null;
+    }
+    fixes.push(
+      `consumo P1–P6 anulado: suma periodos ${sum.toFixed(1)} ≠ consumption_kwh ${e.consumption_kwh} (desvío ${(rel * 100).toFixed(0)}%; revisar en factura)`,
+    );
+    return;
+  }
+
+  const factor = e.consumption_kwh / sum;
+  for (const k of keys) {
+    const v = e[k];
+    if (v != null && v > 0) {
+      (e as Record<string, unknown>)[k] = Math.round(v * factor * 1000) / 1000;
+    }
+  }
+  fixes.push(
+    `consumo por periodo escalado (×${factor.toFixed(4)}) para alinear suma ${sum.toFixed(1)} kWh con consumption_kwh ${e.consumption_kwh}`,
+  );
 }
 
 /** precio_energia_kwh = media ponderada por consumo por periodo (no total factura / kWh). */
@@ -177,6 +223,7 @@ function validateExtraction(e: InvoiceExtraction): InvoiceExtraction {
   }
 
   fixPeriodStartEveBeforeMonth(e, fixes);
+  reconcileConsumoPorPeriodo(e, fixes);
   recomputeWeightedPrecioEnergia(e, fixes);
 
   if (fixes.length > 0) {
