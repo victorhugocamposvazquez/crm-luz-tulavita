@@ -58,13 +58,10 @@ export function EnergySavingsResult({ data }: { data: EnergyComparisonData }) {
     <div className="space-y-4 bg-white rounded-xl p-4 sm:p-6 border border-gray-100">
       {showExact && (
         <div className="space-y-2 text-center w-full min-w-0 px-1">
-          <p
-            className="text-2xl sm:text-4xl font-semibold text-emerald-600 animate-in fade-in duration-300 zoom-in-95 break-words"
-            style={{
-              textShadow: '0 0 20px rgba(5, 150, 105, 0.5), 0 0 40px rgba(5, 150, 105, 0.25)',
-            }}
-          >
-            Podrías ahorrar hasta un <strong className="font-bold">{percent}%</strong> con una mejor tarifa.
+          <p className="text-2xl sm:text-4xl break-words text-[#26606b]">
+            <span className="font-light">Podrías </span>
+            <strong className="font-bold">ahorrar hasta un {percent}%</strong>
+            <span className="font-light"> con una mejor tarifa.</span>
           </p>
           <p className="text-sm text-gray-500">{LEGAL_TEXT}</p>
           {prudent && (

@@ -1,6 +1,6 @@
 /**
  * Procesa factura y obtiene comparación de ahorro (polling hasta completed/failed).
- * El loader se muestra al menos MIN_LOADER_MS para que el usuario vea el progreso.
+ * Opcional: minLoaderMs (loader mínimo) y fallback desde prefetch si falla el persist.
  */
 
 import { useState, useCallback, useRef } from 'react';
@@ -9,8 +9,7 @@ const PROCESS_API = import.meta.env.VITE_PROCESS_INVOICE_API_URL ?? '/api/proces
 const COMPARISON_API = import.meta.env.VITE_ENERGY_COMPARISON_API_URL ?? '/api/energy-comparison';
 const POLL_INTERVAL_MS = 1000;
 const POLL_MAX_ATTEMPTS = 30;
-/** Sin retardo artificial: en cuanto responde la API se muestra el resultado. */
-const MIN_LOADER_MS = 0;
+const DEFAULT_MIN_LOADER_MS = 0;
 
 export interface EnergyComparisonResult {
   id: string;
@@ -24,6 +23,7 @@ export interface EnergyComparisonResult {
   prudent_mode: boolean | null;
   ocr_confidence: number | null;
   created_at: string;
+  error_message?: string | null;
 }
 
 export interface ManualExtractionInput {
@@ -32,34 +32,61 @@ export interface ManualExtractionInput {
   period_months?: number;
 }
 
+export interface RunEnergyComparisonOptions {
+  /** Tiempo mínimo en pantalla de “procesando” antes de mostrar resultado (p. ej. 3000 en landing). */
+  minLoaderMs?: number;
+  /** Resultado del prefetch (/api/preview-invoice); solo se usa si coincide prefetchAttachmentPath. */
+  prefetchedFallback?: EnergyComparisonResult | null;
+  prefetchAttachmentPath?: string;
+}
+
 export function useEnergyComparison() {
   const [status, setStatus] = useState<'idle' | 'processing' | 'completed' | 'failed'>('idle');
   const [comparison, setComparison] = useState<EnergyComparisonResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef(false);
+  const pendingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const run = useCallback(async (leadId: string, attachmentPath: string) => {
+  const clearPendingTimer = () => {
+    if (pendingTimerRef.current != null) {
+      clearTimeout(pendingTimerRef.current);
+      pendingTimerRef.current = null;
+    }
+  };
+
+  const run = useCallback(async (
+    leadId: string,
+    attachmentPath: string,
+    options?: RunEnergyComparisonOptions,
+  ) => {
+    const minLoaderMs = options?.minLoaderMs ?? DEFAULT_MIN_LOADER_MS;
+    const prefetchedFallback = options?.prefetchedFallback ?? null;
+    const prefetchPathOk =
+      !!options?.prefetchAttachmentPath &&
+      options.prefetchAttachmentPath === attachmentPath;
+
     const startedAt = Date.now();
+    clearPendingTimer();
     setStatus('processing');
     setComparison(null);
     setError(null);
     abortRef.current = false;
 
-    const applyResult = (
+    const scheduleFinish = (
       nextStatus: 'completed' | 'failed',
       nextComparison: EnergyComparisonResult | null,
-      nextError: string | null
+      nextError: string | null,
     ) => {
       const elapsed = Date.now() - startedAt;
-      const delay = Math.max(0, MIN_LOADER_MS - elapsed);
-      const apply = () => {
+      const delay = Math.max(0, minLoaderMs - elapsed);
+      clearPendingTimer();
+      pendingTimerRef.current = setTimeout(() => {
+        pendingTimerRef.current = null;
         if (abortRef.current) return;
         setComparison(nextComparison);
         setError(nextError);
         setStatus(nextStatus);
-      };
-      if (delay > 0) setTimeout(apply, delay);
-      else apply();
+      }, delay);
     };
 
     try {
@@ -75,20 +102,34 @@ export function useEnergyComparison() {
           processRes.status === 429
             ? 'Demasiadas solicitudes. Por favor, espera un poco e inténtalo de nuevo.'
             : processData.error || 'Error al procesar la factura';
-        applyResult('failed', null, msg);
+        if (
+          prefetchedFallback &&
+          prefetchedFallback.status === 'completed' &&
+          prefetchPathOk
+        ) {
+          scheduleFinish('completed', prefetchedFallback, null);
+        } else {
+          scheduleFinish('failed', null, msg);
+        }
         return;
       }
 
       if (processData.comparison?.status === 'completed') {
-        applyResult('completed', processData.comparison as EnergyComparisonResult, null);
+        scheduleFinish('completed', processData.comparison as EnergyComparisonResult, null);
         return;
       }
       if (processData.comparison?.status === 'failed') {
-        applyResult(
-          'failed',
-          null,
-          processData.comparison?.error_message || 'No se pudo calcular el ahorro'
-        );
+        const failMsg =
+          processData.comparison?.error_message || 'No se pudo calcular el ahorro';
+        if (
+          prefetchedFallback &&
+          prefetchedFallback.status === 'completed' &&
+          prefetchPathOk
+        ) {
+          scheduleFinish('completed', prefetchedFallback, null);
+        } else {
+          scheduleFinish('failed', null, failMsg);
+        }
         return;
       }
 
@@ -99,25 +140,51 @@ export function useEnergyComparison() {
         const getRes = await fetch(`${COMPARISON_API}/${leadId}`);
         const getData = await getRes.json().catch(() => null);
         if (getData?.status === 'completed') {
-          applyResult('completed', getData as EnergyComparisonResult, null);
+          scheduleFinish('completed', getData as EnergyComparisonResult, null);
           return;
         }
         if (getData?.status === 'failed') {
-          applyResult('failed', null, getData?.error_message || 'No se pudo calcular el ahorro');
+          const failMsg = getData?.error_message || 'No se pudo calcular el ahorro';
+          if (
+            prefetchedFallback &&
+            prefetchedFallback.status === 'completed' &&
+            prefetchPathOk
+          ) {
+            scheduleFinish('completed', prefetchedFallback, null);
+          } else {
+            scheduleFinish('failed', null, failMsg);
+          }
           return;
         }
         attempts++;
       }
 
       if (abortRef.current) return;
-      applyResult('failed', null, 'Tiempo de espera agotado. Un asesor te contactará.');
+      if (
+        prefetchedFallback &&
+        prefetchedFallback.status === 'completed' &&
+        prefetchPathOk
+      ) {
+        scheduleFinish('completed', prefetchedFallback, null);
+      } else {
+        scheduleFinish('failed', null, 'Tiempo de espera agotado. Un asesor te contactará.');
+      }
     } catch (e) {
-      applyResult('failed', null, e instanceof Error ? e.message : 'Error de conexión');
+      const msg = e instanceof Error ? e.message : 'Error de conexión';
+      if (
+        prefetchedFallback &&
+        prefetchedFallback.status === 'completed' &&
+        prefetchPathOk
+      ) {
+        scheduleFinish('completed', prefetchedFallback, null);
+      } else {
+        scheduleFinish('failed', null, msg);
+      }
     }
   }, []);
 
-  /** Plan B: calcular ahorro con datos introducidos por el usuario (sin procesar archivo). */
   const runWithManual = useCallback(async (leadId: string, data: ManualExtractionInput) => {
+    clearPendingTimer();
     setStatus('processing');
     setComparison(null);
     setError(null);
@@ -157,6 +224,7 @@ export function useEnergyComparison() {
 
   const reset = useCallback(() => {
     abortRef.current = true;
+    clearPendingTimer();
     setStatus('idle');
     setComparison(null);
     setError(null);

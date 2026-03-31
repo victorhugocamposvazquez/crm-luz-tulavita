@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { useEnergyComparison } from '@/hooks/useEnergyComparison';
+import { useEnergyComparison, type EnergyComparisonResult } from '@/hooks/useEnergyComparison';
 import { EnergySavingsLoader } from './EnergySavingsLoader';
 import { EnergySavingsResult } from './EnergySavingsResult';
 import { cn } from '@/lib/utils';
@@ -16,12 +16,20 @@ export function EnergySavingsFlow({
   attachmentPath,
   onReset,
   compactLoader = false,
+  fixedResultLoaderMs,
+  prefetchedComparison,
+  prefetchedAttachmentPath,
 }: {
   leadId: string;
   attachmentPath: string;
   onReset?: () => void;
   /** Loader más compacto y rápido (p. ej. debajo del paso de contacto en la landing). */
   compactLoader?: boolean;
+  /** Tiempo mínimo mostrando el loader antes del resultado (landing con prefetch). */
+  fixedResultLoaderMs?: number;
+  /** Resultado de /api/preview-invoice (misma ruta que attachmentPath). */
+  prefetchedComparison?: EnergyComparisonResult | null;
+  prefetchedAttachmentPath?: string;
 }) {
   const { status, comparison, error, run, runWithManual, reset } = useEnergyComparison();
   const [manualConsumption, setManualConsumption] = useState('');
@@ -30,9 +38,21 @@ export function EnergySavingsFlow({
   const [manualError, setManualError] = useState<string | null>(null);
 
   useEffect(() => {
-    run(leadId, attachmentPath);
+    run(leadId, attachmentPath, {
+      minLoaderMs: fixedResultLoaderMs ?? 0,
+      prefetchedFallback: prefetchedComparison ?? null,
+      prefetchAttachmentPath: prefetchedAttachmentPath ?? attachmentPath,
+    });
     return () => reset();
-  }, [leadId, attachmentPath, run, reset]);
+  }, [
+    leadId,
+    attachmentPath,
+    fixedResultLoaderMs,
+    prefetchedComparison,
+    prefetchedAttachmentPath,
+    run,
+    reset,
+  ]);
 
   if (status === 'processing') {
     return <EnergySavingsLoader compact={compactLoader} />;

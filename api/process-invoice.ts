@@ -13,6 +13,12 @@ import { extractInvoiceFromBuffer } from '../server-lib/invoice/pipeline.js';
 import { getActiveOffers, runComparison, getComparisonFailureReason } from '../server-lib/energy/calculation.js';
 import { validateAttachmentPath } from '../server-lib/invoice/validate-path.js';
 import { emptyExtraction } from '../server-lib/invoice/types.js';
+import {
+  getAttachmentAnalysisCache,
+  upsertAttachmentAnalysisCache,
+  pruneExpiredAttachmentCache,
+  rowToCachePayload,
+} from '../server-lib/invoice/attachment-analysis-cache.js';
 
 const BUCKET = 'lead-attachments';
 const TIMEOUT_MS = 55000;
@@ -217,6 +223,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       setTimeout(() => reject(new Error('Timeout procesando factura')), TIMEOUT_MS)
     );
     const work = (async () => {
+      const cached = await getAttachmentAnalysisCache(supabase, attachment_path!);
+      if (cached) {
+        const rowFromCache = {
+          lead_id,
+          attachment_path,
+          raw_text: cached.raw_text,
+          current_company: cached.current_company,
+          current_monthly_cost: cached.current_monthly_cost,
+          best_offer_company: cached.best_offer_company,
+          estimated_savings_amount: cached.estimated_savings_amount,
+          estimated_savings_percentage: cached.estimated_savings_percentage,
+          status: cached.status,
+          ocr_confidence: cached.ocr_confidence,
+          invoice_period_months: cached.invoice_period_months ?? 1,
+          prudent_mode: cached.prudent_mode,
+          raw_extraction: cached.raw_extraction,
+          error_message: cached.error_message,
+        };
+        const { data: inserted, error: insertError } = await supabase
+          .from('energy_comparisons')
+          .insert(rowFromCache)
+          .select('id, lead_id, current_company, current_monthly_cost, best_offer_company, estimated_savings_amount, estimated_savings_percentage, status, ocr_confidence, prudent_mode, error_message, created_at')
+          .single();
+        if (insertError) throw insertError;
+        await pruneExpiredAttachmentCache(supabase);
+        return inserted;
+      }
+
       const { data: fileData, error: downloadError } = await supabase.storage
         .from(BUCKET)
         .download(attachment_path);
@@ -268,6 +302,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         .single();
 
       if (insertError) throw insertError;
+
+      await upsertAttachmentAnalysisCache(
+        supabase,
+        attachment_path!,
+        rowToCachePayload({
+          raw_text: row.raw_text,
+          current_company: row.current_company,
+          current_monthly_cost: row.current_monthly_cost,
+          best_offer_company: row.best_offer_company,
+          estimated_savings_amount: row.estimated_savings_amount,
+          estimated_savings_percentage: row.estimated_savings_percentage,
+          status: row.status,
+          ocr_confidence: row.ocr_confidence,
+          invoice_period_months: row.invoice_period_months,
+          prudent_mode: row.prudent_mode,
+          raw_extraction: row.raw_extraction,
+          error_message: row.error_message,
+        }),
+      );
+      await pruneExpiredAttachmentCache(supabase);
+
       return inserted;
     })();
     return Promise.race([work, timeoutPromise]);

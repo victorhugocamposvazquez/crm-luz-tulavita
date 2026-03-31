@@ -11,6 +11,7 @@ import { QuestionStep, validateQuestion } from '@/components/landing-form';
 import type { FormConfig } from '@/components/landing-form';
 import { useMetaAttribution } from '@/hooks/useMetaAttribution';
 import { EnergySavingsFlow } from '@/components/energy-savings/EnergySavingsFlow';
+import type { EnergyComparisonResult } from '@/hooks/useEnergyComparison';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
@@ -19,6 +20,32 @@ import { toast } from '@/hooks/use-toast';
 
 const BRAND_COLOR = '#26606b';
 const LEAD_ATTACHMENTS_BUCKET = 'lead-attachments';
+const PREVIEW_INVOICE_API = import.meta.env.VITE_PREVIEW_INVOICE_API_URL ?? '/api/preview-invoice';
+/** Loader fijo tras enviar el formulario mientras se persiste la comparativa (el análisis suele ir en prefetch). */
+const LANDING_POST_SUBMIT_LOADER_MS = 3000;
+
+function headlineSavingsPercentFromComparison(
+  c: EnergyComparisonResult | null | undefined,
+): number | null {
+  if (!c || c.status !== 'completed') return null;
+  const p = c.estimated_savings_percentage;
+  if (p != null && Number.isFinite(p) && p > 0) {
+    return Math.floor(p);
+  }
+  const cur = c.current_monthly_cost;
+  const sav = c.estimated_savings_amount;
+  if (
+    cur != null &&
+    sav != null &&
+    Number.isFinite(cur) &&
+    Number.isFinite(sav) &&
+    cur > 0
+  ) {
+    const derived = Math.floor((sav / cur) * 100);
+    return derived > 0 ? derived : null;
+  }
+  return null;
+}
 
 /** Comprimimos imágenes antes de subirlas para mantener uploads ligeros. */
 const IMAGE_COMPRESSION_OPTIONS = {
@@ -117,6 +144,10 @@ export default function AhorroLuz() {
   const [direction, setDirection] = useState<'next' | 'prev'>('next');
   const [lastLeadId, setLastLeadId] = useState<string | null>(null);
   const [lastFacturaPath, setLastFacturaPath] = useState<string | null>(null);
+  const [invoicePrefetch, setInvoicePrefetch] = useState<{
+    path: string;
+    comparison: EnergyComparisonResult | null;
+  } | null>(null);
   const autoAdvanceTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const contactValuesRef = useRef<Record<string, string>>({});
   const formContainerRef = useRef<HTMLDivElement | null>(null);
@@ -127,7 +158,6 @@ export default function AhorroLuz() {
   const {
     currentQuestion,
     visibleQuestions,
-    totalSteps,
     currentStep,
     progress,
     isFirst,
@@ -157,6 +187,65 @@ export default function AhorroLuz() {
       setLastFacturaPath(path);
     },
   });
+
+  const attachmentStoragePath = useMemo(() => {
+    const adj = answers.adjuntar_factura;
+    if (
+      adj &&
+      typeof adj === 'object' &&
+      adj !== null &&
+      'path' in adj &&
+      typeof (adj as { path: unknown }).path === 'string'
+    ) {
+      return (adj as { path: string }).path.trim() || null;
+    }
+    return null;
+  }, [answers.adjuntar_factura]);
+
+  /** Prefetch: analizar factura en cuanto está en storage y el usuario sigue el formulario (contacto, etc.). */
+  useEffect(() => {
+    if (!attachmentStoragePath || submitStatus === 'success') {
+      return;
+    }
+    let cancelled = false;
+    setInvoicePrefetch((prev) =>
+      prev?.path === attachmentStoragePath
+        ? prev
+        : { path: attachmentStoragePath, comparison: null },
+    );
+
+    fetch(PREVIEW_INVOICE_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ attachment_path: attachmentStoragePath }),
+    })
+      .then((res) => res.json())
+      .then((data: { success?: boolean; comparison?: EnergyComparisonResult }) => {
+        if (cancelled) return;
+        if (data.success && data.comparison) {
+          setInvoicePrefetch({
+            path: attachmentStoragePath,
+            comparison: data.comparison,
+          });
+        } else {
+          setInvoicePrefetch({
+            path: attachmentStoragePath,
+            comparison: null,
+          });
+        }
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setInvoicePrefetch({
+          path: attachmentStoragePath,
+          comparison: null,
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [attachmentStoragePath, submitStatus]);
 
   const uploadLeadAttachment = useCallback(async (file: File): Promise<{ name: string; path: string }> => {
     let fileToUpload = file;
@@ -286,21 +375,15 @@ export default function AhorroLuz() {
   const handleReset = useCallback(() => {
     setLastLeadId(null);
     setLastFacturaPath(null);
+    setInvoicePrefetch(null);
     reset();
   }, [reset]);
 
   if (submitStatus === 'success') {
     const sinFactura = answers.tiene_factura === 'no';
     const showEnergyFlow = !sinFactura && lastLeadId && lastFacturaPath;
-    const contactQ = AHORRO_LUZ_CONFIG.questions.find((q) => q.id === 'contacto');
-    const contactHeader =
-      contactQ?.type === 'contact' && 'header' in contactQ && typeof contactQ.header === 'string'
-        ? contactQ.header
-        : 'Tus datos de contacto';
-    const contactVals =
-      answers.contacto && typeof answers.contacto === 'object' && answers.contacto !== null
-        ? (answers.contacto as Record<string, string>)
-        : {};
+    const prefetchMatch = invoicePrefetch?.path === lastFacturaPath ? invoicePrefetch.comparison : null;
+    const headlinePct = headlineSavingsPercentFromComparison(prefetchMatch);
     return (
       <div className="min-h-screen flex flex-col bg-white">
         <header className="fixed top-0 left-0 right-0 z-40 flex flex-col bg-white/80 backdrop-blur-sm border-b border-gray-200/50">
@@ -321,42 +404,35 @@ export default function AhorroLuz() {
         </header>
         <div className="flex-1 overflow-y-auto pt-24 pb-8 px-4 sm:px-6">
           {showEnergyFlow ? (
-            <div className="w-full max-w-xl mx-auto space-y-6 animate-in fade-in duration-300">
-              <div className="flex items-start gap-2">
-                <span
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-white text-sm font-medium"
-                  style={{ backgroundColor: BRAND_COLOR }}
-                >
-                  {totalSteps}
-                </span>
-                <h2 className="text-xl sm:text-2xl font-semibold leading-tight pt-0.5" style={{ color: BRAND_COLOR }}>
-                  {contactHeader}
-                </h2>
-              </div>
-              {(contactVals.name || contactVals.email || contactVals.phone) && (
-                <div className="rounded-xl border border-gray-200 bg-gray-50/90 p-4 text-sm text-gray-800 space-y-2">
-                  {contactVals.name ? (
-                    <p>
-                      <span className="text-gray-500">Nombre</span> — {contactVals.name}
-                    </p>
-                  ) : null}
-                  {contactVals.email ? (
-                    <p>
-                      <span className="text-gray-500">Email</span> — {contactVals.email}
-                    </p>
-                  ) : null}
-                  {contactVals.phone ? (
-                    <p>
-                      <span className="text-gray-500">Teléfono</span> — {contactVals.phone}
-                    </p>
-                  ) : null}
-                </div>
-              )}
+            <div className="w-full max-w-xl mx-auto space-y-6 animate-in fade-in duration-300 text-center">
+              <h2
+                className="text-xl sm:text-2xl leading-snug px-1"
+                style={{ color: BRAND_COLOR, textShadow: 'none' }}
+              >
+                {headlinePct != null ? (
+                  <>
+                    <span className="font-light">Según tu factura, </span>
+                    <strong className="font-bold">ahorra hasta un {headlinePct}%</strong>
+                    <span className="font-light"> con una tarifa mejor ajustada.</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="font-light">Estamos terminando el análisis; en un momento verás </span>
+                    <strong className="font-bold">cuánto puedes ahorrar</strong>
+                    <span className="font-light"> en tu factura.</span>
+                  </>
+                )}
+              </h2>
               <EnergySavingsFlow
                 leadId={lastLeadId!}
                 attachmentPath={lastFacturaPath!}
                 onReset={handleReset}
                 compactLoader
+                fixedResultLoaderMs={LANDING_POST_SUBMIT_LOADER_MS}
+                prefetchedComparison={
+                  invoicePrefetch?.path === lastFacturaPath ? invoicePrefetch.comparison : null
+                }
+                prefetchedAttachmentPath={lastFacturaPath ?? undefined}
               />
             </div>
           ) : (
@@ -429,13 +505,23 @@ export default function AhorroLuz() {
             direction === 'prev' && 'fade-in slide-in-from-left-4'
           )}
         >
-          {/* Indicador de paso - cuadrado negro con número */}
-          <div className="flex items-start gap-2 mb-6">
+          {/* Indicador de paso - cuadrado con número; contacto: título centrado */}
+          <div
+            className={cn(
+              'flex mb-6',
+              currentQuestion.type === 'contact'
+                ? 'flex-col items-center gap-3 text-center'
+                : 'items-start gap-2'
+            )}
+          >
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-white text-sm font-medium" style={{ backgroundColor: BRAND_COLOR }}>
               {currentStep}
             </span>
             {currentQuestion.type === 'contact' && 'header' in currentQuestion && currentQuestion.header ? (
-              <h1 className="text-xl sm:text-2xl font-semibold leading-tight pt-0.5" style={{ color: BRAND_COLOR }}>
+              <h1
+                className="text-xl sm:text-2xl font-semibold leading-tight max-w-lg"
+                style={{ color: BRAND_COLOR, textShadow: 'none' }}
+              >
                 {currentQuestion.header}
               </h1>
             ) : currentQuestion.type !== 'contact' ? (
