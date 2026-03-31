@@ -94,6 +94,7 @@ interface EnergyOffer {
   price_per_kwh: number;
   monthly_fixed_cost: number;
   active: boolean;
+  tarifa_tipo: string;
 }
 
 interface OfferWithCost extends EnergyOffer {
@@ -144,6 +145,17 @@ function calcMonthlyCost(consumptionKwh: number, offer: EnergyOffer, powerKw: nu
 
 function normalizeCompany(name: string): string {
   return name.replace(/,?\s*(S\.?L\.?U?\.?|S\.?A\.?|S\.?L\.?|S\.?Coop\.?)$/i, '').replace(/\s+/g, ' ').trim();
+}
+
+function detectTarifaTipo(extraction: InvoiceExtraction): string {
+  const t = (extraction.tipo_tarifa ?? '').toUpperCase().replace(/\s+/g, '');
+  if (t.includes('3.0') || t.includes('30TD')) return '3.0TD';
+  return '2.0TD';
+}
+
+function filterOffersByTarifa(offers: EnergyOffer[], tarifaTipo: string): EnergyOffer[] {
+  const matched = offers.filter((o) => o.tarifa_tipo === tarifaTipo);
+  return matched.length > 0 ? matched : offers;
 }
 
 function buildComparison(extraction: InvoiceExtraction, offers: EnergyOffer[]): { snapshot: ComparisonSnapshot; offersWithCost: OfferWithCost[] } {
@@ -527,7 +539,16 @@ function ComparisonView({
       </Card>
 
       <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-base">Datos de la factura</CardTitle></CardHeader>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            Datos de la factura
+            {extraction.tipo_tarifa && (
+              <Badge variant={detectTarifaTipo(extraction) === '3.0TD' ? 'secondary' : 'default'} className="text-xs">
+                {extraction.tipo_tarifa}
+              </Badge>
+            )}
+          </CardTitle>
+        </CardHeader>
         <CardContent className="space-y-4">
           {(extraction.titular || extraction.cups || extraction.tipo_tarifa || extraction.company_name || extraction.direccion_suministro) && (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-2 text-sm">
@@ -771,7 +792,7 @@ export default function InvoiceSimulator() {
     try {
       const { data, error } = await (supabase as any)
         .from('energy_offers')
-        .select('id, company_name, p1, p2, price_per_kwh, monthly_fixed_cost, active')
+        .select('id, company_name, p1, p2, price_per_kwh, monthly_fixed_cost, active, tarifa_tipo')
         .eq('active', true)
         .order('company_name');
       if (error) throw error;
@@ -783,6 +804,7 @@ export default function InvoiceSimulator() {
         price_per_kwh: Number(r.price_per_kwh),
         monthly_fixed_cost: Number(r.monthly_fixed_cost),
         active: r.active as boolean,
+        tarifa_tipo: (r.tarifa_tipo as string) || '2.0TD',
       }));
       setOffers(mapped);
       return mapped;
@@ -859,7 +881,9 @@ export default function InvoiceSimulator() {
 
   const handleCalculate = useCallback(() => {
     if (!extraction) return;
-    const { snapshot, offersWithCost } = buildComparison(extraction, offers);
+    const tarifaTipo = detectTarifaTipo(extraction);
+    const filtered = filterOffersByTarifa(offers, tarifaTipo);
+    const { snapshot, offersWithCost } = buildComparison(extraction, filtered);
     setCurrentSnapshot(snapshot);
     setCurrentOffersWithCost(offersWithCost);
     setSelectedOfferId(snapshot.selected_offer_id);
@@ -877,7 +901,9 @@ export default function InvoiceSimulator() {
       setCurrentOffersWithCost(s.comparison_result.offers || []);
       setSelectedOfferId(s.comparison_result.selected_offer_id ?? null);
     } else {
-      const { snapshot, offersWithCost } = buildComparison(s.extraction, offers);
+      const tarifaTipo = detectTarifaTipo(s.extraction);
+      const filtered = filterOffersByTarifa(offers, tarifaTipo);
+      const { snapshot, offersWithCost } = buildComparison(s.extraction, filtered);
       setCurrentSnapshot(snapshot);
       setCurrentOffersWithCost(offersWithCost);
       setSelectedOfferId(snapshot.selected_offer_id);

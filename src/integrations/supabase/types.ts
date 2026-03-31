@@ -377,6 +377,7 @@ export type Database = {
           p1: number | null
           p2: number | null
           active: boolean
+          tarifa_tipo: string
           created_at: string
           updated_at: string
         }
@@ -388,6 +389,7 @@ export type Database = {
           p1?: number | null
           p2?: number | null
           active?: boolean
+          tarifa_tipo?: string
           created_at?: string
           updated_at?: string
         }
@@ -399,6 +401,7 @@ export type Database = {
           p1?: number | null
           p2?: number | null
           active?: boolean
+          tarifa_tipo?: string
           created_at?: string
           updated_at?: string
         }
