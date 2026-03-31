@@ -13,8 +13,9 @@ import { extractWithLLM } from './llm-extract.js';
 const IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
-const extractionCache = new Map<string, { extraction: InvoiceExtraction; ts: number }>();
-const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hora
+const PROMPT_VERSION = 'v5-3.0TD-6periods';
+const extractionCache = new Map<string, { extraction: InvoiceExtraction; ts: number; pv: string }>();
+const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutos
 
 function fileHash(buffer: Buffer): string {
   return createHash('md5').update(buffer).digest('hex');
@@ -161,8 +162,8 @@ export async function extractInvoiceFromBuffer(
 
   const hash = fileHash(buffer);
   const cached = extractionCache.get(hash);
-  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) {
-    console.log(`[pipeline] Cache hit for ${hash}`);
+  if (cached && cached.pv === PROMPT_VERSION && Date.now() - cached.ts < CACHE_TTL_MS) {
+    console.log(`[pipeline] Cache hit for ${hash} (pv=${cached.pv})`);
     return cached.extraction;
   }
 
@@ -174,7 +175,7 @@ export async function extractInvoiceFromBuffer(
       console.warn('[pipeline] LLM returned no consumption and no total — possible non-energy document');
     }
 
-    extractionCache.set(hash, { extraction: validated, ts: Date.now() });
+    extractionCache.set(hash, { extraction: validated, ts: Date.now(), pv: PROMPT_VERSION });
     return validated;
   } catch (err) {
     console.error('[pipeline] Extraction failed:', err instanceof Error ? err.message : err);
