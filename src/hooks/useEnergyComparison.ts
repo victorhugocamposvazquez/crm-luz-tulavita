@@ -9,8 +9,8 @@ const PROCESS_API = import.meta.env.VITE_PROCESS_INVOICE_API_URL ?? '/api/proces
 const COMPARISON_API = import.meta.env.VITE_ENERGY_COMPARISON_API_URL ?? '/api/energy-comparison';
 const POLL_INTERVAL_MS = 1000;
 const POLL_MAX_ATTEMPTS = 30;
-/** Tiempo mínimo mostrando el loader para que se vea la secuencia (no parpadeo). */
-const MIN_LOADER_MS = 1200;
+/** Sin retardo artificial: en cuanto responde la API se muestra el resultado. */
+const MIN_LOADER_MS = 0;
 
 export interface EnergyComparisonResult {
   id: string;

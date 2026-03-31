@@ -292,31 +292,79 @@ export default function AhorroLuz() {
   if (submitStatus === 'success') {
     const sinFactura = answers.tiene_factura === 'no';
     const showEnergyFlow = !sinFactura && lastLeadId && lastFacturaPath;
+    const contactQ = AHORRO_LUZ_CONFIG.questions.find((q) => q.id === 'contacto');
+    const contactHeader =
+      contactQ?.type === 'contact' && 'header' in contactQ && typeof contactQ.header === 'string'
+        ? contactQ.header
+        : 'Tus datos de contacto';
+    const contactVals =
+      answers.contacto && typeof answers.contacto === 'object' && answers.contacto !== null
+        ? (answers.contacto as Record<string, string>)
+        : {};
     return (
       <div className="min-h-screen flex flex-col bg-white">
-        <header className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 pt-6 pb-4 sm:pt-7 sm:pb-5 bg-white/80 backdrop-blur-sm border-b border-gray-200/50">
-          <div className="flex items-center justify-center min-w-[3rem] sm:min-w-[3.5rem]">
-            <img src="/logo-tulavita.png" alt="Tulavita" className="h-14 w-14 sm:h-16 sm:w-16 object-contain" />
+        <header className="fixed top-0 left-0 right-0 z-40 flex flex-col bg-white/80 backdrop-blur-sm border-b border-gray-200/50">
+          <div className="flex items-center justify-between px-4 pt-6 pb-3 sm:pt-7 sm:pb-4">
+            <div className="flex items-center justify-center min-w-[3rem] sm:min-w-[3.5rem]">
+              <img src="/logo-tulavita.png" alt="Tulavita" className="h-14 w-14 sm:h-16 sm:w-16 object-contain" />
+            </div>
+            <h1 className="absolute left-1/2 -translate-x-1/2 text-lg sm:text-xl font-semibold" style={{ color: BRAND_COLOR }}>
+              Ahorra en tu factura
+            </h1>
+            <div className="min-w-[3rem] sm:min-w-[3.5rem]" aria-hidden />
           </div>
-          <h1 className="absolute left-1/2 -translate-x-1/2 text-lg sm:text-xl font-semibold" style={{ color: BRAND_COLOR }}>
-            Ahorra en tu factura
-          </h1>
-          <div className="min-w-[3rem] sm:min-w-[3.5rem]" aria-hidden />
+          {showEnergyFlow && (
+            <div className="h-0.5 w-full bg-gray-200">
+              <div className="h-full transition-all duration-300 ease-out" style={{ backgroundColor: BRAND_COLOR, width: '100%' }} />
+            </div>
+          )}
         </header>
         <div className="flex-1 overflow-y-auto pt-24 pb-8 px-4 sm:px-6">
-          <div className="max-w-lg w-full mx-auto text-center animate-in fade-in duration-500 space-y-6">
-            {!showEnergyFlow && (
-              <h2 className="text-2xl sm:text-3xl font-semibold" style={{ color: BRAND_COLOR }}>
-                ¡Gracias!
-              </h2>
-            )}
-            {showEnergyFlow ? (
+          {showEnergyFlow ? (
+            <div className="w-full max-w-xl mx-auto space-y-6 animate-in fade-in duration-300">
+              <div className="flex items-start gap-2">
+                <span
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-white text-sm font-medium"
+                  style={{ backgroundColor: BRAND_COLOR }}
+                >
+                  {totalSteps}
+                </span>
+                <h2 className="text-xl sm:text-2xl font-semibold leading-tight pt-0.5" style={{ color: BRAND_COLOR }}>
+                  {contactHeader}
+                </h2>
+              </div>
+              {(contactVals.name || contactVals.email || contactVals.phone) && (
+                <div className="rounded-xl border border-gray-200 bg-gray-50/90 p-4 text-sm text-gray-800 space-y-2">
+                  {contactVals.name ? (
+                    <p>
+                      <span className="text-gray-500">Nombre</span> — {contactVals.name}
+                    </p>
+                  ) : null}
+                  {contactVals.email ? (
+                    <p>
+                      <span className="text-gray-500">Email</span> — {contactVals.email}
+                    </p>
+                  ) : null}
+                  {contactVals.phone ? (
+                    <p>
+                      <span className="text-gray-500">Teléfono</span> — {contactVals.phone}
+                    </p>
+                  ) : null}
+                </div>
+              )}
               <EnergySavingsFlow
-                leadId={lastLeadId}
-                attachmentPath={lastFacturaPath}
+                leadId={lastLeadId!}
+                attachmentPath={lastFacturaPath!}
                 onReset={handleReset}
+                compactLoader
               />
-            ) : sinFactura ? (
+            </div>
+          ) : (
+          <div className="max-w-lg w-full mx-auto text-center animate-in fade-in duration-500 space-y-6">
+            <h2 className="text-2xl sm:text-3xl font-semibold" style={{ color: BRAND_COLOR }}>
+              ¡Gracias!
+            </h2>
+            {sinFactura ? (
               <>
                 <p className="text-xl sm:text-2xl font-bold" style={{ color: BRAND_COLOR }}>
                   ¿Sabías que cerca del 99% de las facturas que recibimos les mejoramos el precio? Seguro que la tuya también! 💪
@@ -339,6 +387,7 @@ export default function AhorroLuz() {
               </>
             )}
           </div>
+          )}
         </div>
       </div>
     );

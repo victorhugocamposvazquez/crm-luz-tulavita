@@ -15,10 +15,13 @@ export function EnergySavingsFlow({
   leadId,
   attachmentPath,
   onReset,
+  compactLoader = false,
 }: {
   leadId: string;
   attachmentPath: string;
   onReset?: () => void;
+  /** Loader más compacto y rápido (p. ej. debajo del paso de contacto en la landing). */
+  compactLoader?: boolean;
 }) {
   const { status, comparison, error, run, runWithManual, reset } = useEnergyComparison();
   const [manualConsumption, setManualConsumption] = useState('');
@@ -32,7 +35,7 @@ export function EnergySavingsFlow({
   }, [leadId, attachmentPath, run, reset]);
 
   if (status === 'processing') {
-    return <EnergySavingsLoader />;
+    return <EnergySavingsLoader compact={compactLoader} />;
   }
 
   const handleManualSubmit = (e: React.FormEvent) => {

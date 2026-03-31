@@ -3,7 +3,7 @@ import { Check, Circle, Loader2, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const BRAND = '#26606b';
-const STEP_INTERVAL_MS = 1000;
+const DEFAULT_STEP_INTERVAL_MS = 1000;
 
 export interface InvoiceProcessingLoaderStep {
   label: string;
@@ -18,6 +18,7 @@ export function InvoiceProcessingLoader({
   note,
   compact = false,
   className,
+  stepIntervalMs = DEFAULT_STEP_INTERVAL_MS,
 }: {
   title: string;
   subtitle?: string;
@@ -26,6 +27,8 @@ export function InvoiceProcessingLoader({
   note?: string;
   compact?: boolean;
   className?: string;
+  /** Intervalo entre pasos del indicador (ms). */
+  stepIntervalMs?: number;
 }) {
   const [stepIndex, setStepIndex] = useState(0);
 
@@ -33,9 +36,9 @@ export function InvoiceProcessingLoader({
     if (steps.length <= 1 || stepIndex >= steps.length - 1) return;
     const timeout = window.setTimeout(() => {
       setStepIndex((current) => Math.min(current + 1, steps.length - 1));
-    }, STEP_INTERVAL_MS);
+    }, stepIntervalMs);
     return () => window.clearTimeout(timeout);
-  }, [stepIndex, steps.length]);
+  }, [stepIndex, steps.length, stepIntervalMs]);
 
   const currentStep = steps[stepIndex] ?? steps[0];
   const CurrentIcon = currentStep?.icon;
