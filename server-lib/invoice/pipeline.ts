@@ -38,6 +38,178 @@ async function extractPdfText(buffer: Buffer): Promise<string | null> {
   }
 }
 
+function parseSpanishNum(text: string | null | undefined): number | null {
+  if (!text) return null;
+  const clean = text.trim().replace(/\s/g, '');
+  if (clean === '') return null;
+  const normalized = clean.includes(',') && clean.includes('.')
+    ? clean.replace(/\./g, '').replace(',', '.')
+    : clean.replace(',', '.');
+  const n = Number(normalized);
+  return Number.isFinite(n) ? n : null;
+}
+
+function firstNumber(text: string, regexes: RegExp[]): number | null {
+  for (const regex of regexes) {
+    const match = text.match(regex);
+    const value = parseSpanishNum(match?.[1]);
+    if (value != null) return value;
+  }
+  return null;
+}
+
+function firstString(text: string, regexes: RegExp[]): string | null {
+  for (const regex of regexes) {
+    const match = text.match(regex);
+    const value = match?.[1]?.trim();
+    if (value) return value;
+  }
+  return null;
+}
+
+function detectCompanyFromText(text: string): string | null {
+  const patterns: Array<[RegExp, string]> = [
+    [/ENDESA ENERG[ÍI]A/i, 'Endesa Energía'],
+    [/IBERDROLA CLIENTES/i, 'Iberdrola'],
+    [/REPSOL COMERCIALIZADORA/i, 'Repsol'],
+    [/TOTALENERGIES CLIENTES/i, 'TotalEnergies'],
+    [/NATURGY/i, 'Naturgy'],
+    [/PLENITUDE/i, 'Plenitude'],
+    [/CONTIGO ENERG[ÍI]A/i, 'Contigo Energía'],
+    [/GABA ENERG[ÍI]A/i, 'Gaba Energía'],
+    [/GESTERNOVA/i, 'Gesternova'],
+  ];
+  for (const [regex, company] of patterns) {
+    if (regex.test(text)) return company;
+  }
+  return null;
+}
+
+function parse20TDFromText(text: string): InvoiceExtraction | null {
+  const normalized = text.replace(/\r/g, '');
+  if (!/2[\.\s]?0\s*TD/i.test(normalized) && !/20TD/i.test(normalized)) return null;
+
+  const company_name = detectCompanyFromText(normalized);
+  const total_factura = firstNumber(normalized, [
+    /Total factura\s+([\d.,]+)\s*€/i,
+    /TOTAL IMPORTE FACTURA\s+([\d.,]+)\s*€/i,
+    /IMPORTE TOTAL ELECTRICIDAD \+ TASAS E IMPUESTOS\s+([\d.,]+)\s*€/i,
+    /TOTAL\s+([\d.,]+)\s*€/i,
+    /¿Cuánto tengo que pagar\?\s+([\d.,]+)\s*€/i,
+  ]);
+  const consumption_kwh = firstNumber(normalized, [
+    /Consumo Total\s+([\d.,]+)\s*kWh/i,
+    /Consumo en este periodo\s+([\d.,]+)\s*kWh/i,
+    /Tu consumo en el periodo facturado ha sido de\s+([\d.,]+)\s*kWh/i,
+    /Total:\s*([\d.,]+)\s*kWh/i,
+  ]);
+  const cups = firstString(normalized, [
+    /CUPS[:\s]+(ES[0-9A-Z ]{16,24})/i,
+    /Identificaci[oó]n punto de suministro \(CUPS\):\s*(ES[0-9A-Z ]{16,24})/i,
+  ])?.replace(/\s+/g, '') ?? null;
+  const titular = firstString(normalized, [
+    /Titular del contrato:\s*([^\n]+)/i,
+    /Nombre y Apellidos del titular\s*([^\n]+)/i,
+    /Titular Potencia:\s*([^\n]+)/i,
+    /Cliente:\s*([^\n]+)/i,
+  ]);
+  const periodRange = normalized.match(/Periodo de facturaci[oó]n(?: elec\.)?:?\s*(?:del\s*)?(\d{2}[./-]\d{2}[./-]\d{4})\s*(?:a|-)\s*(\d{2}[./-]\d{2}[./-]\d{4})/i)
+    ?? normalized.match(/PERIODO DE FACTURACI[ÓO]N:\s*(\d{2}[./-]\d{2}[./-]\d{4})\s*-\s*(\d{2}[./-]\d{2}[./-]\d{4})/i);
+  const period_start = periodRange ? toIsoDate(periodRange[1]) : null;
+  const period_end = periodRange ? toIsoDate(periodRange[2]) : null;
+
+  const powerP1 = firstNumber(normalized, [
+    /Potencias contratadas:\s*punta-llano\s*([\d.,]+)\s*kW/i,
+    /Potencia punta:\s*([\d.,]+)\s*kW/i,
+    /Potencia P1:\s*([\d.,]+)/i,
+    /Potencia contratada\s*([\d.,]+)kW/i,
+  ]);
+  const powerP2 = firstNumber(normalized, [
+    /Potencias contratadas:.*?valle\s*([\d.,]+)\s*kW/i,
+    /Potencia valle:\s*([\d.,]+)\s*kW/i,
+    /Potencia P2:\s*([\d.,]+)\s*kW/i,
+    /Potencia contratada\s*[\d.,]+kW\s*([\d.,]+)kW/i,
+  ]) ?? powerP1;
+
+  const precio_p1_kwh = firstNumber(normalized, [
+    /Consumo\s+[\d.,]+\s*kWh\s*x\s*([\d.,]+)\s*Eur\/kWh/i,
+    /Horas no promocionadas\s+[\d.,]+\s*kWh\s*x\s*([\d.,]+)\s*€\/kWh/i,
+  ]);
+  const precio_p2_kwh = (() => {
+    const matches = [...normalized.matchAll(/(?:Consumo|Horas promocionadas|Horas no promocionadas)\s+[\d.,]+\s*kWh\s*x\s*([\d.,]+)\s*(?:Eur|€)\/kWh/gi)];
+    if (matches.length >= 2) return parseSpanishNum(matches[1][1]);
+    return null;
+  })();
+  const consumos = [...normalized.matchAll(/(?:Punta|Llano|Valle|Horas promocionadas|Horas no promocionadas|Consumo)\s*[: ]*([\d.,]+)\s*kWh/gi)]
+    .map((m) => parseSpanishNum(m[1]))
+    .filter((n): n is number => n != null && n >= 0);
+  const consumo_p1_kwh = consumos.length >= 2 ? consumos[0] : null;
+  const consumo_p2_kwh = consumos.length >= 2 ? consumos[1] : null;
+
+  let precio_energia_kwh: number | null = null;
+  if (consumption_kwh && consumption_kwh > 0 && precio_p1_kwh != null && precio_p2_kwh != null && consumo_p1_kwh != null && consumo_p2_kwh != null) {
+    precio_energia_kwh = (consumo_p1_kwh * precio_p1_kwh + consumo_p2_kwh * precio_p2_kwh) / (consumo_p1_kwh + consumo_p2_kwh);
+  } else {
+    precio_energia_kwh = firstNumber(normalized, [
+      /ha salido a\s*([\d.,]+)\s*€\/kWh/i,
+      /precio medio.*?([\d.,]+)\s*€\/kWh/i,
+    ]);
+  }
+
+  const direccion_suministro = firstString(normalized, [
+    /Direcci[oó]n de suministro:\s*([^\n]+(?:\n[^\n]+)?)/i,
+    /Direcci[oó]n suministro\s*([^\n]+)/i,
+  ])?.replace(/\n+/g, ' ').trim() ?? null;
+
+  const minOk = total_factura != null && consumption_kwh != null && cups != null;
+  if (!minOk) return null;
+
+  return {
+    ...emptyExtraction(),
+    company_name,
+    consumption_kwh,
+    total_factura,
+    period_start,
+    period_end,
+    period_months: safePeriodMonthsFromDates(period_start, period_end),
+    confidence: 0.92,
+    potencia_contratada_kw: powerP1,
+    potencia_p1_kw: powerP1,
+    potencia_p2_kw: powerP2,
+    precio_energia_kwh,
+    precio_p1_kwh,
+    precio_p2_kwh,
+    consumo_p1_kwh,
+    consumo_p2_kwh,
+    tipo_tarifa: '2.0TD',
+    cups,
+    titular,
+    direccion_suministro,
+  };
+}
+
+function toIsoDate(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const parts = raw.trim().replace(/\./g, '/').replace(/-/g, '/').split('/');
+  if (parts.length !== 3) return null;
+  const [dd, mm, yyyy] = parts;
+  if (!dd || !mm || !yyyy) return null;
+  return `${yyyy.padStart(4, '0')}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
+}
+
+function safePeriodMonthsFromDates(start: string | null, end: string | null): number {
+  if (!start || !end) return 1;
+  try {
+    const s = new Date(start);
+    const e = new Date(end);
+    const diffDays = (e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24);
+    if (!Number.isFinite(diffDays) || diffDays < 0) return 1;
+    return Math.max(1, Math.round(diffDays / 30));
+  } catch {
+    return 1;
+  }
+}
+
 /**
  * Intenta corregir un consumo que parece estar multiplicado por 1000
  * (error típico del formato decimal español: "714,000" → 714000 en vez de 714).
@@ -347,9 +519,14 @@ export async function extractInvoiceFromBuffer(
     let validated: InvoiceExtraction;
 
     if (detectedTarifa === '2.0TD') {
-      const extraction = extractedPdfText
-        ? await extractWithLLM20TDFromText(extractedPdfText)
-        : await extractWithLLM20TD(buffer, mimeType);
+      const parsed = extractedPdfText ? parse20TDFromText(extractedPdfText) : null;
+      if (parsed) {
+        console.log('[pipeline] 2.0TD parsed locally from PDF text (sin LLM)');
+      }
+      const extraction = parsed
+        ?? (extractedPdfText
+          ? await extractWithLLM20TDFromText(extractedPdfText)
+          : await extractWithLLM20TD(buffer, mimeType));
       validated = validateExtraction(extraction);
     } else {
       let extraction = await extractWithLLM30TD(buffer, mimeType);
