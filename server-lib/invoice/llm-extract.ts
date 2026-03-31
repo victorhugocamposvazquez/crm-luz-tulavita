@@ -150,8 +150,56 @@ VERIFICACIÓN FINAL — OBLIGATORIA:
 4. ¿Leíste TODOS los bloques de energía (suelen ser 2-3)?
 5. ¿potencia_p6_kw distinta de P1 si la factura lo indica?`;
 
+/** Prompt genérico cuando no se conoce la tarifa de antemano. */
+const SYSTEM_PROMPT_GENERIC = `Eres un experto en facturas de energía eléctrica en España. Extrae datos estructurados.
+
+INSTRUCCIONES:
+1. Analiza todas las páginas o toda la imagen.
+2. Convierte números del formato español (coma decimal) a punto decimal.
+3. Responde SOLO con JSON válido, sin texto, sin markdown.
+
+${NUMERO_ESPANOL_BLOQUE}
+
+REGLA CRÍTICA PARA DETERMINAR LA TARIFA:
+- Determina "tipo_tarifa" SOLO por una etiqueta explícita visible en la factura: "2.0TD", "3.0TD", "2.0A", "3.0A", "Peaje de transporte y distribución", "Peaje de acceso", "ATR".
+- Si ves explícitamente "2.0TD", entonces la tarifa es 2.0TD aunque aparezcan términos como "P3", "Valle", "punta/llano/valle" o lecturas desagregadas.
+- En algunas facturas 2.0TD el detalle regulatorio usa "P3" para el componente valle o para lecturas internas; ESO NO la convierte en 3.0TD.
+- NO infieras 3.0TD solo porque aparezca "P3" en una línea de potencia o consumos. Para 3.0TD debe verse explícitamente "3.0TD" / "3.0A" o una estructura clara P1...P6 en la propia tarifa.
+
+ESQUEMA JSON:
+{
+  "company_name": "string",
+  "consumption_kwh": number,
+  "total_factura": number,
+  "importe_energia_activa": number,
+  "importe_potencia": number,
+  "period_start": "YYYY-MM-DD",
+  "period_end": "YYYY-MM-DD",
+  "period_months": number,
+  "potencia_contratada_kw": number,
+  "potencia_p1_kw": number, "potencia_p2_kw": number, "potencia_p3_kw": number,
+  "potencia_p4_kw": number, "potencia_p5_kw": number, "potencia_p6_kw": number,
+  "precio_energia_kwh": number,
+  "precio_p1_kwh": number, "precio_p2_kwh": number, "precio_p3_kwh": number,
+  "precio_p4_kwh": number, "precio_p5_kwh": number, "precio_p6_kwh": number,
+  "consumo_p1_kwh": number, "consumo_p2_kwh": number, "consumo_p3_kwh": number,
+  "consumo_p4_kwh": number, "consumo_p5_kwh": number, "consumo_p6_kwh": number,
+  "tipo_tarifa": "string",
+  "cups": "string",
+  "titular": "string",
+  "direccion_suministro": "string"
+}
+
+SI LA TARIFA EXPLÍCITA ES 2.0TD:
+- Prioriza P1 y P2.
+- Si aparece P3 solo como detalle regulatorio/valle, no clasifiques como 3.0TD.
+
+SI LA TARIFA EXPLÍCITA ES 3.0TD:
+- Usa P1...P6 y suma todos los bloques de energía activa si hay varios.
+`;
+
 /** Prompt genérico de compatibilidad (usado si no se puede pre-clasificar). */
-const SYSTEM_PROMPT = SYSTEM_PROMPT_30TD;
+const SYSTEM_PROMPT = SYSTEM_PROMPT_GENERIC;
 
 const USER_PROMPT = 'Extrae todos los datos de esta factura de energía. Devuelve SOLO el JSON, sin explicaciones.';
 
@@ -427,6 +475,24 @@ export async function extractWithLLM30TD(
   return full.confidence >= fast.confidence ? full : fast;
 }
 
+/** Camino genérico cuando la tarifa no se ha podido pre-detectar. */
+export async function extractWithLLMGeneric(
+  fileBuffer: Buffer,
+  mimeType: string,
+): Promise<InvoiceExtraction> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    console.error('[llm-extract] OPENAI_API_KEY not set');
+    return emptyExtraction();
+  }
+  const opts: CallOptions = { systemPrompt: SYSTEM_PROMPT_GENERIC, maxTokens: MAX_TOKENS_30TD };
+  const t0 = Date.now();
+  const result = await callResponsesAPI(fileBuffer, mimeType, MODEL_FAST, apiKey, opts);
+  result.confidence = computeConfidence(result);
+  console.log(`[llm-extract] generic gpt-4o-mini in ${Date.now() - t0}ms (confidence: ${result.confidence.toFixed(2)})`);
+  return result;
+}
+
 /**
  * Fuerza extracción 3.0TD con gpt-4o (modelo completo).
  * Usado por el pipeline cuando gpt-4o-mini produce consumo sospechoso.
@@ -456,7 +522,7 @@ export async function extractWithLLM(
   fileBuffer: Buffer,
   mimeType: string,
 ): Promise<InvoiceExtraction> {
-  return extractWithLLM30TD(fileBuffer, mimeType);
+  return extractWithLLMGeneric(fileBuffer, mimeType);
 }
 
 /** Limpia campos P3-P6 para 2.0TD (el LLM a veces rellena campos que no corresponden). */

@@ -8,7 +8,7 @@
 import { createHash } from 'crypto';
 import type { InvoiceExtraction } from './types.js';
 import { emptyExtraction } from './types.js';
-import { extractWithLLM20TD, extractWithLLM20TDFromText, extractWithLLM30TD, extractWithLLMForceFull } from './llm-extract.js';
+import { extractWithLLM20TD, extractWithLLM20TDFromText, extractWithLLM30TD, extractWithLLMForceFull, extractWithLLMGeneric } from './llm-extract.js';
 
 const IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
@@ -207,6 +207,40 @@ function safePeriodMonthsFromDates(start: string | null, end: string | null): nu
     return Math.max(1, Math.round(diffDays / 30));
   } catch {
     return 1;
+  }
+}
+
+function nullify30TDFields(e: InvoiceExtraction): void {
+  e.potencia_p3_kw = null;
+  e.potencia_p4_kw = null;
+  e.potencia_p5_kw = null;
+  e.potencia_p6_kw = null;
+  e.precio_p3_kwh = null;
+  e.precio_p4_kwh = null;
+  e.precio_p5_kwh = null;
+  e.precio_p6_kwh = null;
+  e.consumo_p3_kwh = null;
+  e.consumo_p4_kwh = null;
+  e.consumo_p5_kwh = null;
+  e.consumo_p6_kwh = null;
+}
+
+function normalizeLikely20TD(e: InvoiceExtraction, fixes: string[]): void {
+  const rawTarifa = (e.tipo_tarifa ?? '').toUpperCase().replace(/\s+/g, '');
+  const explicit20 = rawTarifa.includes('2.0') || rawTarifa.includes('20TD') || rawTarifa.includes('20A');
+  const noP4ToP6Data = [e.potencia_p4_kw, e.potencia_p5_kw, e.potencia_p6_kw, e.precio_p4_kwh, e.precio_p5_kwh, e.precio_p6_kwh, e.consumo_p4_kwh, e.consumo_p5_kwh, e.consumo_p6_kwh]
+    .every((v) => v == null || v === 0);
+  const onlyTwoUsefulPrices = [e.precio_p1_kwh, e.precio_p2_kwh, e.precio_p3_kwh, e.precio_p4_kwh, e.precio_p5_kwh, e.precio_p6_kwh]
+    .filter((v) => v != null && v > 0).length <= 3;
+  const p3LooksCopied = e.potencia_p3_kw != null && e.potencia_p1_kw != null && Math.abs(e.potencia_p3_kw - e.potencia_p1_kw) < 0.001;
+  const looks20ByShape = noP4ToP6Data && onlyTwoUsefulPrices && p3LooksCopied;
+
+  if (explicit20 || looks20ByShape) {
+    if (e.tipo_tarifa !== '2.0TD') {
+      fixes.push(`tipo_tarifa normalizada: ${e.tipo_tarifa ?? 'null'} → 2.0TD`);
+      e.tipo_tarifa = '2.0TD';
+    }
+    nullify30TDFields(e);
   }
 }
 
@@ -448,6 +482,7 @@ function validateExtraction(e: InvoiceExtraction): InvoiceExtraction {
   }
 
   fixPeriodStartEveBeforeMonth(e, fixes);
+  normalizeLikely20TD(e, fixes);
   crossCheckWithImporteEnergia(e, warnings);
   reconcileConsumoPorPeriodo(e, fixes);
   recomputeWeightedPrecioEnergia(e, fixes);
@@ -528,7 +563,7 @@ export async function extractInvoiceFromBuffer(
           ? await extractWithLLM20TDFromText(extractedPdfText)
           : await extractWithLLM20TD(buffer, mimeType));
       validated = validateExtraction(extraction);
-    } else {
+    } else if (detectedTarifa === '3.0TD') {
       let extraction = await extractWithLLM30TD(buffer, mimeType);
       validated = validateExtraction(extraction);
 
@@ -552,6 +587,18 @@ export async function extractInvoiceFromBuffer(
           validated = retryValidated;
         } else {
           console.log('[pipeline] gpt-4o forzado no mejoró; manteniendo original');
+        }
+      }
+    } else {
+      const extraction = await extractWithLLMGeneric(buffer, mimeType);
+      validated = validateExtraction(extraction);
+
+      if (needs30TDRetry(validated)) {
+        console.log('[pipeline] tarifa desconocida, pero consumo parece 3.0TD incompleto — reintentando con gpt-4o forzado');
+        const retryExtraction = await extractWithLLMForceFull(buffer, mimeType);
+        const retryValidated = validateExtraction(retryExtraction);
+        if (!needs30TDRetry(retryValidated) || (retryValidated.confidence ?? 0) >= (validated.confidence ?? 0)) {
+          validated = retryValidated;
         }
       }
     }
