@@ -167,6 +167,17 @@ interface CallOptions {
   maxTokens: number;
 }
 
+function readResponseOutput(
+  data: {
+    output?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>;
+    output_text?: string;
+  },
+): string | null {
+  return data.output_text
+    ?? data.output?.find(o => o.type === 'message')?.content?.find(c => c.type === 'output_text')?.text
+    ?? null;
+}
+
 async function callResponsesAPI(
   fileBuffer: Buffer,
   mimeType: string,
@@ -222,12 +233,61 @@ async function callResponsesAPI(
     output_text?: string;
   };
 
-  const raw = data.output_text
-    ?? data.output?.find(o => o.type === 'message')?.content?.find(c => c.type === 'output_text')?.text
-    ?? null;
+  const raw = readResponseOutput(data);
 
   if (!raw) {
     console.error(`[llm-extract] No text in response (${model}):`, JSON.stringify(data).slice(0, 300));
+    return emptyExtraction();
+  }
+
+  return parseLLMResponse(raw.trim());
+}
+
+async function callResponsesAPIText(
+  text: string,
+  model: string,
+  apiKey: string,
+  opts?: CallOptions,
+): Promise<InvoiceExtraction> {
+  const prompt = opts?.systemPrompt ?? SYSTEM_PROMPT;
+  const maxTokens = opts?.maxTokens ?? MAX_TOKENS_30TD;
+  const clippedText = text.length > 24_000 ? text.slice(0, 24_000) : text;
+
+  const res = await fetch(OPENAI_RESPONSES_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model,
+      instructions: prompt,
+      input: [{
+        role: 'user',
+        content: [
+          { type: 'input_text', text: USER_PROMPT },
+          { type: 'input_text', text: `TEXTO EXTRAIDO DE PDF:\n${clippedText}` },
+        ],
+      }],
+      max_output_tokens: maxTokens,
+      temperature: 0,
+    }),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error(`[llm-extract-text] OpenAI API error (${model})`, res.status, errText.slice(0, 500));
+    return emptyExtraction();
+  }
+
+  const data = (await res.json()) as {
+    output?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>;
+    output_text?: string;
+  };
+
+  const raw = readResponseOutput(data);
+  if (!raw) {
+    console.error(`[llm-extract-text] No text in response (${model}):`, JSON.stringify(data).slice(0, 300));
     return emptyExtraction();
   }
 
@@ -303,6 +363,28 @@ export async function extractWithLLM20TD(
   if (!result.tipo_tarifa) result.tipo_tarifa = '2.0TD';
   nullify30TDFields(result);
   console.log(`[llm-extract] 2.0TD gpt-4o-mini in ${Date.now() - t0}ms (confidence: ${result.confidence.toFixed(2)})`);
+  return result;
+}
+
+/**
+ * Camino ultrarrápido para 2.0TD cuando ya tenemos el texto del PDF.
+ * Evita enviar el PDF binario a OpenAI y reduce mucho la latencia.
+ */
+export async function extractWithLLM20TDFromText(
+  text: string,
+): Promise<InvoiceExtraction> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    console.error('[llm-extract] OPENAI_API_KEY not set');
+    return emptyExtraction();
+  }
+  const opts: CallOptions = { systemPrompt: SYSTEM_PROMPT_20TD, maxTokens: MAX_TOKENS_20TD };
+  const t0 = Date.now();
+  const result = await callResponsesAPIText(text, MODEL_FAST, apiKey, opts);
+  result.confidence = computeConfidence(result);
+  if (!result.tipo_tarifa) result.tipo_tarifa = '2.0TD';
+  nullify30TDFields(result);
+  console.log(`[llm-extract] 2.0TD text gpt-4o-mini in ${Date.now() - t0}ms (confidence: ${result.confidence.toFixed(2)})`);
   return result;
 }
 

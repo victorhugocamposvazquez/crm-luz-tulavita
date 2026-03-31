@@ -6,9 +6,10 @@
  */
 
 import { createHash } from 'crypto';
+import { PDFParse } from 'pdf-parse';
 import type { InvoiceExtraction } from './types.js';
 import { emptyExtraction } from './types.js';
-import { extractWithLLM20TD, extractWithLLM30TD, extractWithLLMForceFull } from './llm-extract.js';
+import { extractWithLLM20TD, extractWithLLM20TDFromText, extractWithLLM30TD, extractWithLLMForceFull } from './llm-extract.js';
 
 const IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
@@ -22,6 +23,19 @@ const CACHE_TTL_MS = (() => {
 
 function fileHash(buffer: Buffer): string {
   return createHash('md5').update(buffer).digest('hex');
+}
+
+async function extractPdfText(buffer: Buffer): Promise<string | null> {
+  try {
+    const parser = new PDFParse({ data: buffer });
+    const result = await parser.getText();
+    await parser.destroy();
+    const text = result.text?.trim();
+    return text ? text : null;
+  } catch (err) {
+    console.warn('[pipeline] PDF text extraction failed:', err instanceof Error ? err.message : err);
+    return null;
+  }
 }
 
 /**
@@ -280,14 +294,17 @@ function validateExtraction(e: InvoiceExtraction): InvoiceExtraction {
  * Busca "3.0TD", "3.0A", "30TD" en el texto embebido del PDF.
  * Si no puede leer el texto (imagen), devuelve null y se usa el camino 3.0TD (más seguro).
  */
-function quickDetectTarifa(buffer: Buffer, mimeType: string): '2.0TD' | '3.0TD' | null {
-  if (mimeType !== 'application/pdf') return null;
+function quickDetectTarifa(text: string | null, buffer: Buffer, mimeType: string): '2.0TD' | '3.0TD' | null {
+  const haystack = text && text.trim() !== ''
+    ? text
+    : (mimeType === 'application/pdf' ? buffer.toString('latin1') : '');
 
-  const chunk = buffer.subarray(0, Math.min(buffer.length, 80_000)).toString('latin1');
-  const has30 = /3[\.\s]?0\s*TD/i.test(chunk) || /30TD/i.test(chunk) || /3[\.\s]?0\s*A/i.test(chunk);
+  if (!haystack) return null;
+
+  const has30 = /3[\.\s]?0\s*TD/i.test(haystack) || /30TD/i.test(haystack) || /3[\.\s]?0\s*A/i.test(haystack);
   if (has30) return '3.0TD';
 
-  const has20 = /2[\.\s]?0\s*TD/i.test(chunk) || /20TD/i.test(chunk) || /2[\.\s]?0\s*A/i.test(chunk);
+  const has20 = /2[\.\s]?0\s*TD/i.test(haystack) || /20TD/i.test(haystack) || /2[\.\s]?0\s*A/i.test(haystack);
   if (has20) return '2.0TD';
 
   return null;
@@ -322,14 +339,17 @@ export async function extractInvoiceFromBuffer(
     return cached.extraction;
   }
 
-  const detectedTarifa = quickDetectTarifa(buffer, mimeType);
+  const extractedPdfText = mimeType === 'application/pdf' ? await extractPdfText(buffer) : null;
+  const detectedTarifa = quickDetectTarifa(extractedPdfText, buffer, mimeType);
   console.log(`[pipeline] Tarifa pre-detectada: ${detectedTarifa ?? 'desconocida (usando 3.0TD)'}`);
 
   try {
     let validated: InvoiceExtraction;
 
     if (detectedTarifa === '2.0TD') {
-      const extraction = await extractWithLLM20TD(buffer, mimeType);
+      const extraction = extractedPdfText
+        ? await extractWithLLM20TDFromText(extractedPdfText)
+        : await extractWithLLM20TD(buffer, mimeType);
       validated = validateExtraction(extraction);
     } else {
       let extraction = await extractWithLLM30TD(buffer, mimeType);
