@@ -550,6 +550,7 @@ function ExtractionStep({
   const is30 = detectTarifaTipo(extraction) === '3.0TD';
   const implied = impliedTotalPerKwh(extraction);
   const suspiciousConsumo = suspicious30tdConsumption(extraction);
+  const canCalculate = hasMinData;
 
   return (
     <Card>
@@ -645,7 +646,7 @@ function ExtractionStep({
         <Separator />
         <div className="flex items-center justify-between pt-2">
           <Button variant="outline" onClick={onBack}><ArrowLeft className="h-4 w-4 mr-2" />Volver</Button>
-          <Button onClick={onCalculate} disabled={!hasMinData}>Calcular oferta<ArrowRight className="h-4 w-4 ml-2" /></Button>
+          <Button onClick={onCalculate} disabled={!canCalculate}>Calcular oferta<ArrowRight className="h-4 w-4 ml-2" /></Button>
         </div>
         {!hasMinData && <p className="text-xs text-destructive text-center">Se necesitan al menos consumo (kWh) y total factura (€) para calcular</p>}
       </CardContent>
@@ -1167,6 +1168,16 @@ export default function InvoiceSimulator() {
 
   const handleCalculate = useCallback(() => {
     if (!extraction) return;
+    if (suspicious30tdConsumption(extraction)) {
+      const implied = impliedTotalPerKwh(extraction);
+      toast({
+        title: 'Atención: consumo puede estar incompleto',
+        description: implied != null
+          ? `Total/consumo ≈ ${implied.toFixed(2)} €/kWh en 3.0TD; revisa si el total kWh cuadra con la factura.`
+          : 'En 3.0TD el consumo podría ser parcial; compara con la factura.',
+        variant: 'default',
+      });
+    }
     const tarifaTipo = detectTarifaTipo(extraction);
     const filtered = filterOffersByTarifa(offers, tarifaTipo);
     const { snapshot, offersWithCost } = buildComparison(extraction, filtered, taxConfig);

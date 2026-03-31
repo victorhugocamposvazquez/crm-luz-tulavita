@@ -18,8 +18,8 @@ const MODEL_FULL = 'gpt-4o';
 const CONFIDENCE_THRESHOLD = Number(process.env.INVOICE_LLM_CONFIDENCE_THRESHOLD ?? '0.7') || 0.7;
 const MAX_TOKENS = (() => {
   const raw = process.env.INVOICE_LLM_MAX_OUTPUT_TOKENS;
-  const n = raw != null && raw !== '' ? Number(raw) : 1400;
-  return Math.min(4096, Math.max(800, Number.isFinite(n) ? n : 1400));
+  const n = raw != null && raw !== '' ? Number(raw) : 2000;
+  return Math.min(4096, Math.max(800, Number.isFinite(n) ? n : 2000));
 })();
 
 const SYSTEM_PROMPT = `Eres un experto en facturas de energía eléctrica y gas en España. Tu trabajo es extraer datos estructurados de facturas.
@@ -295,6 +295,26 @@ export async function extractWithLLM(
   if (full.confidence >= fast.confidence) return full;
   console.log('[llm-extract] gpt-4o peor que mini, devolviendo mini');
   return fast;
+}
+
+/**
+ * Fuerza extracción con gpt-4o (modelo completo).
+ * Usado por el pipeline cuando gpt-4o-mini produce consumo sospechoso en 3.0TD.
+ */
+export async function extractWithLLMForceFull(
+  fileBuffer: Buffer,
+  mimeType: string
+): Promise<InvoiceExtraction> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    console.error('[llm-extract-force-full] OPENAI_API_KEY not set');
+    return emptyExtraction();
+  }
+  const t0 = Date.now();
+  const result = await callResponsesAPI(fileBuffer, mimeType, MODEL_FULL, apiKey);
+  result.confidence = computeConfidence(result);
+  console.log(`[llm-extract] gpt-4o forced retry in ${Date.now() - t0}ms (confidence: ${result.confidence.toFixed(2)})`);
+  return result;
 }
 
 /**

@@ -8,12 +8,12 @@
 import { createHash } from 'crypto';
 import type { InvoiceExtraction } from './types.js';
 import { emptyExtraction } from './types.js';
-import { extractWithLLM } from './llm-extract.js';
+import { extractWithLLM, extractWithLLMForceFull } from './llm-extract.js';
 
 const IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
-const PROMPT_VERSION = 'v12-consumo-multibloque-3td';
+const PROMPT_VERSION = 'v13-auto-retry-30td';
 const extractionCache = new Map<string, { extraction: InvoiceExtraction; ts: number; pv: string }>();
 const CACHE_TTL_MS = (() => {
   const n = Number(process.env.INVOICE_CACHE_TTL_MS ?? '');
@@ -274,11 +274,30 @@ export async function extractInvoiceFromBuffer(
   }
 
   try {
-    const extraction = await extractWithLLM(buffer, mimeType);
-    const validated = validateExtraction(extraction);
+    let extraction = await extractWithLLM(buffer, mimeType);
+    let validated = validateExtraction(extraction);
 
     if (!validated.consumption_kwh && !validated.total_factura) {
       console.warn('[pipeline] LLM returned no consumption and no total — possible non-energy document');
+    }
+
+    if (needs30TDRetry(validated)) {
+      console.log('[pipeline] 3.0TD consumo sospechoso — reintentando con gpt-4o forzado');
+      const retryExtraction = await extractWithLLMForceFull(buffer, mimeType);
+      const retryValidated = validateExtraction(retryExtraction);
+
+      if (!needs30TDRetry(retryValidated)) {
+        console.log('[pipeline] gpt-4o forzado resolvió el consumo incompleto');
+        validated = retryValidated;
+      } else if (
+        retryValidated.consumption_kwh != null && validated.consumption_kwh != null
+        && retryValidated.consumption_kwh > validated.consumption_kwh * 1.3
+      ) {
+        console.log(`[pipeline] gpt-4o forzado extrajo más consumo (${retryValidated.consumption_kwh} vs ${validated.consumption_kwh}), usando retry`);
+        validated = retryValidated;
+      } else {
+        console.log('[pipeline] gpt-4o forzado no mejoró; manteniendo original');
+      }
     }
 
     extractionCache.set(hash, { extraction: validated, ts: Date.now(), pv: PROMPT_VERSION });
@@ -287,4 +306,14 @@ export async function extractInvoiceFromBuffer(
     console.error('[pipeline] Extraction failed:', err instanceof Error ? err.message : err);
     return emptyExtraction();
   }
+}
+
+function needs30TDRetry(e: InvoiceExtraction): boolean {
+  if (e.consumption_kwh == null || e.consumption_kwh <= 0) return false;
+  if (e.total_factura == null || e.total_factura <= 0) return false;
+  const t = (e.tipo_tarifa ?? '').toUpperCase().replace(/\s+/g, '');
+  const is30 = t.includes('3.0') || t.includes('30TD') || t.includes('30A');
+  if (!is30) return false;
+  const implied = e.total_factura / e.consumption_kwh;
+  return implied > 0.47;
 }
