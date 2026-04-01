@@ -425,38 +425,35 @@ export default function AhorroLuz() {
         </div>
       </header>
 
-      {/* Contenido */}
-      <div className="flex-1 flex flex-col items-center px-4 sm:px-6 py-16 pt-28">
-        <div
-          key={currentQuestion.id}
-          onKeyDown={handleKeyDown}
-          className={cn(
-            'w-full max-w-xl animate-in duration-300',
-            direction === 'next' && 'fade-in slide-in-from-right-4',
-            direction === 'prev' && 'fade-in slide-in-from-left-4'
-          )}
-        >
-          {/* Indicador de paso - cuadrado con número; contacto: título centrado */}
+      {/* Contenido: centrado horizontal y vertical en el viewport (debajo del header fijo) */}
+      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
+        <div className="flex-1 flex flex-col items-center justify-center w-full px-4 sm:px-6 py-8 pt-[calc(env(safe-area-inset-top,0px)+6.75rem)] sm:pt-28 pb-10 min-h-[calc(100dvh-4.5rem)]">
           <div
+            key={currentQuestion.id}
+            onKeyDown={handleKeyDown}
             className={cn(
-              'flex mb-6',
-              currentQuestion.type === 'contact'
-                ? 'flex-col items-center gap-3 text-center'
-                : 'items-start gap-2'
+              'w-full max-w-xl mx-auto animate-in duration-300',
+              direction === 'next' && 'fade-in slide-in-from-right-4',
+              direction === 'prev' && 'fade-in slide-in-from-left-4'
             )}
           >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-white text-sm font-medium" style={{ backgroundColor: BRAND_COLOR }}>
+          {/* Indicador de paso + título siempre centrados */}
+          <div className="flex flex-col items-center gap-3 mb-6 text-center">
+            <span
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-white text-sm font-medium"
+              style={{ backgroundColor: BRAND_COLOR }}
+            >
               {currentStep}
             </span>
             {currentQuestion.type === 'contact' && 'header' in currentQuestion && currentQuestion.header ? (
               <h1
-                className="text-xl sm:text-2xl font-semibold leading-tight max-w-lg"
+                className="text-xl sm:text-2xl font-semibold leading-tight max-w-lg mx-auto"
                 style={{ color: BRAND_COLOR, textShadow: 'none' }}
               >
                 {currentQuestion.header}
               </h1>
             ) : currentQuestion.type !== 'contact' ? (
-              <h1 className="text-xl sm:text-2xl font-medium leading-tight" style={{ color: BRAND_COLOR }}>
+              <h1 className="text-xl sm:text-2xl font-medium leading-tight max-w-lg mx-auto" style={{ color: BRAND_COLOR }}>
                 {currentQuestion.label}
                 {currentQuestion.required !== false && (
                   <span className="text-red-500 ml-0.5">*</span>
@@ -467,17 +464,20 @@ export default function AhorroLuz() {
 
           {/* Descripción extra para paso 5 (tiene_factura) */}
           {currentQuestion.id === 'tiene_factura' && (
-            <div className="mb-6">
+            <div className="mb-6 text-center max-w-lg mx-auto">
               <p className="text-base text-gray-700">
                 Es la forma más <strong>rápida</strong> y <strong>exacta</strong> de calcular tu ahorro.*
               </p>
             </div>
           )}
 
-          {/* Respuesta */}
-          <div className={cn(
-            currentQuestion.type !== 'contact' && '[&_input]:text-lg [&_input]:h-12 [&_input]:rounded-xl [&_input]:border-2'
-          )}>
+          {/* Respuesta: contacto alineado a la izquierda; resto puede ir centrado en bloque */}
+          <div
+            className={cn(
+              currentQuestion.type === 'contact' ? 'text-left' : 'text-center',
+              currentQuestion.type !== 'contact' && '[&_input]:text-lg [&_input]:h-12 [&_input]:rounded-xl [&_input]:border-2'
+            )}
+          >
             <QuestionStep
               question={currentQuestion}
               value={answers[currentQuestion.id]}
@@ -498,76 +498,86 @@ export default function AhorroLuz() {
           </div>
 
           {validationError && (
-            <p className="mt-3 text-sm text-red-500">{validationError}</p>
+            <p className="mt-3 text-sm text-red-500 text-center">{validationError}</p>
           )}
           {submitError && (
-            <p className="mt-3 text-sm text-red-500">{submitError}</p>
+            <p className="mt-3 text-sm text-red-500 text-center">{submitError}</p>
           )}
 
-          {/* Navegación: flechas + botón Aceptar */}
-          <div className="mt-10 flex items-center justify-between gap-4">
-            <button
-              onClick={handlePrev}
-              disabled={isFirst || submitStatus === 'loading'}
-              className={cn(
-                'flex items-center gap-2 p-2 rounded-lg transition-colors',
-                isFirst || submitStatus === 'loading'
-                  ? 'text-gray-300 cursor-not-allowed'
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-[#26606b]'
-              )}
-              title="Atrás"
-            >
-              <ChevronLeft className="h-6 w-6" />
-              <span className="text-sm font-medium">Atrás</span>
-            </button>
+          {/* Navegación: Atrás | Aceptar (centro) | Siguiente */}
+          <div className="mt-10 grid grid-cols-3 items-center gap-2 w-full max-w-full">
+            <div className="flex justify-start min-w-0">
+              <button
+                type="button"
+                onClick={handlePrev}
+                disabled={isFirst || submitStatus === 'loading'}
+                className={cn(
+                  'flex items-center gap-1 sm:gap-2 p-2 rounded-lg transition-colors',
+                  isFirst || submitStatus === 'loading'
+                    ? 'text-gray-300 cursor-not-allowed'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-[#26606b]'
+                )}
+                title="Atrás"
+              >
+                <ChevronLeft className="h-6 w-6 shrink-0" />
+                <span className="text-sm font-medium hidden sm:inline">Atrás</span>
+              </button>
+            </div>
 
-            <button
-              onClick={() => {
-                if (currentQuestion?.type === 'file_upload' && !answers[currentQuestion.id]) {
-                  fileInputRef.current?.click();
-                } else {
-                  handleNext();
+            <div className="flex justify-center min-w-0">
+              <button
+                type="button"
+                onClick={() => {
+                  if (currentQuestion?.type === 'file_upload' && !answers[currentQuestion.id]) {
+                    fileInputRef.current?.click();
+                  } else {
+                    handleNext();
+                  }
+                }}
+                disabled={
+                  submitStatus === 'loading' ||
+                  (currentQuestion?.type !== 'file_upload' && !hasSelection)
                 }
-              }}
-              disabled={
-                submitStatus === 'loading' ||
-                (currentQuestion?.type !== 'file_upload' && !hasSelection)
-              }
-              className={cn(
-                'flex items-center justify-center gap-2 px-8 py-3 rounded-xl font-medium text-white transition-all',
-                'hover:opacity-90 disabled:opacity-70 disabled:cursor-not-allowed'
-              )}
-              style={{ backgroundColor: BRAND_COLOR }}
-            >
-              {submitStatus === 'loading' ? (
-                <>
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                  Enviando...
-                </>
-              ) : isLast ? (
-                'Enviar'
-              ) : currentQuestion?.type === 'file_upload' && !answers[currentQuestion.id] ? (
-                'Elegir archivo'
-              ) : (
-                'Aceptar'
-              )}
-            </button>
+                className={cn(
+                  'flex items-center justify-center gap-2 px-5 sm:px-8 py-3 rounded-xl font-medium text-white transition-all text-sm sm:text-base whitespace-nowrap',
+                  'hover:opacity-90 disabled:opacity-70 disabled:cursor-not-allowed max-w-full'
+                )}
+                style={{ backgroundColor: BRAND_COLOR }}
+              >
+                {submitStatus === 'loading' ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin shrink-0" />
+                    Enviando...
+                  </>
+                ) : isLast ? (
+                  'Enviar'
+                ) : currentQuestion?.type === 'file_upload' && !answers[currentQuestion.id] ? (
+                  'Elegir archivo'
+                ) : (
+                  'Aceptar'
+                )}
+              </button>
+            </div>
 
-            <button
-              onClick={handleNext}
-              disabled={isLast || submitStatus === 'loading' || !hasSelection}
-              className={cn(
-                'flex items-center gap-2 p-2 rounded-lg transition-colors',
-                isLast || submitStatus === 'loading' || !hasSelection
-                  ? 'text-gray-300 cursor-not-allowed'
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-[#26606b]'
-              )}
-              title="Siguiente"
-            >
-              <span className="text-sm font-medium">Siguiente</span>
-              <ChevronRight className="h-6 w-6" />
-            </button>
+            <div className="flex justify-end min-w-0">
+              <button
+                type="button"
+                onClick={handleNext}
+                disabled={isLast || submitStatus === 'loading' || !hasSelection}
+                className={cn(
+                  'flex items-center gap-1 sm:gap-2 p-2 rounded-lg transition-colors',
+                  isLast || submitStatus === 'loading' || !hasSelection
+                    ? 'text-gray-300 cursor-not-allowed'
+                    : 'text-gray-600 hover:bg-gray-100 hover:text-[#26606b]'
+                )}
+                title="Siguiente"
+              >
+                <span className="text-sm font-medium hidden sm:inline">Siguiente</span>
+                <ChevronRight className="h-6 w-6 shrink-0" />
+              </button>
+            </div>
           </div>
+        </div>
         </div>
       </div>
     </div>
