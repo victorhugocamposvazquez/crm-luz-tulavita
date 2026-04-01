@@ -168,6 +168,9 @@ function LandingFormSteps({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const heroFileConsumedKey = useRef<string | null>(null);
 
+  /** Factura ya elegida en el hero: se sube en segundo plano y se entra directo en contacto. */
+  const skipHeroFileStep = mode === 'upload' && initialFile != null;
+
   const uploadLeadAttachment = useCallback(
     async (file: File): Promise<{ name: string; path: string; pdf_text?: string }> => {
       let fileToUpload = file;
@@ -208,6 +211,7 @@ function LandingFormSteps({
 
   const {
     currentQuestion,
+    currentIndex,
     isFirst,
     isLast,
     answers,
@@ -226,7 +230,25 @@ function LandingFormSteps({
     leadEntryApiUrl: import.meta.env.VITE_LEAD_ENTRIES_API_URL ?? '/api/lead-entries',
     onSuccess: onLeadSuccess,
     extraCustomFields,
+    initialStepIndex: skipHeroFileStep ? 1 : 0,
   });
+
+  const heroAttachmentReady = useMemo(() => {
+    const adj = answers.adjuntar_factura;
+    return (
+      !!adj &&
+      typeof adj === 'object' &&
+      'path' in adj &&
+      typeof (adj as { path: unknown }).path === 'string' &&
+      (adj as { path: string }).path.length > 0
+    );
+  }, [answers.adjuntar_factura]);
+
+  const heroUploadStillPending = skipHeroFileStep && !heroAttachmentReady;
+
+  useEffect(() => {
+    if (heroAttachmentReady) setValidationError((e) => (e?.includes('subirse la factura') ? null : e));
+  }, [heroAttachmentReady]);
 
   const fileFingerprint = initialFile
     ? `${initialFile.name}-${initialFile.size}-${initialFile.lastModified}`
@@ -293,6 +315,10 @@ function LandingFormSteps({
         setValidationError(err);
         return;
       }
+      if (isLast && heroUploadStillPending) {
+        setValidationError('Espera un momento a que termine de subirse la factura.');
+        return;
+      }
       setValidationError(null);
       setDirection('next');
       if (isLast) {
@@ -306,20 +332,23 @@ function LandingFormSteps({
       } else goNext();
       setTimeout(scrollToTop, 100);
     },
-    [currentQuestion, answers, isLast, submit, goNext, scrollToTop, setAnswer],
+    [currentQuestion, answers, isLast, submit, goNext, scrollToTop, setAnswer, heroUploadStillPending],
   );
+
+  const backToHeroFromSkippedUpload =
+    skipHeroFileStep && currentIndex === 1 && questions[0]?.id === 'adjuntar_factura';
 
   const handlePrev = useCallback(() => {
     setValidationError(null);
     setDirection('prev');
-    if (isFirst) {
+    if (isFirst || backToHeroFromSkippedUpload) {
       onBackToHero();
       setTimeout(scrollToTop, 100);
       return;
     }
     goPrev();
     setTimeout(scrollToTop, 100);
-  }, [isFirst, goPrev, onBackToHero, scrollToTop]);
+  }, [isFirst, backToHeroFromSkippedUpload, goPrev, onBackToHero, scrollToTop]);
 
   const handleSelectAndAdvance = useCallback(
     (selectedValue: string) => {
@@ -440,10 +469,12 @@ function LandingFormSteps({
                       ? 'cursor-not-allowed text-neutral-300'
                       : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900'
                   )}
-                  title={isFirst ? 'Volver al inicio' : 'Atrás'}
+                  title={isFirst || backToHeroFromSkippedUpload ? 'Volver al inicio' : 'Atrás'}
                 >
                   <ChevronLeft className="h-6 w-6 shrink-0" />
-                  <span className="text-sm font-medium hidden sm:inline">{isFirst ? 'Inicio' : 'Atrás'}</span>
+                  <span className="text-sm font-medium hidden sm:inline">
+                    {isFirst || backToHeroFromSkippedUpload ? 'Inicio' : 'Atrás'}
+                  </span>
                 </button>
               </div>
 
@@ -459,6 +490,7 @@ function LandingFormSteps({
                   }}
                   disabled={
                     submitStatus === 'loading' ||
+                    heroUploadStillPending ||
                     (currentQuestion?.type !== 'file_upload' && !hasSelection)
                   }
                   className={cn(
@@ -470,6 +502,11 @@ function LandingFormSteps({
                     <>
                       <Loader2 className="h-5 w-5 shrink-0 animate-spin text-neutral-900" />
                       Enviando...
+                    </>
+                  ) : heroUploadStillPending && isLast ? (
+                    <>
+                      <Loader2 className="h-5 w-5 shrink-0 animate-spin text-neutral-900" />
+                      Subiendo factura…
                     </>
                   ) : isLast ? (
                     'Enviar'

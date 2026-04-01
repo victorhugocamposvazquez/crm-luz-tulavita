@@ -295,7 +295,7 @@ export function QuestionStep({
           {fileQ.description && (
             <p className="text-sm text-neutral-600 mb-2">{fileQ.description}</p>
           )}
-          <label className="flex flex-col items-center justify-center w-full min-h-[180px] border-2 border-dashed rounded-2xl cursor-pointer transition-colors bg-neutral-50/60 border-neutral-300 hover:border-neutral-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-[color:var(--form-accent)] focus-within:border-[color:var(--form-accent)] has-[:focus]:ring-2 has-[:focus]:ring-[color:var(--form-accent)] has-[:focus]:border-[color:var(--form-accent)]">
+          <label className="flex min-h-[180px] w-full cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-neutral-300 bg-neutral-50/60 transition-colors hover:border-neutral-400 focus-within:border-[color:var(--form-accent)] focus-within:ring-2 focus-within:ring-[color:var(--form-accent)] focus-within:ring-offset-2 has-[:focus]:border-[color:var(--form-accent)] has-[:focus]:ring-2 has-[:focus]:ring-[color:var(--form-accent)]">
             <input
               ref={fileInputRef}
               type="file"
@@ -305,12 +305,12 @@ export function QuestionStep({
               disabled={disabled || uploadLoading}
             />
             {uploadLoading ? (
-              <div className="flex flex-col items-center gap-3 py-8 px-4">
+              <div className="flex min-h-[180px] w-full flex-col items-center justify-center gap-3 px-4 py-6">
                 <div className="h-12 w-12 animate-spin rounded-full border-2 border-neutral-200 border-t-[color:var(--form-accent)]" />
                 <span className="text-sm text-neutral-600">Subiendo archivo...</span>
               </div>
             ) : hasFile ? (
-              <div className="flex flex-col items-center gap-3 py-8 px-4">
+              <div className="flex min-h-[180px] w-full flex-col items-center justify-center gap-2 px-4 py-6">
                 <span
                   className="flex h-12 w-12 items-center justify-center rounded-full"
                   style={{ backgroundColor: `${accent}1a`, color: accent }}
@@ -320,7 +320,10 @@ export function QuestionStep({
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 </span>
-                <p className="text-sm font-medium text-neutral-800 text-center break-all px-2">
+                <p
+                  className="max-w-full truncate px-2 text-center text-sm font-medium text-neutral-800"
+                  title={typeof fileName === 'string' ? fileName : undefined}
+                >
                   {fileName}
                 </p>
                 <p className="text-xs text-neutral-500">Archivo listo. Puedes cambiarlo si lo necesitas.</p>
@@ -339,8 +342,8 @@ export function QuestionStep({
                 </button>
               </div>
             ) : (
-              <div className="flex flex-col items-center gap-2 py-8 px-4">
-                <svg className="w-12 h-12 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="flex min-h-[180px] w-full flex-col items-center justify-center gap-2 px-4 py-6">
+                <svg className="h-12 w-12 text-neutral-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                 </svg>
                 <span className="text-sm text-neutral-600">Elige el archivo o arrastra aquí</span>

@@ -22,6 +22,8 @@ export interface UseFormStateOptions {
   onSuccess?: (lead: { id: string }, payload: LeadPayload) => void;
   /** Se mezclan en `custom_fields` del payload (p. ej. tracking del flujo de landing). */
   extraCustomFields?: Record<string, unknown>;
+  /** Paso inicial (p. ej. 1 para saltar la subida si el archivo ya vino del hero). */
+  initialStepIndex?: number;
 }
 
 export function useFormState({
@@ -35,9 +37,10 @@ export function useFormState({
   leadEntryApiUrl,
   onSuccess,
   extraCustomFields,
+  initialStepIndex = 0,
 }: UseFormStateOptions) {
   const [answers, setAnswers] = useState<FormAnswers>({});
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(() => initialStepIndex);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [submitError, setSubmitError] = useState<string | null>(null);
 
