@@ -10,6 +10,8 @@ import { EnergySavingsResult } from './EnergySavingsResult';
 import { cn } from '@/lib/utils';
 
 const BRAND = '#26606b';
+/** GIF celebración bajo el resultado (coloca el archivo en public/animatios/final.gif). */
+const RESULT_CELEBRATION_GIF = '/animatios/final.gif';
 
 export function EnergySavingsFlow({
   leadId,
@@ -44,7 +46,19 @@ export function EnergySavingsFlow({
   }, [leadId, attachmentPath, fixedResultLoaderMs, attachmentPdfText, run, reset]);
 
   if (status === 'processing') {
-    return <EnergySavingsLoader compact={compactLoader} />;
+    return (
+      <div className="space-y-8 w-full">
+        <h2
+          className="text-xl sm:text-2xl leading-snug px-2"
+          style={{ color: BRAND, textShadow: 'none' }}
+        >
+          <span className="font-light">Estamos analizando tu factura; en un momento verás </span>
+          <strong className="font-bold">cuánto puedes ahorrar</strong>
+          <span className="font-light"> en tu factura.</span>
+        </h2>
+        <EnergySavingsLoader compact={compactLoader} />
+      </div>
+    );
   }
 
   const handleManualSubmit = (e: React.FormEvent) => {
@@ -150,7 +164,7 @@ export function EnergySavingsFlow({
 
   if (comparison) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 flex flex-col items-center w-full">
         <EnergySavingsResult
           data={{
             status: comparison.status,
@@ -159,6 +173,15 @@ export function EnergySavingsFlow({
             current_monthly_cost: comparison.current_monthly_cost,
             prudent_mode: comparison.prudent_mode ?? false,
           }}
+        />
+        <img
+          src={RESULT_CELEBRATION_GIF}
+          alt=""
+          className="w-full max-w-xs sm:max-w-sm mx-auto rounded-lg object-contain"
+          width={400}
+          height={300}
+          loading="lazy"
+          decoding="async"
         />
         <p className="text-lg text-gray-600">
           Un asesor te contactará en las próximas horas para ayudarte a ahorrar en tu factura.

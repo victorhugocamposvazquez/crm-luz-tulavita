@@ -350,27 +350,22 @@ export default function AhorroLuz() {
             </div>
           )}
         </header>
-        <div className="flex-1 overflow-y-auto pt-24 pb-8 px-4 sm:px-6">
+        <div className="flex-1 overflow-y-auto min-h-0 flex flex-col">
           {showEnergyFlow ? (
-            <div className="w-full max-w-xl mx-auto space-y-6 animate-in fade-in duration-300 text-center">
-              <h2
-                className="text-xl sm:text-2xl leading-snug px-1"
-                style={{ color: BRAND_COLOR, textShadow: 'none' }}
-              >
-                <span className="font-light">Estamos analizando tu factura; en un momento verás </span>
-                <strong className="font-bold">cuánto puedes ahorrar</strong>
-                <span className="font-light"> en tu factura.</span>
-              </h2>
-              <EnergySavingsFlow
-                leadId={lastLeadId!}
-                attachmentPath={lastFacturaPath!}
-                onReset={handleReset}
-                compactLoader
-                fixedResultLoaderMs={LANDING_POST_SUBMIT_LOADER_MS}
-                attachmentPdfText={invoicePdfText}
-              />
+            <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-10 pt-[calc(env(safe-area-inset-top,0px)+7.25rem)] sm:pt-[7.75rem] pb-12 min-h-[calc(100dvh-5.5rem)]">
+              <div className="w-full max-w-xl mx-auto text-center animate-in fade-in duration-300 space-y-6">
+                <EnergySavingsFlow
+                  leadId={lastLeadId!}
+                  attachmentPath={lastFacturaPath!}
+                  onReset={handleReset}
+                  compactLoader
+                  fixedResultLoaderMs={LANDING_POST_SUBMIT_LOADER_MS}
+                  attachmentPdfText={invoicePdfText}
+                />
+              </div>
             </div>
           ) : (
+          <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-10 pt-[calc(env(safe-area-inset-top,0px)+6rem)] pb-12 min-h-[calc(100dvh-5.5rem)]">
           <div className="max-w-lg w-full mx-auto text-center animate-in fade-in duration-500 space-y-6">
             <h2 className="text-2xl sm:text-3xl font-semibold" style={{ color: BRAND_COLOR }}>
               ¡Gracias!
@@ -397,6 +392,7 @@ export default function AhorroLuz() {
                 </button>
               </>
             )}
+          </div>
           </div>
           )}
         </div>
