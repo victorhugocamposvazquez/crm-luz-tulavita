@@ -10,14 +10,59 @@ import { ChevronRight, Pencil, Phone, Upload } from 'lucide-react';
 /** Acento verde (referencia look claro tipo producto SaaS) */
 const ACCENT = '#22c55e';
 
-const PROVIDERS: { name: string; color: string }[] = [
-  { name: 'Endesa', color: '#0066cc' },
-  { name: 'Naturgy', color: '#e85d04' },
-  { name: 'Iberdrola', color: '#00a651' },
-  { name: 'Repsol', color: '#e30613' },
-  { name: 'Octopus', color: '#e91e8c' },
-  { name: 'Plenitude', color: '#1a365d' },
+/** Marcas como wordmarks en escala de grises (sustituible por <img> si hay logos en /public) */
+const PROVIDER_LOGOS: { name: string; className: string }[] = [
+  { name: 'Endesa', className: 'font-serif text-xl sm:text-2xl font-semibold tracking-tight' },
+  { name: 'Naturgy', className: 'text-lg sm:text-xl font-bold tracking-wide uppercase' },
+  { name: 'Iberdrola', className: 'text-lg sm:text-xl font-medium tracking-tighter' },
+  { name: 'Repsol', className: 'text-xl sm:text-2xl font-black italic' },
+  { name: 'Octopus', className: 'font-serif text-lg sm:text-xl font-normal' },
+  { name: 'Plenitude', className: 'text-base sm:text-lg font-semibold' },
+  { name: 'TotalEnergies', className: 'text-base sm:text-lg font-bold tracking-tight' },
+  { name: 'Holaluz', className: 'text-lg font-extrabold tracking-tight' },
+  { name: 'Lucera', className: 'font-serif text-lg italic' },
+  { name: 'Audax', className: 'text-lg font-bold uppercase tracking-widest' },
+  { name: 'Factor Energía', className: 'text-base sm:text-lg font-semibold' },
+  { name: 'CHC Energía', className: 'text-sm sm:text-base font-medium' },
 ];
+
+function ProviderLogoMarquee() {
+  const fadeMask = {
+    maskImage: 'linear-gradient(90deg, transparent 0%, black 10%, black 90%, transparent 100%)',
+    WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, black 10%, black 90%, transparent 100%)',
+  } as const;
+
+  const logoClass = (p: (typeof PROVIDER_LOGOS)[0]) =>
+    cn('select-none whitespace-nowrap text-neutral-500 [filter:grayscale(1)]', p.className);
+
+  const segment = (suffix: string) => (
+    <div className="flex w-max shrink-0 items-center gap-x-12 pr-12 sm:gap-x-16 sm:pr-16">
+      {PROVIDER_LOGOS.map((p) => (
+        <span key={`${p.name}-${suffix}`} className={logoClass(p)}>
+          {p.name}
+        </span>
+      ))}
+    </div>
+  );
+
+  return (
+    <>
+      <div className="hidden flex-wrap justify-center gap-x-10 gap-y-4 px-4 py-5 motion-reduce:flex sm:gap-x-14">
+        {PROVIDER_LOGOS.map((p) => (
+          <span key={p.name} className={logoClass(p)}>
+            {p.name}
+          </span>
+        ))}
+      </div>
+      <div className="motion-reduce:hidden w-full overflow-hidden py-5 sm:py-6" style={fadeMask}>
+        <div className="flex w-max animate-logo-marquee">
+          {segment('a')}
+          {segment('b')}
+        </div>
+      </div>
+    </>
+  );
+}
 
 export type AhorroLuzHeroProps = {
   onFileSelected: (file: File) => void;
@@ -59,16 +104,24 @@ export function AhorroLuzHero({
       />
 
       <header className="shrink-0 border-b border-neutral-200/80 bg-white">
-        <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-4 sm:px-6 sm:py-5">
-          <img src="/logo-tulavita.png" alt="Tulavita" className="h-10 w-10 sm:h-11 sm:w-11 object-contain" />
-          <span className="text-sm font-semibold tracking-tight text-neutral-900 sm:text-base">Tulavita Energía</span>
+        <div className="mx-auto flex w-full items-center justify-center gap-2.5 px-4 py-4 sm:gap-3 sm:px-6 sm:py-5">
+          <img
+            src="/logo-tulavita.png"
+            alt=""
+            className="h-10 w-10 shrink-0 object-contain sm:h-11 sm:w-11"
+            width={44}
+            height={44}
+          />
+          <span className="text-center text-sm font-semibold tracking-tight text-neutral-900 sm:text-base">
+            Tulavita Energía
+          </span>
         </div>
       </header>
 
-      <section className="relative flex flex-1 flex-col px-4 pb-12 pt-8 sm:px-6 sm:pb-16 sm:pt-12">
+      <section className="relative flex flex-1 flex-col px-4 pb-12 pt-5 sm:px-6 sm:pb-16 sm:pt-12">
         <div className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center text-center">
           <div
-            className="mb-6 inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-600 sm:mb-8 sm:text-xs"
+            className="mb-3 inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-600 sm:mb-8 sm:text-xs"
           >
             <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ACCENT }} aria-hidden />
             Ahorro en electricidad
@@ -145,7 +198,7 @@ export function AhorroLuzHero({
             </button>
           </div>
 
-          <div className="mt-12 grid w-full max-w-md grid-cols-3 gap-3 text-center sm:mt-16 sm:gap-4">
+          <div className="mt-3 grid w-full max-w-md grid-cols-3 gap-3 text-center sm:mt-16 sm:gap-4">
             <div className="min-w-0">
               <p className="text-xl font-bold tabular-nums text-neutral-950 sm:text-2xl">
                 <span style={{ color: ACCENT }}>340€</span>
@@ -165,25 +218,16 @@ export function AhorroLuzHero({
           </div>
         </div>
 
-        <div className="mx-auto mt-auto w-full max-w-2xl px-1 pt-10 sm:pt-14">
-          <div className="rounded-2xl border border-neutral-200 bg-white px-4 py-5 sm:rounded-3xl sm:px-6 sm:py-6">
-            <p className="mb-4 text-center text-[10px] font-semibold uppercase tracking-wider text-neutral-500 sm:text-[11px]">
-              Comparamos entre las principales comercializadoras
-            </p>
-            <div className="flex flex-wrap justify-center gap-2 sm:gap-2.5">
-              {PROVIDERS.map((p) => (
-                <span
-                  key={p.name}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-xs font-medium text-neutral-800"
-                >
-                  <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: p.color }} />
-                  {p.name}
-                </span>
-              ))}
-              <span className="inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium text-neutral-500">
-                +12 más
-              </span>
-            </div>
+        <div className="relative mt-auto w-full pt-10 sm:pt-14">
+          <p className="mb-1 px-4 text-center text-[10px] font-semibold uppercase tracking-wider text-neutral-500 sm:mb-2 sm:text-[11px]">
+            Comparamos entre las principales comercializadoras
+          </p>
+          <p className="sr-only">
+            Incluimos comparativa con numerosas comercializadoras, entre otras Endesa, Naturgy, Iberdrola, Repsol,
+            Octopus y Plenitude.
+          </p>
+          <div aria-hidden>
+            <ProviderLogoMarquee />
           </div>
         </div>
       </section>

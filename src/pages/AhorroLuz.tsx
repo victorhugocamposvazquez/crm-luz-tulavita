@@ -364,14 +364,17 @@ function LandingFormSteps({
   return (
     <div className="min-h-screen bg-white flex flex-col">
       <header className="fixed top-0 left-0 right-0 z-40 flex flex-col bg-white/80 backdrop-blur-sm border-b border-gray-200/50">
-        <div className="flex items-center justify-between px-4 py-3 pb-2 min-h-14 sm:min-h-16">
-          <div className="flex items-center justify-center min-w-[3rem] sm:min-w-[3.5rem]">
-            <img src="/logo-tulavita.png" alt="Tulavita" className="h-14 w-14 sm:h-16 sm:w-16 object-contain" />
-          </div>
-          <h1 className="absolute left-1/2 -translate-x-1/2 text-lg sm:text-xl font-semibold" style={{ color: BRAND_COLOR }}>
+        <div className="flex items-center justify-center gap-2 px-4 py-3 pb-2 min-h-14 sm:min-h-16 sm:gap-2.5">
+          <img
+            src="/logo-tulavita.png"
+            alt=""
+            className="h-10 w-10 shrink-0 object-contain sm:h-11 sm:w-11"
+            width={44}
+            height={44}
+          />
+          <h1 className="text-center text-base font-semibold sm:text-lg" style={{ color: BRAND_COLOR }}>
             Ahorra en tu factura
           </h1>
-          <div className="min-w-[3rem] sm:min-w-[3.5rem]" aria-hidden />
         </div>
         <div className="h-0.5 w-full bg-gray-200">
           <div
@@ -596,14 +599,17 @@ export default function AhorroLuz() {
     return (
       <div className="min-h-screen flex flex-col bg-white">
         <header className="fixed top-0 left-0 right-0 z-40 flex flex-col bg-white/80 backdrop-blur-sm border-b border-gray-200/50">
-          <div className="flex items-center justify-between px-4 pt-6 pb-3 sm:pt-7 sm:pb-4">
-            <div className="flex items-center justify-center min-w-[3rem] sm:min-w-[3.5rem]">
-              <img src="/logo-tulavita.png" alt="Tulavita" className="h-14 w-14 sm:h-16 sm:w-16 object-contain" />
-            </div>
-            <h1 className="absolute left-1/2 -translate-x-1/2 text-lg sm:text-xl font-semibold" style={{ color: BRAND_COLOR }}>
+          <div className="flex items-center justify-center gap-2 px-4 pt-6 pb-3 sm:gap-2.5 sm:pt-7 sm:pb-4">
+            <img
+              src="/logo-tulavita.png"
+              alt=""
+              className="h-10 w-10 shrink-0 object-contain sm:h-11 sm:w-11"
+              width={44}
+              height={44}
+            />
+            <h1 className="text-center text-base font-semibold sm:text-lg" style={{ color: BRAND_COLOR }}>
               Ahorra en tu factura
             </h1>
-            <div className="min-w-[3rem] sm:min-w-[3.5rem]" aria-hidden />
           </div>
           {showEnergyFlow && (
             <div className="h-0.5 w-full bg-gray-200">
