@@ -31,6 +31,7 @@ import {
 import { toast } from '@/hooks/use-toast';
 import imageCompression from 'browser-image-compression';
 import { InvoiceProcessingLoader } from '@/components/invoice/InvoiceProcessingLoader';
+import { ensurePdfWorker, extractPdfTextFromFile } from '@/lib/pdf-text-client';
 import {
   Upload,
   FileText,
@@ -348,15 +349,6 @@ function buildComparison(
   };
 }
 
-let pdfjsWorkerReady = false;
-async function ensurePdfWorker() {
-  if (pdfjsWorkerReady) return;
-  const pdfjsLib = await import('pdfjs-dist');
-  const workerModule = await import('pdfjs-dist/build/pdf.worker.min.mjs?url');
-  pdfjsLib.GlobalWorkerOptions.workerSrc = workerModule.default;
-  pdfjsWorkerReady = true;
-}
-
 async function generateThumbnail(file: File): Promise<string | null> {
   try {
     if (file.type === 'application/pdf') {
@@ -390,33 +382,6 @@ async function generateThumbnail(file: File): Promise<string | null> {
     });
   } catch (err) {
     console.warn('Thumbnail generation failed:', err);
-    return null;
-  }
-}
-
-async function extractPdfTextForUpload(file: File): Promise<string | null> {
-  if (file.type !== 'application/pdf') return null;
-
-  try {
-    await ensurePdfWorker();
-    const pdfjsLib = await import('pdfjs-dist');
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(arrayBuffer) }).promise;
-    const pages: string[] = [];
-
-    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-      const page = await pdf.getPage(pageNumber);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .map((item) => ('str' in item ? item.str : ''))
-        .join(' ')
-        .trim();
-      if (pageText) pages.push(pageText);
-    }
-
-    return pages.join('\n').trim() || null;
-  } catch (err) {
-    console.warn('Client PDF text extraction failed:', err);
     return null;
   }
 }
@@ -525,7 +490,7 @@ function UploadStep({
     try {
       const [uploadFile, pdfText] = await Promise.all([
         prepareUploadFile(file),
-        extractPdfTextForUpload(file),
+        extractPdfTextFromFile(file),
       ]);
 
       void generateThumbnail(file)

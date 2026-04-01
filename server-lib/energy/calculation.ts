@@ -5,6 +5,8 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { InvoiceExtraction } from '../invoice/types.js';
+import type { InvoiceEstimateTaxConfig } from './invoice-estimate-taxes.js';
+import { estimateSpanishBillTotal } from './invoice-estimate-taxes.js';
 
 export interface EnergyOffer {
   id: string;
@@ -125,9 +127,13 @@ export function getComparisonFailureReason(
  * Usa potencia real de la factura (potencia_contratada_kw o media de P1/P2)
  * en vez de asumir un valor por defecto.
  */
+/**
+ * @param taxConfig Coeficientes IE/IVA/cargos (misma capa que columna «≈ Factura» del simulador).
+ */
 export function runComparison(
   extraction: InvoiceExtraction,
-  offers: EnergyOffer[]
+  offers: EnergyOffer[],
+  taxConfig: InvoiceEstimateTaxConfig,
 ): ComparisonResult | null {
   const consumption = extraction.consumption_kwh;
   const totalFactura = extraction.total_factura;
@@ -144,6 +150,9 @@ export function runComparison(
   const powerDaysPerBillMonth = billDays != null && billDays >= 28
     ? billDays / periodMonths
     : FALLBACK_POWER_DAYS_PER_MONTH;
+  /** Días de factura para cargos fijos en `estimateSpanishBillTotal` (como InvoiceSimulator). */
+  const taxBillingDays =
+    billDays != null && billDays >= 28 && billDays <= 370 ? billDays : FALLBACK_POWER_DAYS_PER_MONTH;
 
   const extractedPower = extraction.potencia_contratada_kw
     ?? (extraction.potencia_p1_kw != null && extraction.potencia_p2_kw != null
@@ -168,7 +177,9 @@ export function runComparison(
     }
   }
 
-  const savingsAmount = currentMonthlyCost - bestCost;
+  /** Ahorro frente al total factura actual vs mejor oferta con IE+IVA+cargos (alineado con simulador CRM). */
+  const bestApproxBill = estimateSpanishBillTotal(bestCost, taxBillingDays, taxConfig);
+  const savingsAmount = currentMonthlyCost - bestApproxBill;
   const savingsPercent = currentMonthlyCost > 0 ? (savingsAmount / currentMonthlyCost) * 100 : 0;
 
   if (savingsPercent < 0) return null;

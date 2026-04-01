@@ -9,6 +9,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import { extractInvoiceFromBuffer } from '../server-lib/invoice/pipeline.js';
 import { getActiveOffers, runComparison, getComparisonFailureReason } from '../server-lib/energy/calculation.js';
+import { fetchInvoiceEstimateTaxConfig } from '../server-lib/energy/invoice-estimate-taxes.js';
 import { validateAttachmentPath } from '../server-lib/invoice/validate-path.js';
 import {
   getAttachmentAnalysisCache,
@@ -20,6 +21,14 @@ import {
 const BUCKET = 'lead-attachments';
 const TIMEOUT_MS = 55000;
 const RATE_LIMIT_WINDOW_HOURS = 1;
+const MAX_PDF_TEXT_BODY_CHARS = 400_000;
+
+function normalizeClientPdfText(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const t = raw.trim();
+  if (!t) return null;
+  return t.length > MAX_PDF_TEXT_BODY_CHARS ? t.slice(0, MAX_PDF_TEXT_BODY_CHARS) : t;
+}
 
 const PLACEHOLDER_ID = '00000000-0000-4000-8000-000000000001';
 const PLACEHOLDER_LEAD_ID = '00000000-0000-4000-8000-000000000002';
@@ -99,7 +108,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   const supabase = createClient(supabaseUrl, supabaseKey);
 
-  let body: { attachment_path?: string };
+  let body: { attachment_path?: string; pdf_text?: unknown };
   try {
     body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body as Record<string, unknown>) ?? {};
   } catch {
@@ -109,6 +118,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   const attachment_path = body.attachment_path;
+  const clientPdfText = normalizeClientPdfText(body.pdf_text);
   if (!attachment_path || typeof attachment_path !== 'string') {
     cors();
     res.status(400).json({ error: 'attachment_path es obligatorio', code: 'VALIDATION_ERROR' });
@@ -167,9 +177,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const buffer = Buffer.from(await fileData.arrayBuffer());
       const mimeType = fileData.type || (attachment_path.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
 
-      const extraction = await extractInvoiceFromBuffer(buffer, mimeType);
-      const offers = await getActiveOffers(supabase);
-      const result = runComparison(extraction, offers);
+      const extraction = await extractInvoiceFromBuffer(
+        buffer,
+        mimeType,
+        mimeType === 'application/pdf' && clientPdfText ? { pdfText: clientPdfText } : undefined,
+      );
+      const [offers, taxConfig] = await Promise.all([
+        getActiveOffers(supabase),
+        fetchInvoiceEstimateTaxConfig(supabase),
+      ]);
+      const result = runComparison(extraction, offers, taxConfig);
 
       const row = {
         raw_text: extraction.raw_text != null ? extraction.raw_text.slice(0, 10000) : null,

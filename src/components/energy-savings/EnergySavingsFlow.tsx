@@ -3,9 +3,8 @@
  * Si la extracción automática falla, se muestra un formulario para introducir consumo y total (plan B).
  */
 
-import { useEffect, useMemo, useState } from 'react';
-import { Loader2 } from 'lucide-react';
-import { useEnergyComparison, type EnergyComparisonResult } from '@/hooks/useEnergyComparison';
+import { useEffect, useState } from 'react';
+import { useEnergyComparison } from '@/hooks/useEnergyComparison';
 import { EnergySavingsLoader } from './EnergySavingsLoader';
 import { EnergySavingsResult } from './EnergySavingsResult';
 import { cn } from '@/lib/utils';
@@ -18,29 +17,19 @@ export function EnergySavingsFlow({
   onReset,
   compactLoader = false,
   fixedResultLoaderMs,
-  prefetchedComparison,
-  prefetchedAttachmentPath,
+  attachmentPdfText,
 }: {
   leadId: string;
   attachmentPath: string;
   onReset?: () => void;
   /** Loader más compacto y rápido (p. ej. debajo del paso de contacto en la landing). */
   compactLoader?: boolean;
-  /** Tiempo mínimo mostrando el loader antes del resultado (landing con prefetch). */
+  /** Tiempo mínimo mostrando el loader antes del resultado. */
   fixedResultLoaderMs?: number;
-  /** Resultado de /api/preview-invoice (misma ruta que attachmentPath). */
-  prefetchedComparison?: EnergyComparisonResult | null;
-  prefetchedAttachmentPath?: string;
+  /** Texto del PDF extraído en cliente al subir (acelera extracción en servidor). */
+  attachmentPdfText?: string | null;
 }) {
   const { status, comparison, error, run, runWithManual, reset } = useEnergyComparison();
-  const warmPrefetch = useMemo(() => {
-    const pathOk = (prefetchedAttachmentPath ?? attachmentPath) === attachmentPath;
-    return (
-      pathOk &&
-      prefetchedComparison != null &&
-      prefetchedComparison.status === 'completed'
-    );
-  }, [attachmentPath, prefetchedAttachmentPath, prefetchedComparison]);
   const [manualConsumption, setManualConsumption] = useState('');
   const [manualTotal, setManualTotal] = useState('');
   const [manualPeriod, setManualPeriod] = useState<number>(1);
@@ -49,36 +38,12 @@ export function EnergySavingsFlow({
   useEffect(() => {
     run(leadId, attachmentPath, {
       minLoaderMs: fixedResultLoaderMs ?? 0,
-      prefetchedFallback: prefetchedComparison ?? null,
-      prefetchAttachmentPath: prefetchedAttachmentPath ?? attachmentPath,
+      attachmentPdfText: attachmentPdfText ?? null,
     });
     return () => reset();
-  }, [
-    leadId,
-    attachmentPath,
-    fixedResultLoaderMs,
-    prefetchedComparison,
-    prefetchedAttachmentPath,
-    run,
-    reset,
-  ]);
+  }, [leadId, attachmentPath, fixedResultLoaderMs, attachmentPdfText, run, reset]);
 
   if (status === 'processing') {
-    if (warmPrefetch) {
-      return (
-        <div
-          className="flex flex-col items-center justify-center py-8 px-4 text-center space-y-2"
-          role="status"
-          aria-live="polite"
-        >
-          <Loader2 className="h-8 w-8 animate-spin text-[#26606b]" aria-hidden />
-          <p className="text-base font-medium text-slate-900">Ya hemos analizado tu factura</p>
-          <p className="text-sm text-slate-600 max-w-sm">
-            Solo guardamos el resultado en tu solicitud; en breve lo verás aquí.
-          </p>
-        </div>
-      );
-    }
     return <EnergySavingsLoader compact={compactLoader} />;
   }
 

@@ -11,57 +11,19 @@ import { QuestionStep, validateQuestion } from '@/components/landing-form';
 import type { FormConfig } from '@/components/landing-form';
 import { useMetaAttribution } from '@/hooks/useMetaAttribution';
 import { EnergySavingsFlow } from '@/components/energy-savings/EnergySavingsFlow';
-import type { EnergyComparisonResult } from '@/hooks/useEnergyComparison';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
+import { extractPdfTextFromFile } from '@/lib/pdf-text-client';
 
 const BRAND_COLOR = '#26606b';
+/** Tamaño máximo del texto PDF enviado en JSON a process-invoice. */
+const MAX_PDF_TEXT_CHARS = 350_000;
 const LEAD_ATTACHMENTS_BUCKET = 'lead-attachments';
-const PREVIEW_INVOICE_API = import.meta.env.VITE_PREVIEW_INVOICE_API_URL ?? '/api/preview-invoice';
-/** Solo tras un momento en contacto con intención (evita preview en abandonos tras subir archivo). */
-const PREFETCH_CONTACT_DEBOUNCE_MS = 650;
-
-/** Email mínimo creíble o teléfono con dígitos suficientes antes de gastar extracción. */
-function hasContactPrefetchIntent(contact: Record<string, string>): boolean {
-  const email = (contact.email ?? '').trim();
-  const phone = (contact.phone ?? contact.telefono ?? '').replace(/\D/g, '');
-  const emailOk = email.length > 5 && email.includes('@') && /\.[^@]+/.test(email);
-  const phoneOk = phone.length >= 6;
-  return emailOk || phoneOk;
-}
-/**
- * Loader mínimo tras enviar si el prefetch aún no dejó una comparación lista.
- * Si el análisis ya vino en preview + caché, forzar 3 s aquí anula por completo la ganancia de tiempo.
- */
-const LANDING_POST_SUBMIT_LOADER_MS = 3000;
-/** Con prefetch listo, el persist suele ser rápido; casi sin espera artificial. */
-const LANDING_POST_SUBMIT_LOADER_WARM_MS = 0;
-
-function headlineSavingsPercentFromComparison(
-  c: EnergyComparisonResult | null | undefined,
-): number | null {
-  if (!c || c.status !== 'completed') return null;
-  const p = c.estimated_savings_percentage;
-  if (p != null && Number.isFinite(p) && p > 0) {
-    return Math.floor(p);
-  }
-  const cur = c.current_monthly_cost;
-  const sav = c.estimated_savings_amount;
-  if (
-    cur != null &&
-    sav != null &&
-    Number.isFinite(cur) &&
-    Number.isFinite(sav) &&
-    cur > 0
-  ) {
-    const derived = Math.floor((sav / cur) * 100);
-    return derived > 0 ? derived : null;
-  }
-  return null;
-}
+/** Loader mínimo tras enviar (un solo `process-invoice` con pdf_text suele ser bastante rápido). */
+const LANDING_POST_SUBMIT_LOADER_MS = 2000;
 
 /** Comprimimos imágenes antes de subirlas para mantener uploads ligeros. */
 const IMAGE_COMPRESSION_OPTIONS = {
@@ -160,10 +122,6 @@ export default function AhorroLuz() {
   const [direction, setDirection] = useState<'next' | 'prev'>('next');
   const [lastLeadId, setLastLeadId] = useState<string | null>(null);
   const [lastFacturaPath, setLastFacturaPath] = useState<string | null>(null);
-  const [invoicePrefetch, setInvoicePrefetch] = useState<{
-    path: string;
-    comparison: EnergyComparisonResult | null;
-  } | null>(null);
   const autoAdvanceTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const contactValuesRef = useRef<Record<string, string>>({});
   const formContainerRef = useRef<HTMLDivElement | null>(null);
@@ -204,110 +162,59 @@ export default function AhorroLuz() {
     },
   });
 
-  const attachmentStoragePath = useMemo(() => {
+  /** Texto PDF del cliente (misma vía que el simulador CRM); acelera extracción en servidor. */
+  const invoicePdfText = useMemo(() => {
     const adj = answers.adjuntar_factura;
     if (
       adj &&
       typeof adj === 'object' &&
       adj !== null &&
-      'path' in adj &&
-      typeof (adj as { path: unknown }).path === 'string'
+      'pdf_text' in adj &&
+      typeof (adj as { pdf_text: unknown }).pdf_text === 'string'
     ) {
-      return (adj as { path: string }).path.trim() || null;
+      const t = (adj as { pdf_text: string }).pdf_text.trim();
+      return t.length > 0 ? t : null;
     }
     return null;
   }, [answers.adjuntar_factura]);
 
-  /**
-   * Prefetch solo en paso contacto (1) y si hay señal de intención: email creíble o teléfono con bastantes dígitos (2).
-   * Debounce: no dispara en el mismo instante de entrar en contacto ni en cada tecla.
-   */
-  const contactEmail = answers.contacto && typeof answers.contacto === 'object' && answers.contacto !== null
-    ? String((answers.contacto as Record<string, string>).email ?? '')
-    : '';
-  const contactPhone = answers.contacto && typeof answers.contacto === 'object' && answers.contacto !== null
-    ? String((answers.contacto as Record<string, string>).phone ?? (answers.contacto as Record<string, string>).telefono ?? '')
-    : '';
-
-  useEffect(() => {
-    if (!attachmentStoragePath || submitStatus === 'success') {
-      return;
-    }
-    if (currentQuestion?.id !== 'contacto') {
-      return;
-    }
-
-    const fromState =
-      answers.contacto && typeof answers.contacto === 'object' && answers.contacto !== null
-        ? (answers.contacto as Record<string, string>)
-        : {};
-    const merged: Record<string, string> = { ...contactValuesRef.current, ...fromState };
-    if (!hasContactPrefetchIntent(merged)) {
-      return;
-    }
-
-    let cancelled = false;
-    const debounceId = window.setTimeout(() => {
-      if (cancelled) return;
-
-      setInvoicePrefetch((prev) =>
-        prev?.path === attachmentStoragePath
-          ? prev
-          : { path: attachmentStoragePath, comparison: null },
-      );
-
-      fetch(PREVIEW_INVOICE_API, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ attachment_path: attachmentStoragePath }),
-      })
-        .then((res) => res.json())
-        .then((data: { success?: boolean; comparison?: EnergyComparisonResult }) => {
-          if (cancelled) return;
-          if (data.success && data.comparison) {
-            setInvoicePrefetch({
-              path: attachmentStoragePath,
-              comparison: data.comparison,
-            });
-          } else {
-            setInvoicePrefetch({
-              path: attachmentStoragePath,
-              comparison: null,
-            });
-          }
-        })
-        .catch(() => {
-          if (cancelled) return;
-          setInvoicePrefetch({
-            path: attachmentStoragePath,
-            comparison: null,
-          });
-        });
-    }, PREFETCH_CONTACT_DEBOUNCE_MS);
-
-    return () => {
-      cancelled = true;
-      window.clearTimeout(debounceId);
-    };
-  }, [attachmentStoragePath, submitStatus, currentQuestion?.id, contactEmail, contactPhone]);
-
-  const uploadLeadAttachment = useCallback(async (file: File): Promise<{ name: string; path: string }> => {
-    let fileToUpload = file;
-    if (file.type.startsWith('image/')) {
-      try {
-        fileToUpload = await imageCompression(file, IMAGE_COMPRESSION_OPTIONS);
-      } catch (e) {
-        console.warn('Compresión de imagen fallida, se sube original:', e);
+  const uploadLeadAttachment = useCallback(
+    async (file: File): Promise<{ name: string; path: string; pdf_text?: string }> => {
+      let fileToUpload = file;
+      if (file.type.startsWith('image/')) {
+        try {
+          fileToUpload = await imageCompression(file, IMAGE_COMPRESSION_OPTIONS);
+        } catch (e) {
+          console.warn('Compresión de imagen fallida, se sube original:', e);
+        }
       }
-    }
-    const path = `${crypto.randomUUID()}/${fileToUpload.name}`;
-    const { error } = await supabase.storage.from(LEAD_ATTACHMENTS_BUCKET).upload(path, fileToUpload, { upsert: false });
-    if (error) {
-      toast({ title: 'Error al subir el archivo', description: error.message, variant: 'destructive' });
-      throw error;
-    }
-    return { name: file.name, path };
-  }, []);
+
+      const [rawPdfText, uploadPath] = await Promise.all([
+        extractPdfTextFromFile(file),
+        (async () => {
+          const p = `${crypto.randomUUID()}/${fileToUpload.name}`;
+          const { error } = await supabase.storage
+            .from(LEAD_ATTACHMENTS_BUCKET)
+            .upload(p, fileToUpload, { upsert: false });
+          if (error) {
+            toast({ title: 'Error al subir el archivo', description: error.message, variant: 'destructive' });
+            throw error;
+          }
+          return p;
+        })(),
+      ]);
+
+      const pdfText =
+        rawPdfText && rawPdfText.length > 0
+          ? rawPdfText.length > MAX_PDF_TEXT_CHARS
+            ? rawPdfText.slice(0, MAX_PDF_TEXT_CHARS)
+            : rawPdfText
+          : undefined;
+
+      return { name: file.name, path: uploadPath, ...(pdfText ? { pdf_text: pdfText } : {}) };
+    },
+    [],
+  );
 
   /** El botón Siguiente/Aceptar solo está activo si hay una opción (o respuesta) seleccionada */
   const hasSelection = useMemo(() => {
@@ -419,18 +326,12 @@ export default function AhorroLuz() {
   const handleReset = useCallback(() => {
     setLastLeadId(null);
     setLastFacturaPath(null);
-    setInvoicePrefetch(null);
     reset();
   }, [reset]);
 
   if (submitStatus === 'success') {
     const sinFactura = answers.tiene_factura === 'no';
     const showEnergyFlow = !sinFactura && lastLeadId && lastFacturaPath;
-    const prefetchMatch = invoicePrefetch?.path === lastFacturaPath ? invoicePrefetch.comparison : null;
-    const headlinePct = headlineSavingsPercentFromComparison(prefetchMatch);
-    const prefetchWarm =
-      invoicePrefetch?.path === lastFacturaPath &&
-      invoicePrefetch.comparison?.status === 'completed';
     return (
       <div className="min-h-screen flex flex-col bg-white">
         <header className="fixed top-0 left-0 right-0 z-40 flex flex-col bg-white/80 backdrop-blur-sm border-b border-gray-200/50">
@@ -456,32 +357,17 @@ export default function AhorroLuz() {
                 className="text-xl sm:text-2xl leading-snug px-1"
                 style={{ color: BRAND_COLOR, textShadow: 'none' }}
               >
-                {headlinePct != null ? (
-                  <>
-                    <span className="font-light">Según tu factura, </span>
-                    <strong className="font-bold">ahorra hasta un {headlinePct}%</strong>
-                    <span className="font-light"> con una tarifa mejor ajustada.</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="font-light">Estamos terminando el análisis; en un momento verás </span>
-                    <strong className="font-bold">cuánto puedes ahorrar</strong>
-                    <span className="font-light"> en tu factura.</span>
-                  </>
-                )}
+                <span className="font-light">Estamos analizando tu factura; en un momento verás </span>
+                <strong className="font-bold">cuánto puedes ahorrar</strong>
+                <span className="font-light"> en tu factura.</span>
               </h2>
               <EnergySavingsFlow
                 leadId={lastLeadId!}
                 attachmentPath={lastFacturaPath!}
                 onReset={handleReset}
                 compactLoader
-                fixedResultLoaderMs={
-                  prefetchWarm ? LANDING_POST_SUBMIT_LOADER_WARM_MS : LANDING_POST_SUBMIT_LOADER_MS
-                }
-                prefetchedComparison={
-                  invoicePrefetch?.path === lastFacturaPath ? invoicePrefetch.comparison : null
-                }
-                prefetchedAttachmentPath={lastFacturaPath ?? undefined}
+                fixedResultLoaderMs={LANDING_POST_SUBMIT_LOADER_MS}
+                attachmentPdfText={invoicePdfText}
               />
             </div>
           ) : (

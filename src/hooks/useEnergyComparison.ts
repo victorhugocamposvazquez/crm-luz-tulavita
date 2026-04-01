@@ -1,6 +1,6 @@
 /**
  * Procesa factura y obtiene comparación de ahorro (polling hasta completed/failed).
- * Opcional: minLoaderMs (loader mínimo) y fallback desde prefetch si falla el persist.
+ * Opcional: minLoaderMs, pdf_text del cliente para acelerar extracción en servidor.
  */
 
 import { useState, useCallback, useRef } from 'react';
@@ -33,11 +33,10 @@ export interface ManualExtractionInput {
 }
 
 export interface RunEnergyComparisonOptions {
-  /** Tiempo mínimo en pantalla de “procesando” antes de mostrar resultado (p. ej. 3000 en landing). */
+  /** Tiempo mínimo en pantalla de “procesando” antes de mostrar resultado. */
   minLoaderMs?: number;
-  /** Resultado del prefetch (/api/preview-invoice); solo se usa si coincide prefetchAttachmentPath. */
-  prefetchedFallback?: EnergyComparisonResult | null;
-  prefetchAttachmentPath?: string;
+  /** Texto PDF extraído en cliente (misma vía que el simulador del backoffice). */
+  attachmentPdfText?: string | null;
 }
 
 export function useEnergyComparison() {
@@ -60,10 +59,10 @@ export function useEnergyComparison() {
     options?: RunEnergyComparisonOptions,
   ) => {
     const minLoaderMs = options?.minLoaderMs ?? DEFAULT_MIN_LOADER_MS;
-    const prefetchedFallback = options?.prefetchedFallback ?? null;
-    const prefetchPathOk =
-      !!options?.prefetchAttachmentPath &&
-      options.prefetchAttachmentPath === attachmentPath;
+    const pdfText =
+      typeof options?.attachmentPdfText === 'string' && options.attachmentPdfText.trim() !== ''
+        ? options.attachmentPdfText.trim()
+        : undefined;
 
     const startedAt = Date.now();
     clearPendingTimer();
@@ -93,7 +92,11 @@ export function useEnergyComparison() {
       const processRes = await fetch(PROCESS_API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lead_id: leadId, attachment_path: attachmentPath }),
+        body: JSON.stringify({
+          lead_id: leadId,
+          attachment_path: attachmentPath,
+          ...(pdfText ? { pdf_text: pdfText } : {}),
+        }),
       });
       const processData = await processRes.json().catch(() => ({}));
 
@@ -102,15 +105,7 @@ export function useEnergyComparison() {
           processRes.status === 429
             ? 'Demasiadas solicitudes. Por favor, espera un poco e inténtalo de nuevo.'
             : processData.error || 'Error al procesar la factura';
-        if (
-          prefetchedFallback &&
-          prefetchedFallback.status === 'completed' &&
-          prefetchPathOk
-        ) {
-          scheduleFinish('completed', prefetchedFallback, null);
-        } else {
-          scheduleFinish('failed', null, msg);
-        }
+        scheduleFinish('failed', null, msg);
         return;
       }
 
@@ -121,15 +116,7 @@ export function useEnergyComparison() {
       if (processData.comparison?.status === 'failed') {
         const failMsg =
           processData.comparison?.error_message || 'No se pudo calcular el ahorro';
-        if (
-          prefetchedFallback &&
-          prefetchedFallback.status === 'completed' &&
-          prefetchPathOk
-        ) {
-          scheduleFinish('completed', prefetchedFallback, null);
-        } else {
-          scheduleFinish('failed', null, failMsg);
-        }
+        scheduleFinish('failed', null, failMsg);
         return;
       }
 
@@ -145,41 +132,17 @@ export function useEnergyComparison() {
         }
         if (getData?.status === 'failed') {
           const failMsg = getData?.error_message || 'No se pudo calcular el ahorro';
-          if (
-            prefetchedFallback &&
-            prefetchedFallback.status === 'completed' &&
-            prefetchPathOk
-          ) {
-            scheduleFinish('completed', prefetchedFallback, null);
-          } else {
-            scheduleFinish('failed', null, failMsg);
-          }
+          scheduleFinish('failed', null, failMsg);
           return;
         }
         attempts++;
       }
 
       if (abortRef.current) return;
-      if (
-        prefetchedFallback &&
-        prefetchedFallback.status === 'completed' &&
-        prefetchPathOk
-      ) {
-        scheduleFinish('completed', prefetchedFallback, null);
-      } else {
-        scheduleFinish('failed', null, 'Tiempo de espera agotado. Un asesor te contactará.');
-      }
+      scheduleFinish('failed', null, 'Tiempo de espera agotado. Un asesor te contactará.');
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Error de conexión';
-      if (
-        prefetchedFallback &&
-        prefetchedFallback.status === 'completed' &&
-        prefetchPathOk
-      ) {
-        scheduleFinish('completed', prefetchedFallback, null);
-      } else {
-        scheduleFinish('failed', null, msg);
-      }
+      scheduleFinish('failed', null, msg);
     }
   }, []);
 

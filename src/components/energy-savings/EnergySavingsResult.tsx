@@ -12,9 +12,10 @@ export interface EnergyComparisonData {
   prudent_mode?: boolean;
 }
 
-function roundDownPercent(value: number | null): number {
+/** Un decimal, alineado con el simulador / `energy_comparisons.estimated_savings_percentage`. */
+function roundPercentOneDecimal(value: number | null | undefined): number {
   if (value == null || !Number.isFinite(value)) return 0;
-  return Math.floor(value);
+  return Math.round(value * 10) / 10;
 }
 
 function resolveSavingsPercent(data: EnergyComparisonData): number {
@@ -23,7 +24,7 @@ function resolveSavingsPercent(data: EnergyComparisonData): number {
     Number.isFinite(data.estimated_savings_percentage) &&
     data.estimated_savings_percentage > 0
   ) {
-    return roundDownPercent(data.estimated_savings_percentage);
+    return roundPercentOneDecimal(data.estimated_savings_percentage);
   }
 
   const currentMonthlyCost = data.current_monthly_cost;
@@ -35,10 +36,15 @@ function resolveSavingsPercent(data: EnergyComparisonData): number {
     Number.isFinite(savingsAmount) &&
     currentMonthlyCost > 0
   ) {
-    return Math.max(0, Math.floor((savingsAmount / currentMonthlyCost) * 100));
+    return Math.max(0, roundPercentOneDecimal((savingsAmount / currentMonthlyCost) * 100));
   }
 
-  return roundDownPercent(data.estimated_savings_percentage);
+  return roundPercentOneDecimal(data.estimated_savings_percentage);
+}
+
+function formatPercentLabel(p: number): string {
+  const r = Math.round(p * 10) / 10;
+  return Number.isInteger(r) ? String(r) : r.toFixed(1);
 }
 
 export function EnergySavingsResult({ data }: { data: EnergyComparisonData }) {
@@ -60,7 +66,7 @@ export function EnergySavingsResult({ data }: { data: EnergyComparisonData }) {
         <div className="space-y-2 text-center w-full min-w-0 px-1">
           <p className="text-2xl sm:text-4xl break-words text-[#26606b]">
             <span className="font-light">Podrías </span>
-            <strong className="font-bold">ahorrar hasta un {percent}%</strong>
+            <strong className="font-bold">ahorrar hasta un {formatPercentLabel(percent)}%</strong>
             <span className="font-light"> con una mejor tarifa.</span>
           </p>
           <p className="text-sm text-gray-500">{LEGAL_TEXT}</p>

@@ -624,8 +624,9 @@ export async function extractInvoiceFromBufferDetailed(
 export async function extractInvoiceFromBuffer(
   buffer: Buffer,
   mimeType: string,
+  opts?: { pdfText?: string | null },
 ): Promise<InvoiceExtraction> {
-  const { extraction } = await extractInvoiceFromBufferDetailed(buffer, mimeType);
+  const { extraction } = await extractInvoiceFromBufferDetailed(buffer, mimeType, opts);
   return extraction;
 }
 

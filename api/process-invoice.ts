@@ -11,6 +11,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 import { extractInvoiceFromBuffer } from '../server-lib/invoice/pipeline.js';
 import { getActiveOffers, runComparison, getComparisonFailureReason } from '../server-lib/energy/calculation.js';
+import { fetchInvoiceEstimateTaxConfig } from '../server-lib/energy/invoice-estimate-taxes.js';
 import { validateAttachmentPath } from '../server-lib/invoice/validate-path.js';
 import { emptyExtraction } from '../server-lib/invoice/types.js';
 import {
@@ -23,6 +24,14 @@ import {
 const BUCKET = 'lead-attachments';
 const TIMEOUT_MS = 55000;
 const RATE_LIMIT_WINDOW_HOURS = 1;
+const MAX_PDF_TEXT_BODY_CHARS = 400_000;
+
+function normalizeClientPdfText(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const t = raw.trim();
+  if (!t) return null;
+  return t.length > MAX_PDF_TEXT_BODY_CHARS ? t.slice(0, MAX_PDF_TEXT_BODY_CHARS) : t;
+}
 
 function parseEnvInt(name: string, fallback: number): number {
   const raw = process.env[name];
@@ -87,7 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     period_months?: number;
     company_name?: string | null;
   };
-  let body: { lead_id?: string; attachment_path?: string; manual_extraction?: ManualExtraction };
+  let body: { lead_id?: string; attachment_path?: string; manual_extraction?: ManualExtraction; pdf_text?: unknown };
   try {
     body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body as Record<string, unknown>) ?? {};
   } catch {
@@ -98,6 +107,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   const lead_id = body.lead_id;
   const attachment_path = body.attachment_path;
+  const clientPdfText = normalizeClientPdfText(body.pdf_text);
   const manual_extraction = body.manual_extraction;
   const useManual = manual_extraction != null &&
     typeof manual_extraction.consumption_kwh === 'number' &&
@@ -171,7 +181,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   /** Plan B: comparación solo con datos manuales (sin procesar archivo). */
   if (useManual) {
     try {
-      const offers = await getActiveOffers(supabase);
+      const [offers, taxConfig] = await Promise.all([
+        getActiveOffers(supabase),
+        fetchInvoiceEstimateTaxConfig(supabase),
+      ]);
       const extraction = {
         ...emptyExtraction(),
         company_name: manual_extraction!.company_name ?? null,
@@ -180,7 +193,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         period_months: period_months ?? 1,
         confidence: 0.9,
       };
-      const result = runComparison(extraction, offers);
+      const result = runComparison(extraction, offers, taxConfig);
       const row = {
         lead_id,
         current_company: result?.current_company ?? extraction.company_name,
@@ -260,9 +273,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       const buffer = Buffer.from(await fileData.arrayBuffer());
       const mimeType = fileData.type || (attachment_path.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
 
-      const extraction = await extractInvoiceFromBuffer(buffer, mimeType);
-      const offers = await getActiveOffers(supabase);
-      const result = runComparison(extraction, offers);
+      const extraction = await extractInvoiceFromBuffer(
+        buffer,
+        mimeType,
+        mimeType === 'application/pdf' && clientPdfText ? { pdfText: clientPdfText } : undefined,
+      );
+      const [offers, taxConfig] = await Promise.all([
+        getActiveOffers(supabase),
+        fetchInvoiceEstimateTaxConfig(supabase),
+      ]);
+      const result = runComparison(extraction, offers, taxConfig);
 
       const row = {
         lead_id,
