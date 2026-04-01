@@ -20,6 +20,8 @@ export interface UseFormStateOptions {
   leadEntryApiUrl?: string;
   /** Llamar tras envío exitoso con el lead creado y el payload (ej. para procesar factura). */
   onSuccess?: (lead: { id: string }, payload: LeadPayload) => void;
+  /** Se mezclan en `custom_fields` del payload (p. ej. tracking del flujo de landing). */
+  extraCustomFields?: Record<string, unknown>;
 }
 
 export function useFormState({
@@ -32,6 +34,7 @@ export function useFormState({
   clearAttribution,
   leadEntryApiUrl,
   onSuccess,
+  extraCustomFields,
 }: UseFormStateOptions) {
   const [answers, setAnswers] = useState<FormAnswers>({});
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -106,6 +109,10 @@ export function useFormState({
       else custom_fields[q.id] = val;
     }
 
+    if (extraCustomFields && Object.keys(extraCustomFields).length > 0) {
+      Object.assign(custom_fields, extraCustomFields);
+    }
+
     return {
       name,
       email,
@@ -116,7 +123,7 @@ export function useFormState({
       ad: ad ?? undefined,
       custom_fields,
     };
-  }, [answers, questions, source, campaign, adset, ad]);
+  }, [answers, questions, source, campaign, adset, ad, extraCustomFields]);
 
   const submit = useCallback(async () => {
     const payload = buildPayload();
