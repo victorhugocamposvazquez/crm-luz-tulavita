@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 
 const BRAND = '#26606b';
 /** GIF celebración bajo el resultado (coloca el archivo en public/animatios/final.gif). */
-const RESULT_CELEBRATION_GIF = '/animatios/final.gif';
+const RESULT_CELEBRATION_GIF = '/animations/final.gif';
 
 export function EnergySavingsFlow({
   leadId,
