@@ -8,8 +8,7 @@ import { useEnergyComparison } from '@/hooks/useEnergyComparison';
 import { EnergySavingsLoader } from './EnergySavingsLoader';
 import { EnergySavingsResult } from './EnergySavingsResult';
 import { cn } from '@/lib/utils';
-
-const BRAND = '#26606b';
+import { AHORRO_PUBLIC_ACCENT } from '@/lib/ahorro-luz-public-ui';
 /** GIF celebración bajo el resultado (coloca el archivo en public/animatios/final.gif). */
 const RESULT_CELEBRATION_GIF = '/animations/final.gif';
 
@@ -47,13 +46,12 @@ export function EnergySavingsFlow({
 
   if (status === 'processing') {
     return (
-      <div className="space-y-8 w-full">
-        <h2
-          className="text-xl sm:text-2xl leading-snug px-2"
-          style={{ color: BRAND, textShadow: 'none' }}
-        >
+      <div className="w-full space-y-8">
+        <h2 className="px-2 text-xl leading-snug text-neutral-900 sm:text-2xl">
           <span className="font-light">Estamos analizando tu factura; en un momento verás </span>
-          <strong className="font-bold">cuánto puedes ahorrar</strong>
+          <strong className="font-bold" style={{ color: AHORRO_PUBLIC_ACCENT }}>
+            cuánto puedes ahorrar
+          </strong>
           <span className="font-light"> en tu factura.</span>
         </h2>
         <EnergySavingsLoader compact={compactLoader} />
@@ -84,16 +82,14 @@ export function EnergySavingsFlow({
   if (status === 'failed' && error) {
     return (
       <div className="space-y-6">
-        <p className="text-lg text-gray-600">
-          {error}
-        </p>
-        <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-4 sm:p-5">
-          <p className="mb-3 font-medium text-gray-800">
+        <p className="text-lg text-neutral-600">{error}</p>
+        <div className="rounded-xl border border-neutral-200 bg-neutral-50/80 p-4 sm:p-5">
+          <p className="mb-3 font-medium text-neutral-900">
             Introduce los datos de tu factura para ver tu ahorro estimado
           </p>
           <form onSubmit={handleManualSubmit} className="space-y-4">
             <div>
-              <label htmlFor="manual-consumption" className="mb-1 block text-sm font-medium text-gray-700">
+              <label htmlFor="manual-consumption" className="mb-1 block text-sm font-medium text-neutral-700">
                 Consumo (kWh)
               </label>
               <input
@@ -103,11 +99,11 @@ export function EnergySavingsFlow({
                 placeholder="Ej. 120"
                 value={manualConsumption}
                 onChange={(e) => setManualConsumption(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-base focus:border-[#26606b] focus:outline-none focus:ring-1 focus:ring-[#26606b]"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-base focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
               />
             </div>
             <div>
-              <label htmlFor="manual-total" className="mb-1 block text-sm font-medium text-gray-700">
+              <label htmlFor="manual-total" className="mb-1 block text-sm font-medium text-neutral-700">
                 Total de la factura (€)
               </label>
               <input
@@ -117,18 +113,18 @@ export function EnergySavingsFlow({
                 placeholder="Ej. 45,50"
                 value={manualTotal}
                 onChange={(e) => setManualTotal(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-base focus:border-[#26606b] focus:outline-none focus:ring-1 focus:ring-[#26606b]"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-base focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
               />
             </div>
             <div>
-              <label htmlFor="manual-period" className="mb-1 block text-sm font-medium text-gray-700">
+              <label htmlFor="manual-period" className="mb-1 block text-sm font-medium text-neutral-700">
                 Periodo de facturación
               </label>
               <select
                 id="manual-period"
                 value={manualPeriod}
                 onChange={(e) => setManualPeriod(Number(e.target.value))}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-base focus:border-[#26606b] focus:outline-none focus:ring-1 focus:ring-[#26606b]"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-base focus:border-green-500 focus:outline-none focus:ring-1 focus:ring-green-500"
               >
                 <option value={1}>Mensual (1 mes)</option>
                 <option value={2}>Bimensual (2 meses)</option>
@@ -142,19 +138,24 @@ export function EnergySavingsFlow({
               type="submit"
               className={cn(
                 'w-full rounded-xl py-3 text-base font-medium text-white transition-opacity',
-                'hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-offset-2'
+                'hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2'
               )}
-              style={{ backgroundColor: BRAND }}
+              style={{ backgroundColor: AHORRO_PUBLIC_ACCENT }}
             >
               Calcular ahorro
             </button>
           </form>
         </div>
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-neutral-500">
           Un asesor te contactará en las próximas horas para ayudarte a ahorrar en tu factura.
         </p>
         {onReset && (
-          <button type="button" onClick={onReset} className="text-sm font-medium hover:underline" style={{ color: BRAND }}>
+          <button
+            type="button"
+            onClick={onReset}
+            className="text-sm font-medium hover:underline"
+            style={{ color: AHORRO_PUBLIC_ACCENT }}
+          >
             Enviar otra solicitud
           </button>
         )}
@@ -164,7 +165,7 @@ export function EnergySavingsFlow({
 
   if (comparison) {
     return (
-      <div className="space-y-6 flex flex-col items-center w-full">
+      <div className="flex w-full flex-col items-center space-y-6">
         <EnergySavingsResult
           data={{
             status: comparison.status,
@@ -183,11 +184,16 @@ export function EnergySavingsFlow({
           loading="lazy"
           decoding="async"
         />
-        <p className="text-lg text-gray-600">
+        <p className="text-lg text-neutral-600">
           Un asesor te contactará en las próximas horas para ayudarte a ahorrar en tu factura.
         </p>
         {onReset && (
-          <button type="button" onClick={onReset} className="text-lg font-medium hover:underline" style={{ color: '#26606b' }}>
+          <button
+            type="button"
+            onClick={onReset}
+            className="text-lg font-medium hover:underline"
+            style={{ color: AHORRO_PUBLIC_ACCENT }}
+          >
             Enviar otra solicitud
           </button>
         )}
@@ -195,9 +201,5 @@ export function EnergySavingsFlow({
     );
   }
 
-  return (
-    <p className="text-lg text-gray-600">
-      Un asesor te contactará en las próximas horas para ayudarte a ahorrar en tu factura.
-    </p>
-  );
+  return <p className="text-lg text-neutral-600">Un asesor te contactará en las próximas horas para ayudarte a ahorrar en tu factura.</p>;
 }

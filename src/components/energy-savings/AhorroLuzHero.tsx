@@ -6,9 +6,9 @@ import { useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { ChevronRight, Pencil, Phone, Upload } from 'lucide-react';
+import { AHORRO_PUBLIC_ACCENT } from '@/lib/ahorro-luz-public-ui';
 
-/** Acento verde (referencia look claro tipo producto SaaS) */
-const ACCENT = '#22c55e';
+const ACCENT = AHORRO_PUBLIC_ACCENT;
 
 /** Marcas como wordmarks en escala de grises (sustituible por <img> si hay logos en /public) */
 const PROVIDER_LOGOS: { name: string; className: string }[] = [
