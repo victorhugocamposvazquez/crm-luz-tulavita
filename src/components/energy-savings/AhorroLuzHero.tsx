@@ -103,8 +103,8 @@ export function AhorroLuzHero({
         }}
       />
 
-      <header className="shrink-0 border-b border-neutral-200/80 bg-white">
-        <div className="mx-auto flex w-full items-center justify-center gap-2.5 px-4 py-4 sm:gap-3 sm:px-6 sm:py-5">
+      <header className="shrink-0 bg-white">
+        <div className="mx-auto flex w-full items-center justify-center gap-2.5 px-4 py-3 sm:gap-3 sm:px-6 sm:py-4">
           <img
             src="/logo-tulavita.png"
             alt=""
@@ -141,18 +141,16 @@ export function AhorroLuzHero({
             type="button"
             onClick={() => inputRef.current?.click()}
             className={cn(
-              'mt-8 w-full max-w-md rounded-2xl border-2 border-dashed border-neutral-300 bg-neutral-50/60',
-              'px-4 py-5 text-left transition-colors sm:mt-10 sm:py-6',
-              'flex items-center gap-4',
-              'hover:border-neutral-400 hover:bg-neutral-50',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-[#22c55e] focus-visible:ring-offset-2'
+              'mt-8 flex w-full max-w-md items-center gap-3 rounded-2xl border border-dashed border-neutral-300 bg-white px-4 py-3.5 text-left transition-colors sm:mt-10 sm:gap-4 sm:py-4',
+              'hover:border-neutral-400 hover:bg-neutral-50/80',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2'
             )}
           >
             <span
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-white sm:h-14 sm:w-14"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-white sm:h-11 sm:w-11"
               aria-hidden
             >
-              <Upload className="h-6 w-6 text-neutral-800 sm:h-7 sm:w-7" />
+              <Upload className="h-5 w-5 text-neutral-900 sm:h-6 sm:w-6" />
             </span>
             <div className="min-w-0 flex-1">
               <p className="text-base font-semibold text-neutral-900 sm:text-lg">Sube tu factura de luz</p>
@@ -169,31 +167,31 @@ export function AhorroLuzHero({
             <div className="h-px flex-1 bg-neutral-200" />
           </div>
 
-          <div className="grid w-full max-w-md grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid w-full max-w-md grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3">
             <button
               type="button"
               onClick={onManualData}
               className={cn(
-                'flex items-center justify-center gap-2 rounded-xl border border-neutral-300 bg-white py-3.5 px-4',
+                'flex items-center justify-center gap-2 rounded-2xl border border-neutral-300 bg-white px-4 py-2.5',
                 'text-sm font-medium text-neutral-900 transition-colors sm:text-base',
                 'hover:bg-neutral-50',
-                'focus:outline-none focus-visible:ring-2 focus-visible:ring-[#22c55e] focus-visible:ring-offset-2'
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2'
               )}
             >
-              <Pencil className="h-4 w-4 shrink-0 text-neutral-700" />
+              <Pencil className="h-4 w-4 shrink-0 text-neutral-900" strokeWidth={1.75} />
               Conozco mis datos
             </button>
             <button
               type="button"
               onClick={onRequestCall}
               className={cn(
-                'flex items-center justify-center gap-2 rounded-xl border border-neutral-300 bg-white py-3.5 px-4',
+                'flex items-center justify-center gap-2 rounded-2xl border border-neutral-300 bg-white px-4 py-2.5',
                 'text-sm font-medium text-neutral-900 transition-colors sm:text-base',
                 'hover:bg-neutral-50',
-                'focus:outline-none focus-visible:ring-2 focus-visible:ring-[#22c55e] focus-visible:ring-offset-2'
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2'
               )}
             >
-              <Phone className="h-4 w-4 shrink-0 text-neutral-700" />
+              <Phone className="h-4 w-4 shrink-0 text-neutral-900" strokeWidth={1.75} />
               Que me llamen
             </button>
           </div>

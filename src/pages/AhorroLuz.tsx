@@ -18,7 +18,7 @@ import imageCompression from 'browser-image-compression';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { extractPdfTextFromFile } from '@/lib/pdf-text-client';
-import { AHORRO_PUBLIC_ACCENT } from '@/lib/ahorro-luz-public-ui';
+import { AHORRO_FORM_CONTROL_ACCENT } from '@/lib/ahorro-luz-public-ui';
 const MAX_PDF_TEXT_CHARS = 350_000;
 const LEAD_ATTACHMENTS_BUCKET = 'lead-attachments';
 const LANDING_POST_SUBMIT_LOADER_MS = 2000;
@@ -208,7 +208,6 @@ function LandingFormSteps({
   const {
     currentQuestion,
     currentStep,
-    progress,
     isFirst,
     isLast,
     answers,
@@ -362,8 +361,8 @@ function LandingFormSteps({
 
   return (
     <div className="min-h-screen flex flex-col bg-white antialiased">
-      <header className="fixed top-0 left-0 right-0 z-40 flex flex-col border-b border-neutral-200/80 bg-white">
-        <div className="flex min-h-14 items-center justify-center gap-2 px-4 py-3 pb-2 sm:min-h-16 sm:gap-2.5">
+      <header className="fixed top-0 left-0 right-0 z-40 bg-white">
+        <div className="flex min-h-[3.25rem] items-center justify-center gap-2 px-4 py-2.5 sm:min-h-14 sm:gap-2.5 sm:py-3">
           <img
             src="/logo-tulavita.png"
             alt=""
@@ -375,16 +374,10 @@ function LandingFormSteps({
             Ahorra en tu factura
           </h1>
         </div>
-        <div className="h-0.5 w-full bg-neutral-200">
-          <div
-            className="h-full transition-all duration-300 ease-out"
-            style={{ backgroundColor: AHORRO_PUBLIC_ACCENT, width: `${progress}%` }}
-          />
-        </div>
       </header>
 
       <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
-        <div className="flex-1 flex flex-col items-center justify-center w-full px-4 sm:px-6 py-8 pt-[calc(env(safe-area-inset-top,0px)+6.75rem)] sm:pt-28 pb-10 min-h-[calc(100dvh-4.5rem)]">
+        <div className="flex min-h-[calc(100dvh-3.5rem)] flex-1 flex-col items-center justify-center px-4 pb-10 pt-[calc(env(safe-area-inset-top,0px)+5rem)] sm:px-6 sm:pt-24">
           <div
             key={currentQuestion.id}
             onKeyDown={handleKeyDown}
@@ -395,10 +388,7 @@ function LandingFormSteps({
             )}
           >
             <div className="mb-6 flex flex-col items-center gap-3 text-center">
-              <span
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-sm font-semibold text-white"
-                style={{ backgroundColor: AHORRO_PUBLIC_ACCENT }}
-              >
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-neutral-300 bg-white text-sm font-semibold text-neutral-900">
                 {currentStep}
               </span>
               {currentQuestion.type === 'contact' && 'header' in currentQuestion && currentQuestion.header ? (
@@ -421,7 +411,7 @@ function LandingFormSteps({
               )}
             >
               <QuestionStep
-                accentColor={AHORRO_PUBLIC_ACCENT}
+                accentColor={AHORRO_FORM_CONTROL_ACCENT}
                 question={currentQuestion}
                 value={
                   answers[currentQuestion.id] as
@@ -460,7 +450,7 @@ function LandingFormSteps({
                     'flex items-center gap-1 sm:gap-2 p-2 rounded-lg transition-colors',
                     submitStatus === 'loading'
                       ? 'cursor-not-allowed text-neutral-300'
-                      : 'text-neutral-600 hover:bg-neutral-50 hover:text-[#22c55e]'
+                      : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900'
                   )}
                   title={isFirst ? 'Volver al inicio' : 'Atrás'}
                 >
@@ -484,14 +474,13 @@ function LandingFormSteps({
                     (currentQuestion?.type !== 'file_upload' && !hasSelection)
                   }
                   className={cn(
-                    'flex max-w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm font-medium text-white transition-all sm:px-8 sm:text-base whitespace-nowrap',
-                    'hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-70'
+                    'flex max-w-full items-center justify-center gap-2 rounded-2xl border border-neutral-300 bg-white px-5 py-2 text-sm font-medium text-neutral-900 transition-colors sm:px-7 sm:text-base whitespace-nowrap',
+                    'hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50'
                   )}
-                  style={{ backgroundColor: AHORRO_PUBLIC_ACCENT }}
                 >
                   {submitStatus === 'loading' ? (
                     <>
-                      <Loader2 className="h-5 w-5 animate-spin shrink-0" />
+                      <Loader2 className="h-5 w-5 shrink-0 animate-spin text-neutral-900" />
                       Enviando...
                     </>
                   ) : isLast ? (
@@ -513,7 +502,7 @@ function LandingFormSteps({
                     'flex items-center gap-1 sm:gap-2 p-2 rounded-lg transition-colors',
                     isLast || submitStatus === 'loading' || !hasSelection
                       ? 'cursor-not-allowed text-neutral-300'
-                      : 'text-neutral-600 hover:bg-neutral-50 hover:text-[#22c55e]'
+                      : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900'
                   )}
                   title="Siguiente"
                 >
@@ -596,8 +585,8 @@ export default function AhorroLuz() {
 
     return (
       <div className="flex min-h-screen flex-col bg-white antialiased">
-        <header className="fixed top-0 left-0 right-0 z-40 flex flex-col border-b border-neutral-200/80 bg-white">
-          <div className="flex items-center justify-center gap-2 px-4 pb-3 pt-6 sm:gap-2.5 sm:pb-4 sm:pt-7">
+        <header className="fixed top-0 left-0 right-0 z-40 bg-white">
+          <div className="flex items-center justify-center gap-2 px-4 py-3 pt-[max(1rem,env(safe-area-inset-top))] sm:gap-2.5 sm:py-4 sm:pt-6">
             <img
               src="/logo-tulavita.png"
               alt=""
@@ -609,18 +598,10 @@ export default function AhorroLuz() {
               Ahorra en tu factura
             </h1>
           </div>
-          {showEnergyFlow && (
-            <div className="h-0.5 w-full bg-neutral-200">
-              <div
-                className="h-full transition-all duration-300 ease-out"
-                style={{ backgroundColor: AHORRO_PUBLIC_ACCENT, width: '100%' }}
-              />
-            </div>
-          )}
         </header>
         <div className="flex-1 overflow-y-auto min-h-0 flex flex-col">
           {showEnergyFlow ? (
-            <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-10 pt-[calc(env(safe-area-inset-top,0px)+7.25rem)] sm:pt-[7.75rem] pb-12 min-h-[calc(100dvh-5.5rem)]">
+            <div className="flex min-h-[calc(100dvh-3.5rem)] flex-1 flex-col items-center justify-center px-4 py-10 pb-12 pt-[calc(env(safe-area-inset-top,0px)+5rem)] sm:px-6 sm:pt-24">
               <div className="w-full max-w-xl mx-auto text-center animate-in fade-in duration-300 space-y-6">
                 <EnergySavingsFlow
                   leadId={lastLeadId}
@@ -633,7 +614,7 @@ export default function AhorroLuz() {
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-10 pt-[calc(env(safe-area-inset-top,0px)+6rem)] pb-12 min-h-[calc(100dvh-5.5rem)]">
+            <div className="flex min-h-[calc(100dvh-3.5rem)] flex-1 flex-col items-center justify-center px-4 py-10 pb-12 pt-[calc(env(safe-area-inset-top,0px)+5rem)] sm:px-6 sm:pt-24">
               <div className="mx-auto w-full max-w-lg space-y-6 text-center animate-in fade-in duration-500">
                 <h2 className="text-2xl font-semibold text-neutral-950 sm:text-3xl">¡Gracias!</h2>
                 {isManualThanks ? (
@@ -643,12 +624,7 @@ export default function AhorroLuz() {
                       también! 💪
                     </p>
                     <p className="text-lg text-neutral-600">Un asesor te contactará pronto para ponernos manos a la obra</p>
-                    <button
-                      type="button"
-                      onClick={handleReset}
-                      className="text-lg font-medium hover:underline"
-                      style={{ color: AHORRO_PUBLIC_ACCENT }}
-                    >
+                    <button type="button" onClick={handleReset} className="text-lg font-medium text-neutral-900 underline-offset-4 hover:underline">
                       Enviar otra solicitud
                     </button>
                   </>
@@ -657,12 +633,7 @@ export default function AhorroLuz() {
                     <p className="text-lg text-neutral-700">
                       Te llamaremos lo antes posible con el número o email que nos has dejado.
                     </p>
-                    <button
-                      type="button"
-                      onClick={handleReset}
-                      className="text-lg font-medium hover:underline"
-                      style={{ color: AHORRO_PUBLIC_ACCENT }}
-                    >
+                    <button type="button" onClick={handleReset} className="text-lg font-medium text-neutral-900 underline-offset-4 hover:underline">
                       Enviar otra solicitud
                     </button>
                   </>
@@ -671,12 +642,7 @@ export default function AhorroLuz() {
                     <p className="text-lg text-neutral-600">
                       Un asesor te contactará en las próximas horas para ayudarte a ahorrar en tu factura.
                     </p>
-                    <button
-                      type="button"
-                      onClick={handleReset}
-                      className="text-lg font-medium hover:underline"
-                      style={{ color: AHORRO_PUBLIC_ACCENT }}
-                    >
+                    <button type="button" onClick={handleReset} className="text-lg font-medium text-neutral-900 underline-offset-4 hover:underline">
                       Enviar otra solicitud
                     </button>
                   </>

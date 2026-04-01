@@ -2,8 +2,6 @@
  * Pantalla de resultado del ahorro estimado (sin animación: el porcentaje se muestra al instante).
  */
 
-import { AHORRO_PUBLIC_ACCENT } from '@/lib/ahorro-luz-public-ui';
-
 const LEGAL_TEXT = 'Cálculo estimado basado en los datos de tu factura.';
 
 export interface EnergyComparisonData {
@@ -68,7 +66,7 @@ export function EnergySavingsResult({ data }: { data: EnergyComparisonData }) {
         <div className="w-full min-w-0 space-y-2 px-1 text-center">
           <p className="break-words text-2xl sm:text-4xl">
             <span className="font-light text-neutral-800">¡Podrías </span>
-            <strong className="font-bold" style={{ color: AHORRO_PUBLIC_ACCENT }}>
+            <strong className="font-bold text-neutral-950">
               ahorrar hasta un {formatPercentLabel(percent)}%
             </strong>
             <span className="font-light text-neutral-800"> con una mejor tarifa!</span>
