@@ -12,6 +12,7 @@ import type { FormConfig, Question, LeadPayload } from '@/components/landing-for
 import { useMetaAttribution } from '@/hooks/useMetaAttribution';
 import { EnergySavingsFlow } from '@/components/energy-savings/EnergySavingsFlow';
 import { AhorroLuzHero } from '@/components/energy-savings/AhorroLuzHero';
+import { AhorroLuzBrandHeader } from '@/components/energy-savings/AhorroLuzBrandHeader';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
@@ -207,7 +208,6 @@ function LandingFormSteps({
 
   const {
     currentQuestion,
-    currentStep,
     isFirst,
     isLast,
     answers,
@@ -334,12 +334,16 @@ function LandingFormSteps({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
+      if (e.key !== 'Enter' || e.shiftKey) return;
+      // Tras elegir archivo, a veces el SO envía Enter al cerrar el diálogo: no avanzar de paso solo por eso.
+      if (currentQuestion?.type === 'file_upload') {
         e.preventDefault();
-        handleNext();
+        return;
       }
+      e.preventDefault();
+      handleNext();
     },
-    [handleNext],
+    [handleNext, currentQuestion?.type],
   );
 
   const isRadioWithLetters =
@@ -361,20 +365,7 @@ function LandingFormSteps({
 
   return (
     <div className="min-h-screen flex flex-col bg-white antialiased">
-      <header className="fixed top-0 left-0 right-0 z-40 bg-white">
-        <div className="flex min-h-[3.25rem] items-center justify-center gap-2 px-4 py-2.5 sm:min-h-14 sm:gap-2.5 sm:py-3">
-          <img
-            src="/logo-tulavita.png"
-            alt=""
-            className="h-10 w-10 shrink-0 object-contain sm:h-11 sm:w-11"
-            width={44}
-            height={44}
-          />
-          <h1 className="text-center text-base font-semibold tracking-tight text-neutral-900 sm:text-lg">
-            Ahorra en tu factura
-          </h1>
-        </div>
-      </header>
+      <AhorroLuzBrandHeader fixed />
 
       <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
         <div className="flex min-h-[calc(100dvh-3.5rem)] flex-1 flex-col items-center justify-center px-4 pb-10 pt-[calc(env(safe-area-inset-top,0px)+5rem)] sm:px-6 sm:pt-24">
@@ -387,10 +378,7 @@ function LandingFormSteps({
               direction === 'prev' && 'fade-in slide-in-from-left-4'
             )}
           >
-            <div className="mb-6 flex flex-col items-center gap-3 text-center">
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-neutral-300 bg-white text-sm font-semibold text-neutral-900">
-                {currentStep}
-              </span>
+            <div className="mb-6 text-center">
               {currentQuestion.type === 'contact' && 'header' in currentQuestion && currentQuestion.header ? (
                 <h1 className="mx-auto max-w-lg text-xl font-semibold leading-tight text-neutral-900 sm:text-2xl">
                   {currentQuestion.header}
@@ -474,7 +462,7 @@ function LandingFormSteps({
                     (currentQuestion?.type !== 'file_upload' && !hasSelection)
                   }
                   className={cn(
-                    'flex max-w-full items-center justify-center gap-2 rounded-2xl border border-neutral-300 bg-white px-5 py-2 text-sm font-medium text-neutral-900 transition-colors sm:px-7 sm:text-base whitespace-nowrap',
+                    'flex max-w-full items-center justify-center gap-2 rounded-xl border border-neutral-300 bg-white px-5 py-3 text-sm font-medium text-neutral-900 transition-colors sm:px-7 sm:text-base whitespace-nowrap',
                     'hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50'
                   )}
                 >
@@ -497,14 +485,26 @@ function LandingFormSteps({
                 <button
                   type="button"
                   onClick={() => handleNext()}
-                  disabled={isLast || submitStatus === 'loading' || !hasSelection}
+                  disabled={
+                    isLast ||
+                    submitStatus === 'loading' ||
+                    !hasSelection ||
+                    currentQuestion?.type === 'file_upload'
+                  }
                   className={cn(
                     'flex items-center gap-1 sm:gap-2 p-2 rounded-lg transition-colors',
-                    isLast || submitStatus === 'loading' || !hasSelection
+                    isLast ||
+                      submitStatus === 'loading' ||
+                      !hasSelection ||
+                      currentQuestion?.type === 'file_upload'
                       ? 'cursor-not-allowed text-neutral-300'
                       : 'text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900'
                   )}
-                  title="Siguiente"
+                  title={
+                    currentQuestion?.type === 'file_upload'
+                      ? 'Usa Aceptar para continuar cuando hayas subido la factura'
+                      : 'Siguiente'
+                  }
                 >
                   <span className="text-sm font-medium hidden sm:inline">Siguiente</span>
                   <ChevronRight className="h-6 w-6 shrink-0" />
@@ -585,20 +585,7 @@ export default function AhorroLuz() {
 
     return (
       <div className="flex min-h-screen flex-col bg-white antialiased">
-        <header className="fixed top-0 left-0 right-0 z-40 bg-white">
-          <div className="flex items-center justify-center gap-2 px-4 py-3 pt-[max(1rem,env(safe-area-inset-top))] sm:gap-2.5 sm:py-4 sm:pt-6">
-            <img
-              src="/logo-tulavita.png"
-              alt=""
-              className="h-10 w-10 shrink-0 object-contain sm:h-11 sm:w-11"
-              width={44}
-              height={44}
-            />
-            <h1 className="text-center text-base font-semibold tracking-tight text-neutral-900 sm:text-lg">
-              Ahorra en tu factura
-            </h1>
-          </div>
-        </header>
+        <AhorroLuzBrandHeader fixed />
         <div className="flex-1 overflow-y-auto min-h-0 flex flex-col">
           {showEnergyFlow ? (
             <div className="flex min-h-[calc(100dvh-3.5rem)] flex-1 flex-col items-center justify-center px-4 py-10 pb-12 pt-[calc(env(safe-area-inset-top,0px)+5rem)] sm:px-6 sm:pt-24">

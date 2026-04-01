@@ -134,7 +134,7 @@ export function EnergySavingsFlow({
             <button
               type="submit"
               className={cn(
-                'w-full rounded-2xl border border-neutral-300 bg-white py-2 text-base font-medium text-neutral-900 transition-colors',
+                'w-full rounded-xl border border-neutral-300 bg-white py-3 text-base font-medium text-neutral-900 transition-colors',
                 'hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2'
               )}
             >

@@ -2,11 +2,12 @@
  * Pantalla inicial Ahorro Luz — look claro: fondo blanco, alto contraste, acento verde en CTAs.
  */
 
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { ChevronRight, Pencil, Phone, Upload } from 'lucide-react';
 import { AHORRO_PUBLIC_ACCENT } from '@/lib/ahorro-luz-public-ui';
+import { AhorroLuzBrandHeader } from '@/components/energy-savings/AhorroLuzBrandHeader';
 
 const ACCENT = AHORRO_PUBLIC_ACCENT;
 
@@ -65,6 +66,7 @@ function ProviderLogoMarquee() {
 }
 
 export type AhorroLuzHeroProps = {
+  /** Se llama solo cuando el usuario confirma (no al elegir el archivo en el selector). */
   onFileSelected: (file: File) => void;
   onManualData: () => void;
   onRequestCall: () => void;
@@ -78,6 +80,7 @@ export function AhorroLuzHero({
   maxFileMb = 10,
 }: AhorroLuzHeroProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const [pickedFile, setPickedFile] = useState<File | null>(null);
 
   return (
     <div className="min-h-screen flex flex-col bg-white text-neutral-900 antialiased">
@@ -99,24 +102,11 @@ export function AhorroLuzHero({
             });
             return;
           }
-          onFileSelected(f);
+          setPickedFile(f);
         }}
       />
 
-      <header className="shrink-0 bg-white">
-        <div className="mx-auto flex w-full items-center justify-center gap-2.5 px-4 py-3 sm:gap-3 sm:px-6 sm:py-4">
-          <img
-            src="/logo-tulavita.png"
-            alt=""
-            className="h-10 w-10 shrink-0 object-contain sm:h-11 sm:w-11"
-            width={44}
-            height={44}
-          />
-          <span className="text-center text-sm font-semibold tracking-tight text-neutral-900 sm:text-base">
-            Tulavita Energía
-          </span>
-        </div>
-      </header>
+      <AhorroLuzBrandHeader />
 
       <section className="relative flex flex-1 flex-col px-4 pb-12 pt-5 sm:px-6 sm:pb-16 sm:pt-12">
         <div className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center text-center">
@@ -134,32 +124,61 @@ export function AhorroLuzHero({
             </span>
           </h1>
           <p className="mt-5 max-w-md text-[15px] leading-relaxed text-neutral-600 sm:text-lg">
-            Sube tu factura y calculamos tu ahorro exacto en segundos. Sin letra pequeña.
+            Sube tu factura y calculamos tu ahorro en segundos. Sin letra pequeña.
           </p>
 
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            className={cn(
-              'mt-8 flex w-full max-w-md items-center gap-3 rounded-2xl border border-dashed border-neutral-300 bg-white px-4 py-3.5 text-left transition-colors sm:mt-10 sm:gap-4 sm:py-4',
-              'hover:border-neutral-400 hover:bg-neutral-50/80',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2'
-            )}
-          >
-            <span
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-white sm:h-11 sm:w-11"
-              aria-hidden
+          {!pickedFile ? (
+            <button
+              type="button"
+              onClick={() => inputRef.current?.click()}
+              className={cn(
+                'mt-8 flex w-full max-w-md items-center gap-4 rounded-2xl border-2 border-dashed border-neutral-300 bg-neutral-50/60 px-4 py-5 text-left transition-colors sm:mt-10 sm:py-6',
+                'hover:border-neutral-400 hover:bg-neutral-50',
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2'
+              )}
             >
-              <Upload className="h-5 w-5 text-neutral-900 sm:h-6 sm:w-6" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-base font-semibold text-neutral-900 sm:text-lg">Sube tu factura de luz</p>
-              <p className="mt-0.5 text-xs text-neutral-500 sm:text-sm">
-                PDF, JPG o PNG · hasta {maxFileMb} MB
-              </p>
+              <span
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-white sm:h-14 sm:w-14"
+                aria-hidden
+              >
+                <Upload className="h-6 w-6 text-neutral-900 sm:h-7 sm:w-7" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-base font-semibold text-neutral-900 sm:text-lg">Sube tu factura de luz</p>
+                <p className="mt-0.5 text-xs text-neutral-500 sm:text-sm">
+                  PDF, JPG o PNG · hasta {maxFileMb} MB
+                </p>
+              </div>
+              <ChevronRight className="h-5 w-5 shrink-0 text-neutral-400" aria-hidden />
+            </button>
+          ) : (
+            <div className="mt-8 w-full max-w-md space-y-3 rounded-xl border border-neutral-300 bg-white px-4 py-4 text-left sm:mt-10">
+              <p className="text-sm font-medium text-neutral-900">Archivo seleccionado</p>
+              <p className="break-all text-sm text-neutral-600">{pickedFile.name}</p>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPickedFile(null);
+                    inputRef.current?.click();
+                  }}
+                  className="text-sm font-medium text-neutral-700 underline-offset-2 hover:underline"
+                >
+                  Elegir otro archivo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onFileSelected(pickedFile)}
+                  className={cn(
+                    'rounded-xl border border-neutral-300 bg-white px-5 py-2.5 text-sm font-medium text-neutral-900 sm:px-6',
+                    'hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2'
+                  )}
+                >
+                  Continuar
+                </button>
+              </div>
             </div>
-            <ChevronRight className="h-5 w-5 shrink-0 text-neutral-400" aria-hidden />
-          </button>
+          )}
 
           <div className="my-7 flex w-full max-w-md items-center gap-3 sm:my-9">
             <div className="h-px flex-1 bg-neutral-200" />
@@ -167,31 +186,31 @@ export function AhorroLuzHero({
             <div className="h-px flex-1 bg-neutral-200" />
           </div>
 
-          <div className="grid w-full max-w-md grid-cols-1 gap-2.5 sm:grid-cols-2 sm:gap-3">
+          <div className="grid w-full max-w-md grid-cols-1 gap-3 sm:grid-cols-2">
             <button
               type="button"
               onClick={onManualData}
               className={cn(
-                'flex items-center justify-center gap-2 rounded-2xl border border-neutral-300 bg-white px-4 py-2.5',
+                'flex items-center justify-center gap-2 rounded-xl border border-neutral-300 bg-white px-4 py-3.5',
                 'text-sm font-medium text-neutral-900 transition-colors sm:text-base',
                 'hover:bg-neutral-50',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2'
               )}
             >
-              <Pencil className="h-4 w-4 shrink-0 text-neutral-900" strokeWidth={1.75} />
+              <Pencil className="h-4 w-4 shrink-0 text-neutral-700" />
               Conozco mis datos
             </button>
             <button
               type="button"
               onClick={onRequestCall}
               className={cn(
-                'flex items-center justify-center gap-2 rounded-2xl border border-neutral-300 bg-white px-4 py-2.5',
+                'flex items-center justify-center gap-2 rounded-xl border border-neutral-300 bg-white px-4 py-3.5',
                 'text-sm font-medium text-neutral-900 transition-colors sm:text-base',
                 'hover:bg-neutral-50',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2'
               )}
             >
-              <Phone className="h-4 w-4 shrink-0 text-neutral-900" strokeWidth={1.75} />
+              <Phone className="h-4 w-4 shrink-0 text-neutral-700" />
               Que me llamen
             </button>
           </div>
@@ -216,13 +235,10 @@ export function AhorroLuzHero({
           </div>
         </div>
 
-        <div className="relative mt-auto w-full pt-10 sm:pt-14">
-          <p className="mb-1 px-4 text-center text-[10px] font-semibold uppercase tracking-wider text-neutral-500 sm:mb-2 sm:text-[11px]">
-            Comparamos entre las principales comercializadoras
-          </p>
+        <div className="relative mt-auto w-full pt-8 sm:pt-12">
           <p className="sr-only">
-            Incluimos comparativa con numerosas comercializadoras, entre otras Endesa, Naturgy, Iberdrola, Repsol,
-            Octopus y Plenitude.
+            Comparativa con numerosas comercializadoras, entre otras Endesa, Naturgy, Iberdrola, Repsol, Octopus y
+            Plenitude.
           </p>
           <div aria-hidden>
             <ProviderLogoMarquee />
