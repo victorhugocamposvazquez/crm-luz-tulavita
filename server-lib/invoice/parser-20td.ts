@@ -66,31 +66,7 @@ interface BetweenLabelSpec {
   transform?: (value: string) => string | null;
 }
 
-/** Mínimo para construir extracción desde el parser (campos críticos presentes). */
 const MIN_ACCEPTED_SCORE = 0.78;
-
-/**
- * Más estricto: solo omitimos LLM si el diagnóstico está limpio y el score es alto.
- * Override numérico: env `PARSER_20TD_FAST_MIN_SCORE` (0.5–1), p. ej. 0.93 para ser más conservadores.
- */
-const PARSER_20TD_FAST_PATH_MIN_SCORE = (() => {
-  const raw = process.env.PARSER_20TD_FAST_MIN_SCORE ?? '';
-  const n = Number(raw);
-  if (Number.isFinite(n) && n >= 0.5 && n <= 1) return n;
-  return 0.9;
-})();
-
-/**
- * El parser puede marcar `accepted` con ~0,78–0,95 y seguir teniendo `warnings`
- * (desfase P1+P2 vs total, €/kWh implícito raro, periodo raro). Eso explica un “92 %” con datos mal leídos.
- * Solo se debe saltar el LLM cuando no hay avisos y el score supera el umbral del fast path.
- */
-export function shouldSkipLLMFor20tdParser(diagnostics: Parser20TDDiagnostics): boolean {
-  if (!diagnostics.accepted) return false;
-  if (diagnostics.warnings.length > 0) return false;
-  if (diagnostics.score < PARSER_20TD_FAST_PATH_MIN_SCORE) return false;
-  return true;
-}
 
 const FIELD_WEIGHTS = {
   tipo_tarifa: 0.18,
@@ -158,72 +134,11 @@ const PERIOD_PATTERNS = [
   /PERIODO DE FACTURACI[ÓO]N:\s*(\d{2}[./-]\d{2}[./-]\d{4})\s*-\s*(\d{2}[./-]\d{2}[./-]\d{4})/i,
 ];
 
-/** Evita capturar marketing / URLs como titular (p. ej. TotalEnergies). */
-const TITULAR_GARBAGE_END_PATTERNS: RegExp[] = [
-  /https?:\/\//i,
-  /www\./i,
-  /clientes\.totalenergies\.es/i,
-  /¿Qué\s+te\s+facturamos/i,
-  /incluye el suministro de electricidad/i,
-  /\bA TU AIRE\b/i,
-];
-
-function looksLikeInvalidTitular(s: string): boolean {
-  const t = s.trim();
-  if (t.length < 3 || t.length > 120) return true;
-  if (/https?:\/\//i.test(t)) return true;
-  if (/\bwww\./i.test(t)) return true;
-  if (/\.es\)\s*¿/.test(t) || /\.es\s*¿/.test(t)) return true;
-  if (/¿Qué\s+te\s+facturamos/i.test(t)) return true;
-  if (/incluye el suministro de electricidad/i.test(t)) return true;
-  if (/^[\s)"'¿]+$/u.test(t)) return true;
-  if ((t.match(/\?/g) ?? []).length >= 1 && /facturamos|suministro|electricidad/i.test(t)) return true;
-  return false;
-}
-
-/**
- * Nombre antes de NIF (muy habitual en cabecera; TotalEnergies, etc.).
- * Solo si hay al menos dos tokens y no parece comercializadora.
- */
-function extractTitularBeforeNif(text: string): ExtractedField<string> {
-  const m = text.match(
-    /\b([A-ZÁÉÍÓÚÑ][A-Za-záéíóúñÁÉÍÓÚÑ\-\s]{2,70}?)\s+NIF\s*[:,.\s]?\s*[A-Z0-9]{7,12}\b/u,
-  );
-  if (!m?.[1]) return emptyField<string>();
-  const raw = cleanCapturedText(m[1]);
-  if (!raw || looksLikeInvalidTitular(raw)) return emptyField<string>();
-  if (/^(TOTALENERGIES|ENDESA|IBERDROLA|NATURGY|REPSOL|PLENITUDE|Naturgy)\b/i.test(raw)) {
-    return emptyField<string>();
-  }
-  const words = raw.split(/\s+/).filter(Boolean);
-  if (words.length < 2) return emptyField<string>();
-  return { value: raw.replace(/\s+/g, ' '), confidence: 0.84, source: 'titular-before-nif' };
-}
-
-function extractTitularField(text: string): { field: ExtractedField<string>; warnings: string[] } {
-  const warnings: string[] = [];
-  let field = extractBetweenLabels(text, TITULAR_SPECS);
-  if (field.value != null) {
-    if (looksLikeInvalidTitular(field.value)) {
-      warnings.push('titular del parser descartado (URL o texto promocional)');
-      field = emptyField<string>();
-    } else {
-      field = { ...field, value: field.value.trim() };
-    }
-  }
-  if (field.value == null) {
-    const byNif = extractTitularBeforeNif(text);
-    if (byNif.value != null) field = byNif;
-  }
-  return { field, warnings };
-}
-
 const TITULAR_SPECS: BetweenLabelSpec[] = [
   {
     label: 'titular-cabecera',
     startPatterns: [/Esta es tu factura de luz,\s*/i],
     endPatterns: [
-      ...TITULAR_GARBAGE_END_PATTERNS,
       /\n/,
       /\bDNI\b/i,
       /CUPS[:\s]/i,
@@ -241,12 +156,10 @@ const TITULAR_SPECS: BetweenLabelSpec[] = [
     startPatterns: [
       /Nombre y Apellidos del titular[:\s]*/i,
       /Titular del contrato[:\s]*/i,
-      /Titular\s+Potencia[:\s]*/i,
-      /\bTitular\s*:\s*/i,
-      /\bCliente\s*:\s*/i,
+      /Titular Potencia[:\s]*/i,
+      /Cliente[:\s]*/i,
     ],
     endPatterns: [
-      ...TITULAR_GARBAGE_END_PATTERNS,
       /\n/,
       /\bDNI\b/i,
       /Cuenta bancaria/i,
@@ -691,7 +604,7 @@ export function parse20TDFromTextDetailed(text: string): Parse20TDTextResult {
   const totalFactura = extractNumberField(searchText, TOTAL_PATTERNS);
   const consumption = extractNumberField(searchText, CONSUMPTION_PATTERNS);
   const cups = extractStringField(searchText, CUPS_PATTERNS);
-  const { field: titular, warnings: titularWarnings } = extractTitularField(searchText);
+  const titular = extractBetweenLabels(searchText, TITULAR_SPECS);
   const direccion = extractBetweenLabels(searchText, ADDRESS_SPECS);
   const periodRange = extractPeriodRange(searchText);
   const powerP1 = extractNumberField(searchText, POWER_P1_PATTERNS);
@@ -741,7 +654,7 @@ export function parse20TDFromTextDetailed(text: string): Parse20TDTextResult {
     precioP2,
     consumoP1: consumoSplit.p1,
     consumoP2: consumoSplit.p2,
-    warnings: [...consumoSplit.warnings, ...titularWarnings],
+    warnings: consumoSplit.warnings,
   });
 
   if (!diagnostics.accepted) {
