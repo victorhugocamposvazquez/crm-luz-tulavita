@@ -111,7 +111,7 @@ export function AhorroLuzHero({
 
       <AhorroLuzBrandHeader />
 
-      <section className="relative flex flex-1 flex-col px-4 pb-12 pt-4 sm:px-6 sm:pb-16 sm:pt-8">
+      <section className="relative flex flex-1 flex-col px-4 pb-12 sm:px-6 sm:pb-16 sm:pt-8">
         <div className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center text-center">
           <h1 className="max-w-[18ch] text-[1.75rem] font-extrabold leading-[1.1] tracking-tight text-neutral-950 sm:max-w-none sm:text-4xl md:text-[2.5rem]">
             Paga menos en tu{' '}
