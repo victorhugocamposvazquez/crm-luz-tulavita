@@ -496,13 +496,22 @@ export async function extractInvoiceFromBufferDetailed(
       if (parsedResult) {
         console.log(`[pipeline] 2.0TD parser en sombra: accepted=${parsedResult.diagnostics.accepted} score=${parsedResult.diagnostics.score}`);
       }
-      const extraction = extractedPdfText
-        ? await (await loadLLMExtractModule()).extractWithLLM20TDFromText(extractedPdfText)
-        : await (await loadLLMExtractModule()).extractWithLLM20TD(buffer, mimeType);
-      debug.usedLLM = true;
-      debug.path = extractedPdfText ? '2.0td-llm-text' : '2.0td-llm-pdf';
-      validated = validateExtraction(extraction);
-      console.log(`[pipeline] 2.0TD path finished in ${Date.now() - tFast20}ms`);
+      if (parsedResult?.diagnostics.accepted && parsedResult.extraction) {
+        console.log(`[pipeline] 2.0TD sin LLM (parser aceptado, score=${parsedResult.diagnostics.score.toFixed(2)})`);
+        validated = validateExtraction(parsedResult.extraction);
+        nullify30TDFields(validated);
+        debug.usedLLM = false;
+        debug.path = extractedPdfText ? '2.0td-text-parser' : '2.0td-raw-parser';
+        console.log(`[pipeline] 2.0TD parser path finished in ${Date.now() - tFast20}ms`);
+      } else {
+        const extraction = extractedPdfText
+          ? await (await loadLLMExtractModule()).extractWithLLM20TDFromText(extractedPdfText)
+          : await (await loadLLMExtractModule()).extractWithLLM20TD(buffer, mimeType);
+        debug.usedLLM = true;
+        debug.path = extractedPdfText ? '2.0td-llm-text' : '2.0td-llm-pdf';
+        validated = validateExtraction(extraction);
+        console.log(`[pipeline] 2.0TD LLM path finished in ${Date.now() - tFast20}ms`);
+      }
     } else if (rawDetectedTarifa === '3.0TD') {
       const t30 = Date.now();
       let extraction = await (await loadLLMExtractModule()).extractWithLLM30TD(buffer, mimeType);
@@ -555,13 +564,22 @@ export async function extractInvoiceFromBufferDetailed(
         if (parsedResult) {
           console.log(`[pipeline] fallback 2.0TD parser en sombra: accepted=${parsedResult.diagnostics.accepted} score=${parsedResult.diagnostics.score}`);
         }
-        const extraction = extractedPdfText
-          ? await (await loadLLMExtractModule()).extractWithLLM20TDFromText(extractedPdfText)
-          : await (await loadLLMExtractModule()).extractWithLLM20TD(buffer, mimeType);
-        debug.usedLLM = true;
-        debug.path = extractedPdfText ? '2.0td-llm-text' : '2.0td-llm-pdf';
-        validated = validateExtraction(extraction);
-        console.log(`[pipeline] fallback 2.0TD path finished in ${Date.now() - tGeneric}ms`);
+        if (parsedResult?.diagnostics.accepted && parsedResult.extraction) {
+          console.log(`[pipeline] fallback 2.0TD sin LLM (parser aceptado, score=${parsedResult.diagnostics.score.toFixed(2)})`);
+          validated = validateExtraction(parsedResult.extraction);
+          nullify30TDFields(validated);
+          debug.usedLLM = false;
+          debug.path = extractedPdfText ? '2.0td-text-parser' : '2.0td-raw-parser';
+          console.log(`[pipeline] fallback 2.0TD parser path finished in ${Date.now() - tGeneric}ms`);
+        } else {
+          const extraction = extractedPdfText
+            ? await (await loadLLMExtractModule()).extractWithLLM20TDFromText(extractedPdfText)
+            : await (await loadLLMExtractModule()).extractWithLLM20TD(buffer, mimeType);
+          debug.usedLLM = true;
+          debug.path = extractedPdfText ? '2.0td-llm-text' : '2.0td-llm-pdf';
+          validated = validateExtraction(extraction);
+          console.log(`[pipeline] fallback 2.0TD LLM path finished in ${Date.now() - tGeneric}ms`);
+        }
         extractionCache.set(hash, { extraction: validated, ts: Date.now(), pv: PROMPT_VERSION });
         console.log(`[pipeline] total ${Date.now() - t0}ms`);
         debug.timings.totalMs = Date.now() - t0;
