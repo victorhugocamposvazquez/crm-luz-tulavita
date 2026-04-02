@@ -111,7 +111,7 @@ export function AhorroLuzCookieConsent() {
       )}
 
       <Dialog open={policyOpen} onOpenChange={setPolicyOpen}>
-        <DialogContent className="z-[110] max-h-[85dvh] max-w-lg overflow-y-auto rounded-xl border border-neutral-200 bg-white p-6 sm:rounded-2xl">
+        <DialogContent className="max-h-[85dvh] max-w-lg overflow-y-auto rounded-xl border border-neutral-200 bg-white p-6 sm:rounded-2xl">
           <DialogHeader>
             <DialogTitle className="text-left text-neutral-950">Política de cookies</DialogTitle>
           </DialogHeader>
