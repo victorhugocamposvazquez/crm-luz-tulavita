@@ -63,7 +63,7 @@ function ProviderLogoMarquee() {
     );
 
   const segment = (suffix: string) => (
-    <div className="flex w-max shrink-0 items-center gap-x-12 pr-12 sm:gap-x-16 sm:pr-16">
+    <div className="flex w-max shrink-0 items-center gap-x-16 pr-16 sm:gap-x-24 sm:pr-24">
       {PROVIDER_LOGOS.map((p) => (
         <span key={`${p.name}-${suffix}`} className={logoClass(p)}>
           {p.name}
@@ -74,7 +74,7 @@ function ProviderLogoMarquee() {
 
   return (
     <>
-      <div className="hidden flex-wrap justify-center gap-x-10 gap-y-3 px-4 py-2 motion-reduce:flex sm:gap-x-14 sm:py-2.5">
+      <div className="hidden flex-wrap justify-center gap-x-14 gap-y-3 px-4 py-2 motion-reduce:flex sm:gap-x-20 sm:py-2.5">
         {PROVIDER_LOGOS.map((p) => (
           <span key={p.name} className={logoClass(p)}>
             {p.name}
@@ -147,26 +147,16 @@ export function AhorroLuzHero({
       <section className="relative flex min-h-0 flex-1 flex-col px-4 pt-1 sm:px-6 sm:pt-2">
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="mx-auto flex w-full max-w-lg flex-col items-center pb-8 text-center sm:pb-10">
-            <div className="flex flex-col items-center gap-1.5 sm:gap-2">
-              <div className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-600 sm:text-xs">
-                <span
-                  className="h-1.5 w-1.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: ACCENT }}
-                  aria-hidden
-                />
-                Ahorro en electricidad
-              </div>
-              <h1 className="max-w-[18ch] text-[1.75rem] font-extrabold leading-[1.1] tracking-tight text-neutral-950 sm:max-w-none sm:text-4xl md:text-[2.5rem]">
-                Paga menos en tu{" "}
-                <span
-                  className="text-neutral-900 underline decoration-[3px] underline-offset-[5px]"
-                  style={{ textDecorationColor: AHORRO_LUZ_CTA_GREEN }}
-                >
-                  factura de la luz
-                </span>
-              </h1>
-            </div>
-            <p className="mt-5 max-w-md text-[15px] leading-relaxed text-neutral-600 sm:text-lg">
+            <h1 className="max-w-[18ch] text-[1.75rem] font-extrabold leading-[1.1] tracking-tight text-neutral-950 sm:max-w-none sm:text-4xl md:text-[2.5rem]">
+              Paga menos en tu{" "}
+              <span
+                className="text-neutral-900 underline decoration-[3px] underline-offset-[5px]"
+                style={{ textDecorationColor: AHORRO_LUZ_CTA_GREEN }}
+              >
+                factura de la luz
+              </span>
+            </h1>
+            <p className="mt-4 max-w-md text-[15px] leading-relaxed text-neutral-600 sm:mt-5 sm:text-lg">
               Sube tu factura y calculamos tu ahorro en segundos. Sin letra
               pequeña.
             </p>

@@ -14,6 +14,7 @@ import { EnergySavingsFlow } from '@/components/energy-savings/EnergySavingsFlow
 import { AhorroLuzHero } from '@/components/energy-savings/AhorroLuzHero';
 import { AhorroLuzBrandHeader } from '@/components/energy-savings/AhorroLuzBrandHeader';
 import { AhorroLuzCookieConsent } from '@/components/energy-savings/AhorroLuzCookieConsent';
+import { AhorroLuzPublicFooter } from '@/components/energy-savings/AhorroLuzPublicFooter';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
@@ -411,7 +412,7 @@ function LandingFormSteps({
     <div className="min-h-screen flex flex-col bg-white antialiased">
       <AhorroLuzBrandHeader fixed />
 
-      <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <div
           className={cn(
             'flex flex-1 flex-col items-center justify-center px-4 pb-10 sm:px-6',
@@ -576,6 +577,7 @@ function LandingFormSteps({
             </div>
           </div>
         </div>
+        <AhorroLuzPublicFooter />
       </div>
     </div>
   );
@@ -650,69 +652,70 @@ export default function AhorroLuz() {
       <>
         <div className="flex min-h-screen flex-col bg-white antialiased">
           <AhorroLuzBrandHeader fixed />
-          <div className="flex-1 overflow-y-auto min-h-0 flex flex-col">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
             {showEnergyFlow ? (
-            <div
-              className={cn(
-                'flex flex-1 flex-col items-center justify-center px-4 pb-12 sm:px-6',
-                AHORRO_LUZ_MAIN_MIN_H_CLASS,
-                AHORRO_LUZ_SCROLL_TOP_PAD_CLASS
-              )}
-            >
-              <div className="w-full max-w-xl mx-auto text-center animate-in fade-in duration-300 space-y-6">
-                <EnergySavingsFlow
-                  leadId={lastLeadId}
-                  attachmentPath={lastFacturaPath!}
-                  onReset={handleReset}
-                  compactLoader
-                  fixedResultLoaderMs={LANDING_POST_SUBMIT_LOADER_MS}
-                  attachmentPdfText={invoicePdfTextForFlow}
-                />
-              </div>
-            </div>
-          ) : (
-            <div
-              className={cn(
-                'flex flex-1 flex-col items-center justify-center px-4 pb-12 sm:px-6',
-                AHORRO_LUZ_MAIN_MIN_H_CLASS,
-                AHORRO_LUZ_SCROLL_TOP_PAD_CLASS
-              )}
-            >
-              <div className="mx-auto w-full max-w-lg space-y-6 text-center animate-in fade-in duration-500">
-                <h2 className="text-2xl font-semibold text-neutral-950 sm:text-3xl">¡Gracias!</h2>
-                {isManualThanks ? (
-                  <>
-                    <p className="text-xl font-bold text-neutral-950 sm:text-2xl">
-                      ¿Sabías que cerca del 99% de las facturas que recibimos les mejoramos el precio? Seguro que la tuya
-                      también! 💪
-                    </p>
-                    <p className="text-lg text-neutral-600">Un asesor te contactará pronto para ponernos manos a la obra</p>
-                    <button type="button" onClick={handleReset} className="text-lg font-medium text-neutral-900 underline-offset-4 hover:underline">
-                      Enviar otra solicitud
-                    </button>
-                  </>
-                ) : isCallbackThanks ? (
-                  <>
-                    <p className="text-lg text-neutral-700">
-                      Te llamaremos lo antes posible con el número o email que nos has dejado.
-                    </p>
-                    <button type="button" onClick={handleReset} className="text-lg font-medium text-neutral-900 underline-offset-4 hover:underline">
-                      Enviar otra solicitud
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-lg text-neutral-600">
-                      Un asesor te contactará en las próximas horas para ayudarte a ahorrar en tu factura.
-                    </p>
-                    <button type="button" onClick={handleReset} className="text-lg font-medium text-neutral-900 underline-offset-4 hover:underline">
-                      Enviar otra solicitud
-                    </button>
-                  </>
+              <div
+                className={cn(
+                  'flex flex-1 flex-col items-center justify-center px-4 pb-12 sm:px-6',
+                  AHORRO_LUZ_MAIN_MIN_H_CLASS,
+                  AHORRO_LUZ_SCROLL_TOP_PAD_CLASS
                 )}
+              >
+                <div className="w-full max-w-xl mx-auto text-center animate-in fade-in duration-300 space-y-6">
+                  <EnergySavingsFlow
+                    leadId={lastLeadId}
+                    attachmentPath={lastFacturaPath!}
+                    onReset={handleReset}
+                    compactLoader
+                    fixedResultLoaderMs={LANDING_POST_SUBMIT_LOADER_MS}
+                    attachmentPdfText={invoicePdfTextForFlow}
+                  />
+                </div>
               </div>
-            </div>
+            ) : (
+              <div
+                className={cn(
+                  'flex flex-1 flex-col items-center justify-center px-4 pb-12 sm:px-6',
+                  AHORRO_LUZ_MAIN_MIN_H_CLASS,
+                  AHORRO_LUZ_SCROLL_TOP_PAD_CLASS
+                )}
+              >
+                <div className="mx-auto w-full max-w-lg space-y-6 text-center animate-in fade-in duration-500">
+                  <h2 className="text-2xl font-semibold text-neutral-950 sm:text-3xl">¡Gracias!</h2>
+                  {isManualThanks ? (
+                    <>
+                      <p className="text-xl font-bold text-neutral-950 sm:text-2xl">
+                        ¿Sabías que cerca del 99% de las facturas que recibimos les mejoramos el precio? Seguro que la tuya
+                        también! 💪
+                      </p>
+                      <p className="text-lg text-neutral-600">Un asesor te contactará pronto para ponernos manos a la obra</p>
+                      <button type="button" onClick={handleReset} className="text-lg font-medium text-neutral-900 underline-offset-4 hover:underline">
+                        Enviar otra solicitud
+                      </button>
+                    </>
+                  ) : isCallbackThanks ? (
+                    <>
+                      <p className="text-lg text-neutral-700">
+                        Te llamaremos lo antes posible con el número o email que nos has dejado.
+                      </p>
+                      <button type="button" onClick={handleReset} className="text-lg font-medium text-neutral-900 underline-offset-4 hover:underline">
+                        Enviar otra solicitud
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-lg text-neutral-600">
+                        Un asesor te contactará en las próximas horas para ayudarte a ahorrar en tu factura.
+                      </p>
+                      <button type="button" onClick={handleReset} className="text-lg font-medium text-neutral-900 underline-offset-4 hover:underline">
+                        Enviar otra solicitud
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
             )}
+            <AhorroLuzPublicFooter />
           </div>
         </div>
         <AhorroLuzCookieConsent />

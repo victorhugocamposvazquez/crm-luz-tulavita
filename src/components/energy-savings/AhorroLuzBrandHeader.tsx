@@ -1,7 +1,8 @@
 import { cn } from '@/lib/utils';
+import { AHORRO_PUBLIC_ACCENT } from '@/lib/ahorro-luz-public-ui';
 
 /**
- * Cabecera fija Ahorro Luz: solo marca (enlace). La pastilla «Ahorro en electricidad» va en el hero junto al título.
+ * Cabecera fija Ahorro Luz: marca + pastilla «Ahorro en electricidad», misma posición en hero, formulario y éxito.
  */
 export function AhorroLuzBrandHeader({
   fixed = false,
@@ -35,6 +36,14 @@ export function AhorroLuzBrandHeader({
           </span>
         </div>
       </a>
+      <div className="mt-12 inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-600 sm:mt-14 sm:text-xs">
+        <span
+          className="h-1.5 w-1.5 shrink-0 rounded-full"
+          style={{ backgroundColor: AHORRO_PUBLIC_ACCENT }}
+          aria-hidden
+        />
+        Ahorro en electricidad
+      </div>
     </div>
   );
 
