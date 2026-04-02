@@ -27,7 +27,8 @@ import {
 } from '@/lib/ahorro-luz-public-ui';
 const MAX_PDF_TEXT_CHARS = 350_000;
 const LEAD_ATTACHMENTS_BUCKET = 'lead-attachments';
-const LANDING_POST_SUBMIT_LOADER_MS = 2000;
+/** Sin espera artificial: el resultado aparece en cuanto responde la API. */
+const LANDING_POST_SUBMIT_LOADER_MS = 0;
 
 const IMAGE_COMPRESSION_OPTIONS = {
   maxSizeMB: 0.6,

@@ -3,7 +3,8 @@ import { Check, Circle, Loader2, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const BRAND = '#26606b';
-const DEFAULT_STEP_INTERVAL_MS = 1000;
+/** Intervalo entre pasos: un poco más largo reduce la sensación de “pasos vacíos”. */
+const DEFAULT_STEP_INTERVAL_MS = 1700;
 
 export interface InvoiceProcessingLoaderStep {
   label: string;

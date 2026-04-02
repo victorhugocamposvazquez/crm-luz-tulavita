@@ -272,13 +272,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       }
       const buffer = Buffer.from(await fileData.arrayBuffer());
       const mimeType = fileData.type || (attachment_path.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
+      const extractOpts =
+        mimeType === 'application/pdf' && clientPdfText ? { pdfText: clientPdfText } : undefined;
 
-      const extraction = await extractInvoiceFromBuffer(
-        buffer,
-        mimeType,
-        mimeType === 'application/pdf' && clientPdfText ? { pdfText: clientPdfText } : undefined,
-      );
-      const [offers, taxConfig] = await Promise.all([
+      const [extraction, offers, taxConfig] = await Promise.all([
+        extractInvoiceFromBuffer(buffer, mimeType, extractOpts),
         getActiveOffers(supabase),
         fetchInvoiceEstimateTaxConfig(supabase),
       ]);
