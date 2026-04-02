@@ -176,18 +176,54 @@ const TITULAR_SPECS: BetweenLabelSpec[] = [
   },
 ];
 
-/** Corta la dirección cuando en la misma línea del PDF viene el bloque contractual (p. ej. Endesa). */
+/**
+ * Texto típico que en facturas eléctricas va *después* de la dirección en la misma línea (Endesa, etc.).
+ * Frases largas y específicas para no cortar direcciones normales por casualidad.
+ */
+const DIRECCION_SUMINISTRO_TAIL_MARKERS: RegExp[] = [
+  /\s+Contrato de mercado\s+(?:libre|fijo|indexado|t[íi]pico)\b/i,
+  /\s+Referencia de contrato de suministro\b/i,
+  /\s+Potencias contratadas\s*[:\s]/i,
+  /\s+Fin de contrato de sumin/i,
+  /\s+Peaje de acceso\b/i,
+  /\s+Contrato\s+ATR\b/i,
+  /\s+Caudal\s+contratado\b/i,
+];
+
+/**
+ * Si el recorte no parece una dirección de suministro razonable, no confiamos en el corte
+ * y devolvemos el bloque original (mejor texto largo que uno cortado erróneo).
+ */
+function isPlausibleDireccionSuministro(s: string): boolean {
+  const t = s.trim();
+  if (t.length < 8 || t.length > 220) return false;
+  if (!/\d/.test(t)) return false;
+  const hasCp = /\b\d{5}\b/.test(t);
+  const hasComma = t.includes(',');
+  if (!hasCp && !hasComma && t.length > 72) return false;
+  return true;
+}
+
+/** Recorta solo si hay marcador claro y el prefijo supera la comprobación de plausibilidad. */
 function trimDireccionSuministroTail(raw: string): string | null {
   const v = raw.replace(/\r/g, ' ').replace(/\n+/g, ' ').replace(/\s{2,}/g, ' ').trim();
   if (!v) return null;
-  const stop =
-    /\s+(?:Contrato de mercado|Referencia de contrato(?:\s+de\s+suministro)?|Potencias contratadas|Fin de contrato(?:\s+de\s+sumin)?|Peaje de acceso|Contrato\s+ATR|Caudal\s+contratado)/i;
-  const m = v.match(stop);
-  if (m?.index != null && m.index > 0) {
-    const cut = v.slice(0, m.index).trim();
-    return cut || null;
+
+  let bestIdx: number | null = null;
+  for (const re of DIRECCION_SUMINISTRO_TAIL_MARKERS) {
+    const m = v.match(re);
+    if (m?.index != null && m.index > 0 && (bestIdx == null || m.index < bestIdx)) {
+      bestIdx = m.index;
+    }
   }
-  return v;
+
+  if (bestIdx == null) return v;
+
+  const cut = v.slice(0, bestIdx).trim();
+  if (!cut || cut.length + 3 >= v.length) return v;
+  if (!isPlausibleDireccionSuministro(cut)) return v;
+
+  return cut;
 }
 
 const ADDRESS_SPECS: BetweenLabelSpec[] = [
@@ -199,12 +235,7 @@ const ADDRESS_SPECS: BetweenLabelSpec[] = [
     ],
     endPatterns: [
       /\n/,
-      /\s+Contrato de mercado/i,
-      /\s+Referencia de contrato/i,
-      /\s+Potencias contratadas/i,
-      /\s+Fin de contrato/i,
-      /\s+Peaje de acceso/i,
-      /\s+Contrato\s+ATR/i,
+      ...DIRECCION_SUMINISTRO_TAIL_MARKERS,
       /Total factura/i,
       /T[eé]rmino fijo/i,
       /Periodo de facturaci[oó]n/i,
