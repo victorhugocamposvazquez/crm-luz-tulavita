@@ -211,26 +211,22 @@ export function QuestionStep({
                   key={opt.value}
                   onClick={() => handleLabelClick(opt.value)}
                   className={cn(
-                    'flex items-center gap-3 rounded-xl border-2 px-3 py-2.5 cursor-pointer transition-all',
-                    'hover:border-neutral-300',
+                    'flex items-center gap-3 rounded-xl border px-3 py-2.5 cursor-pointer transition-all',
+                    'hover:border-neutral-400',
                     selected
                       ? useLetters
-                        ? 'border-transparent bg-white'
+                        ? 'border bg-white'
                         : 'border-primary bg-accent/30'
-                      : 'border-neutral-200'
+                      : 'border-neutral-300'
                   )}
-                  style={
-                    selected && useLetters
-                      ? { borderColor: accent, borderWidth: 2 }
-                      : undefined
-                  }
+                  style={selected && useLetters ? { borderColor: accent } : undefined}
                 >
                   {useLetters ? (
                     <>
                       <span
                         className={cn(
                           'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
-                          selected ? 'text-white' : 'border-2 border-neutral-300 text-neutral-600'
+                          selected ? 'text-white' : 'border border-neutral-300 text-neutral-600'
                         )}
                         style={selected ? { backgroundColor: accent } : undefined}
                       >

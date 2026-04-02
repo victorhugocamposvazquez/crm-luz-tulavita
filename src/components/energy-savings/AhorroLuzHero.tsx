@@ -151,40 +151,42 @@ export function AhorroLuzHero({
           ) : (
             <div
               className={cn(
-                'mt-8 flex w-full max-w-md flex-col justify-between gap-2 rounded-2xl border-2 border-dashed border-neutral-300 bg-neutral-50/60 px-4 py-4 text-left sm:mt-10 sm:gap-2.5 sm:py-5',
+                'mt-8 flex w-full max-w-md flex-col justify-between rounded-2xl border-2 border-dashed border-neutral-300 bg-neutral-50/60 px-4 py-4 text-left sm:mt-10 sm:py-5',
                 HERO_UPLOAD_SLOT_MIN
               )}
             >
-              <div className="flex min-h-0 items-start gap-3 sm:gap-4">
-                <span
-                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-white sm:h-14 sm:w-14"
-                  aria-hidden
-                >
-                  <Check className="h-6 w-6 text-neutral-900 sm:h-7 sm:w-7" strokeWidth={2.25} />
-                </span>
-                <div className="min-w-0 flex-1 pt-0.5">
-                  <p className="text-sm font-semibold text-neutral-900 sm:text-base">Archivo seleccionado</p>
-                  <p className="mt-0.5 truncate text-sm text-neutral-600" title={pickedFile.name}>
-                    {pickedFile.name}
-                  </p>
+              <div className="flex min-h-0 items-start justify-between gap-2 sm:gap-3">
+                <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
+                  <span
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-neutral-200 bg-white sm:h-14 sm:w-14"
+                    aria-hidden
+                  >
+                    <Check className="h-6 w-6 text-neutral-900 sm:h-7 sm:w-7" strokeWidth={2.25} />
+                  </span>
+                  <div className="min-w-0 flex-1 pt-0.5 pr-1">
+                    <p className="text-sm font-semibold text-neutral-900 sm:text-base">Archivo seleccionado</p>
+                    <p className="mt-0.5 truncate text-sm text-neutral-600" title={pickedFile.name}>
+                      {pickedFile.name}
+                    </p>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-center justify-between gap-2">
                 <button
                   type="button"
                   onClick={() => {
                     setPickedFile(null);
                     inputRef.current?.click();
                   }}
-                  className="shrink-0 text-left text-xs font-medium text-neutral-800 underline-offset-2 hover:underline sm:text-sm"
+                  className="shrink-0 self-start text-right text-xs font-medium text-neutral-800 underline-offset-2 hover:underline sm:text-sm"
                 >
                   Elegir otro archivo
                 </button>
+              </div>
+              <div className="mt-3 flex w-full justify-center sm:mt-4">
                 <button
                   type="button"
                   onClick={() => onFileSelected(pickedFile)}
                   className={cn(
-                    'shrink-0 rounded-xl border border-neutral-300 bg-white px-4 py-3.5 text-sm font-medium text-neutral-900 sm:px-5',
+                    'w-full max-w-xs rounded-xl border border-neutral-300 bg-white px-8 py-4 text-base font-semibold text-neutral-900 sm:max-w-sm sm:py-4 sm:text-lg',
                     'hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2'
                   )}
                 >
