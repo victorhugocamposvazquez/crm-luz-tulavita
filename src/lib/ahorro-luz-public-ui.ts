@@ -5,8 +5,8 @@ export const AHORRO_PUBLIC_ACCENT = '#22c55e';
 export const AHORRO_FORM_CONTROL_ACCENT = '#171717';
 
 /**
- * Reserva vertical igual a la cabecera fija (`AhorroLuzBrandHeader` con `fixed`).
- * Mantener sincronizado si cambian paddings, pastilla o tamaños del logo.
+ * Reserva vertical = cabecera fija completa (logo + pastilla «Ahorro en electricidad»).
+ * Mantener alineado con `AhorroLuzBrandHeader`.
  */
 export const AHORRO_LUZ_HEADER_SPACER_CLASS =
   'h-[calc(max(0.875rem,env(safe-area-inset-top,0px))+7.875rem)] sm:h-[calc(max(1.125rem,env(safe-area-inset-top,0px))+8.375rem)]';

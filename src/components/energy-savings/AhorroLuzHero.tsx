@@ -8,6 +8,7 @@ import { toast } from '@/hooks/use-toast';
 import { Check, ChevronRight, Pencil, Phone, Upload } from 'lucide-react';
 import { AHORRO_PUBLIC_ACCENT, AHORRO_LUZ_HEADER_SPACER_CLASS } from '@/lib/ahorro-luz-public-ui';
 import { AhorroLuzBrandHeader } from '@/components/energy-savings/AhorroLuzBrandHeader';
+import { AhorroLuzReviewsStrip } from '@/components/energy-savings/AhorroLuzReviewsStrip';
 
 const ACCENT = AHORRO_PUBLIC_ACCENT;
 
@@ -253,6 +254,7 @@ export function AhorroLuzHero({
         </div>
 
         <div className="relative mt-auto w-full pt-8 sm:pt-12">
+          <AhorroLuzReviewsStrip rating={4.89} reviewCount={750} className="pt-0" />
           <p className="sr-only">
             Comparativa con numerosas comercializadoras, entre otras Endesa, Naturgy, Iberdrola, Repsol, Octopus y
             Plenitude.

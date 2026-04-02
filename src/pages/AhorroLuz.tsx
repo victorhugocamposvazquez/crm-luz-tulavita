@@ -13,6 +13,7 @@ import { useMetaAttribution } from '@/hooks/useMetaAttribution';
 import { EnergySavingsFlow } from '@/components/energy-savings/EnergySavingsFlow';
 import { AhorroLuzHero } from '@/components/energy-savings/AhorroLuzHero';
 import { AhorroLuzBrandHeader } from '@/components/energy-savings/AhorroLuzBrandHeader';
+import { AhorroLuzCookieConsent } from '@/components/energy-savings/AhorroLuzCookieConsent';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
@@ -631,10 +632,11 @@ export default function AhorroLuz() {
     const isCallbackThanks = successEntryPath === 'callback';
 
     return (
-      <div className="flex min-h-screen flex-col bg-white antialiased">
-        <AhorroLuzBrandHeader fixed />
-        <div className="flex-1 overflow-y-auto min-h-0 flex flex-col">
-          {showEnergyFlow ? (
+      <>
+        <div className="flex min-h-screen flex-col bg-white antialiased">
+          <AhorroLuzBrandHeader fixed />
+          <div className="flex-1 overflow-y-auto min-h-0 flex flex-col">
+            {showEnergyFlow ? (
             <div
               className={cn(
                 'flex flex-1 flex-col items-center justify-center px-4 pb-12 sm:px-6',
@@ -695,31 +697,39 @@ export default function AhorroLuz() {
                 )}
               </div>
             </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+        <AhorroLuzCookieConsent />
+      </>
     );
   }
 
   if (phase === 'form' && formMode) {
     return (
-      <LandingFormSteps
-        key={formKey}
-        mode={formMode}
-        initialFile={pendingFile}
-        onBackToHero={backToHero}
-        onLeadSuccess={onFormSuccessWrapper}
-        attribution={attribution}
-        clearAttribution={clearAttribution}
-      />
+      <>
+        <LandingFormSteps
+          key={formKey}
+          mode={formMode}
+          initialFile={pendingFile}
+          onBackToHero={backToHero}
+          onLeadSuccess={onFormSuccessWrapper}
+          attribution={attribution}
+          clearAttribution={clearAttribution}
+        />
+        <AhorroLuzCookieConsent />
+      </>
     );
   }
 
   return (
-    <AhorroLuzHero
-      onFileSelected={(file) => goToForm('upload', file)}
-      onManualData={() => goToForm('manual', null)}
-      onRequestCall={() => goToForm('callback', null)}
-    />
+    <>
+      <AhorroLuzHero
+        onFileSelected={(file) => goToForm('upload', file)}
+        onManualData={() => goToForm('manual', null)}
+        onRequestCall={() => goToForm('callback', null)}
+      />
+      <AhorroLuzCookieConsent />
+    </>
   );
 }

@@ -1,24 +1,29 @@
 import { cn } from '@/lib/utils';
 import { AHORRO_PUBLIC_ACCENT } from '@/lib/ahorro-luz-public-ui';
 
-/** Misma marca, pastilla de contexto y tamaños en hero, formulario y pantallas posteriores. */
+/**
+ * Cabecera pública Ahorro Luz: marca (enlace) + pastilla de contexto debajo, misma posición en todas las pantallas.
+ * La pastilla no forma parte del enlace del logo.
+ */
 export function AhorroLuzBrandHeader({
   fixed = false,
   className,
 }: {
   fixed?: boolean;
-  /** Clases extra en el contenedor interno (p. ej. safe area). */
   className?: string;
 }) {
   const inner = (
     <div
       className={cn(
         'flex w-full flex-col items-center px-4 sm:px-6',
-        'pb-4 pt-[max(0.875rem,env(safe-area-inset-top))] sm:pb-5 sm:pt-[max(1.125rem,env(safe-area-inset-top))]',
+        'pb-4 pt-[max(0.875rem,env(safe-area-inset-top))] sm:pb-4 sm:pt-[max(1.125rem,env(safe-area-inset-top))]',
         className
       )}
     >
-      <a href="/ahorra-factura-luz" className="inline-flex no-underline outline-none ring-offset-2 focus-visible:ring-2 focus-visible:ring-neutral-400">
+      <a
+        href="/ahorra-factura-luz"
+        className="inline-flex no-underline outline-none ring-offset-2 focus-visible:ring-2 focus-visible:ring-neutral-400"
+      >
         <div className="flex items-center justify-center gap-3.5 sm:gap-4">
           <img
             src="/logo-tulavita.png"
