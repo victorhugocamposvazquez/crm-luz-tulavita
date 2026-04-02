@@ -117,7 +117,7 @@ export function AhorroLuzHero({
       <AhorroLuzBrandHeader fixed />
       <div aria-hidden className={cn('pointer-events-none shrink-0', AHORRO_LUZ_HEADER_SPACER_CLASS)} />
 
-      <section className="relative flex flex-1 flex-col px-4 pb-12 pt-4 sm:px-6 sm:pb-16 sm:pt-6">
+      <section className="relative flex flex-1 flex-col px-4 pb-12 pt-1 sm:px-6 sm:pb-16 sm:pt-2">
         <div className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center text-center">
           <h1 className="max-w-[18ch] text-[1.75rem] font-extrabold leading-[1.1] tracking-tight text-neutral-950 sm:max-w-none sm:text-4xl md:text-[2.5rem]">
             Paga menos en tu{' '}

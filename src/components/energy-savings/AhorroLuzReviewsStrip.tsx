@@ -44,17 +44,26 @@ export function AhorroLuzReviewsStrip({
   className?: string;
 }) {
   const ratingLabel = Number.isInteger(rating) ? String(rating) : rating.toFixed(2).replace('.', ',');
+  const countLabel = reviewCount.toLocaleString('es-ES');
 
   return (
     <div className={cn('w-full border-t border-neutral-200 px-4 pt-6 sm:pt-8', className)}>
-      <div className="mx-auto flex max-w-lg flex-col items-center justify-center gap-2 pb-6 text-center sm:max-w-none sm:flex-row sm:items-center sm:pb-8 sm:gap-3">
-        <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
-          <RatingStars value={rating} />
-          <span className="text-base font-bold tabular-nums text-neutral-950 sm:text-lg">{ratingLabel}</span>
+      <div className="mx-auto flex max-w-lg items-center justify-center gap-2 pb-6 sm:max-w-none sm:pb-8 sm:gap-2.5">
+        <div
+          className="flex flex-nowrap items-center justify-center gap-2 text-neutral-950 sm:gap-2.5"
+          role="group"
+          aria-label={`Valoración ${ratingLabel} sobre 5, ${countLabel} reseñas`}
+        >
+          <span className="inline-flex items-center" aria-hidden>
+            <RatingStars value={rating} />
+          </span>
+          <span className="text-base font-bold tabular-nums sm:text-lg" aria-hidden>
+            {ratingLabel}
+          </span>
+          <span className="text-sm tabular-nums text-neutral-600 sm:text-base" aria-hidden>
+            ({countLabel})
+          </span>
         </div>
-        <span className="text-sm text-neutral-500 sm:pl-0">
-          de {reviewCount.toLocaleString('es-ES')} reseñas
-        </span>
       </div>
     </div>
   );

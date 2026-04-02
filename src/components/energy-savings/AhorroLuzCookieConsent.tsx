@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Cookie } from 'lucide-react';
+import { Cookie, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { AHORRO_LUZ_CTA_GREEN } from '@/lib/ahorro-luz-public-ui';
-
-const ctaBtn =
-  'rounded-xl border border-neutral-900/15 px-4 py-2.5 text-sm font-semibold text-neutral-900 shadow-none transition-[filter] hover:brightness-[0.97] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2';
 import {
   Dialog,
   DialogContent,
@@ -14,6 +11,9 @@ import {
 } from '@/components/ui/dialog';
 
 const STORAGE_KEY = 'tulavita_ahorro_luz_cookie_consent';
+
+const ctaBtn =
+  'rounded-xl border border-neutral-900/15 px-4 py-2.5 text-sm font-semibold text-neutral-900 shadow-none transition-[filter] hover:brightness-[0.97] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2';
 
 const COOKIE_POLICY_TEXT = `En Tulavita Energía utilizamos cookies propias y, en su caso, de terceros para fines analíticos y para mejorar tu experiencia en esta página.
 
@@ -59,9 +59,17 @@ export function AhorroLuzCookieConsent() {
         >
           <div
             className={cn(
-              'flex w-full max-w-3xl flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:gap-4 sm:p-4 sm:pr-5'
+              'relative flex w-full max-w-3xl flex-col gap-3 rounded-2xl border border-neutral-200 bg-white p-4 pr-11 pt-3 shadow-sm sm:flex-row sm:items-center sm:gap-4 sm:p-4 sm:pr-12 sm:pt-4'
             )}
           >
+            <button
+              type="button"
+              onClick={() => persist('rejected')}
+              className="absolute right-2 top-2 rounded-md p-2 text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2 sm:right-2.5 sm:top-2.5"
+              aria-label="Cerrar aviso de cookies"
+            >
+              <X className="h-5 w-5" strokeWidth={2} />
+            </button>
             <div className="flex min-w-0 flex-1 flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
               <div className="flex shrink-0 items-center gap-3 sm:border-r sm:border-neutral-200 sm:pr-4">
                 <Cookie className="h-8 w-8 shrink-0 text-neutral-900 sm:h-7 sm:w-7" strokeWidth={1.5} aria-hidden />
