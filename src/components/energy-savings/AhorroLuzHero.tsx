@@ -9,7 +9,6 @@ import { Check, ChevronRight, Pencil, Phone, Upload } from "lucide-react";
 import {
   AHORRO_PUBLIC_ACCENT,
   AHORRO_LUZ_CTA_GREEN,
-  AHORRO_LUZ_HEADER_SPACER_CLASS,
 } from "@/lib/ahorro-luz-public-ui";
 import { AhorroLuzBrandHeader } from "@/components/energy-savings/AhorroLuzBrandHeader";
 import { AhorroLuzPublicFooter } from "@/components/energy-savings/AhorroLuzPublicFooter";
@@ -135,16 +134,9 @@ export function AhorroLuzHero({
         }}
       />
 
-      <AhorroLuzBrandHeader fixed />
-      <div
-        aria-hidden
-        className={cn(
-          "pointer-events-none shrink-0",
-          AHORRO_LUZ_HEADER_SPACER_CLASS,
-        )}
-      />
+      <AhorroLuzBrandHeader />
 
-      <section className="relative flex min-h-0 flex-1 flex-col px-4 sm:px-6 sm:pt-2">
+      <section className="relative flex min-h-0 flex-1 flex-col px-4 pt-1 sm:px-6 sm:pt-2">
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="mx-auto flex w-full max-w-lg flex-col items-center pb-8 text-center sm:pb-10">
             <h1 className="max-w-[18ch] text-[1.75rem] font-extrabold leading-[1.1] tracking-tight text-neutral-950 sm:max-w-none sm:text-4xl md:text-[2.5rem]">

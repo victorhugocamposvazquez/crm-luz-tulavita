@@ -2,7 +2,8 @@ import { cn } from '@/lib/utils';
 import { AHORRO_PUBLIC_ACCENT } from '@/lib/ahorro-luz-public-ui';
 
 /**
- * Cabecera fija Ahorro Luz: marca + pastilla «Ahorro en electricidad», misma posición en hero, formulario y éxito.
+ * Cabecera Ahorro Luz: marca + pastilla «Ahorro en electricidad».
+ * Por defecto fluye con el scroll; usa `fixed` solo si hace falta volver a anclarla arriba.
  */
 export function AhorroLuzBrandHeader({
   fixed = false,

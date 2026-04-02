@@ -24,8 +24,6 @@ import { extractPdfTextFromFile } from '@/lib/pdf-text-client';
 import {
   AHORRO_FORM_CONTROL_ACCENT,
   AHORRO_LUZ_CTA_GREEN,
-  AHORRO_LUZ_MAIN_MIN_H_CLASS,
-  AHORRO_LUZ_SCROLL_TOP_PAD_CLASS,
 } from '@/lib/ahorro-luz-public-ui';
 const MAX_PDF_TEXT_CHARS = 350_000;
 const LEAD_ATTACHMENTS_BUCKET = 'lead-attachments';
@@ -409,17 +407,11 @@ function LandingFormSteps({
     isLast && submitStatus !== 'loading' && !heroUploadStillPending;
 
   return (
-    <div className="min-h-screen flex flex-col bg-white antialiased">
-      <AhorroLuzBrandHeader fixed />
+    <div className="flex min-h-screen flex-col bg-white antialiased">
+      <AhorroLuzBrandHeader />
 
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-        <div
-          className={cn(
-            'flex flex-1 flex-col items-center justify-center px-4 pb-10 sm:px-6',
-            AHORRO_LUZ_MAIN_MIN_H_CLASS,
-            AHORRO_LUZ_SCROLL_TOP_PAD_CLASS
-          )}
-        >
+      <div className="flex flex-1 flex-col">
+        <div className="flex flex-1 flex-col items-center justify-center px-4 pb-8 pt-2 sm:px-6">
           <div
             key={currentQuestion.id}
             onKeyDown={handleKeyDown}
@@ -651,16 +643,10 @@ export default function AhorroLuz() {
     return (
       <>
         <div className="flex min-h-screen flex-col bg-white antialiased">
-          <AhorroLuzBrandHeader fixed />
-          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          <AhorroLuzBrandHeader />
+          <div className="flex flex-1 flex-col">
             {showEnergyFlow ? (
-              <div
-                className={cn(
-                  'flex flex-1 flex-col items-center justify-center px-4 pb-12 sm:px-6',
-                  AHORRO_LUZ_MAIN_MIN_H_CLASS,
-                  AHORRO_LUZ_SCROLL_TOP_PAD_CLASS
-                )}
-              >
+              <div className="flex flex-1 flex-col items-center justify-center px-4 pb-8 pt-2 sm:px-6">
                 <div className="w-full max-w-xl mx-auto text-center animate-in fade-in duration-300 space-y-6">
                   <EnergySavingsFlow
                     leadId={lastLeadId}
@@ -673,13 +659,7 @@ export default function AhorroLuz() {
                 </div>
               </div>
             ) : (
-              <div
-                className={cn(
-                  'flex flex-1 flex-col items-center justify-center px-4 pb-12 sm:px-6',
-                  AHORRO_LUZ_MAIN_MIN_H_CLASS,
-                  AHORRO_LUZ_SCROLL_TOP_PAD_CLASS
-                )}
-              >
+              <div className="flex flex-1 flex-col items-center justify-center px-4 pb-8 pt-2 sm:px-6">
                 <div className="mx-auto w-full max-w-lg space-y-6 text-center animate-in fade-in duration-500">
                   <h2 className="text-2xl font-semibold text-neutral-950 sm:text-3xl">¡Gracias!</h2>
                   {isManualThanks ? (

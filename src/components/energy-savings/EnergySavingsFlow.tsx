@@ -158,7 +158,7 @@ export function EnergySavingsFlow({
 
   if (comparison) {
     return (
-      <div className="flex w-full flex-col items-center space-y-6">
+      <div className="flex w-full flex-col items-center space-y-3 sm:space-y-6">
         <EnergySavingsResult
           data={{
             status: comparison.status,
@@ -171,7 +171,7 @@ export function EnergySavingsFlow({
         <img
           src={RESULT_CELEBRATION_GIF}
           alt=""
-          className="w-full max-w-xs sm:max-w-sm mx-auto rounded-lg object-contain"
+          className="mx-auto h-auto max-h-28 w-auto max-w-[9.5rem] shrink-0 object-contain sm:max-h-none sm:max-w-sm"
           width={400}
           height={300}
           loading="lazy"
