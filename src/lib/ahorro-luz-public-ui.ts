@@ -8,16 +8,16 @@ export const AHORRO_LUZ_CTA_GREEN = '#88f082';
 export const AHORRO_FORM_CONTROL_ACCENT = '#171717';
 
 /**
- * Reserva vertical = cabecera fija completa (logo + pastilla «Ahorro en electricidad»).
+ * Reserva vertical = cabecera fija solo con logo + «Tulavita Energía» (sin pastilla; va en el hero).
  * Mantener alineado con `AhorroLuzBrandHeader`.
  */
 export const AHORRO_LUZ_HEADER_SPACER_CLASS =
-  'h-[calc(max(0.875rem,env(safe-area-inset-top,0px))+9.125rem)] sm:h-[calc(max(1.125rem,env(safe-area-inset-top,0px))+9.5rem)]';
+  'h-[calc(max(0.875rem,env(safe-area-inset-top,0px))+3.5rem)] sm:h-[calc(max(1.125rem,env(safe-area-inset-top,0px))+3.875rem)]';
 
 /** Padding superior del área scrollable bajo la misma cabecera fija. */
 export const AHORRO_LUZ_SCROLL_TOP_PAD_CLASS =
-  'pt-[calc(max(0.875rem,env(safe-area-inset-top,0px))+9.125rem)] sm:pt-[calc(max(1.125rem,env(safe-area-inset-top,0px))+9.5rem)]';
+  'pt-[calc(max(0.875rem,env(safe-area-inset-top,0px))+3.5rem)] sm:pt-[calc(max(1.125rem,env(safe-area-inset-top,0px))+3.875rem)]';
 
 /** `min-height` del panel principal restando la cabecera (evita solapes con viewport). */
 export const AHORRO_LUZ_MAIN_MIN_H_CLASS =
-  'min-h-[calc(100dvh-max(0.875rem,env(safe-area-inset-top,0px))-9.375rem)] sm:min-h-[calc(100dvh-max(1.125rem,env(safe-area-inset-top,0px))-9.875rem)]';
+  'min-h-[calc(100dvh-max(0.875rem,env(safe-area-inset-top,0px))-3.75rem)] sm:min-h-[calc(100dvh-max(1.125rem,env(safe-area-inset-top,0px))-4.125rem)]';
