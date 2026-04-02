@@ -1,5 +1,5 @@
 export { MultiStepForm } from './MultiStepForm';
-export { QuestionStep, validateQuestion } from './QuestionStep';
+export { ContactPrivacyNote, QuestionStep, validateQuestion } from './QuestionStep';
 export { useFormState } from './useFormState';
 export type {
   FormConfig,

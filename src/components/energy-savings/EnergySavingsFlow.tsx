@@ -171,7 +171,7 @@ export function EnergySavingsFlow({
         <img
           src={RESULT_CELEBRATION_GIF}
           alt=""
-          className="mx-auto h-auto max-h-28 w-auto max-w-[9.5rem] shrink-0 object-contain sm:max-h-none sm:max-w-sm"
+          className="mx-auto h-auto max-h-36 w-auto max-w-[11.5rem] shrink-0 object-contain sm:max-h-none sm:max-w-sm"
           width={400}
           height={300}
           loading="lazy"

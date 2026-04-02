@@ -7,7 +7,7 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { flushSync } from 'react-dom';
 import { useFormState } from '@/components/landing-form';
-import { QuestionStep, validateQuestion } from '@/components/landing-form';
+import { ContactPrivacyNote, QuestionStep, validateQuestion } from '@/components/landing-form';
 import type { FormConfig, Question, LeadPayload } from '@/components/landing-form';
 import { useMetaAttribution } from '@/hooks/useMetaAttribution';
 import { EnergySavingsFlow } from '@/components/energy-savings/EnergySavingsFlow';
@@ -48,6 +48,8 @@ const CONTACT_QUESTION_SHARED = {
   privacyNote:
     'Trataremos tus datos para darte respuesta y enviarte ofertas e información promocional sobre nuestros servicios por diversos medios.',
   privacyNoteHighlight: 'darte respuesta',
+  /** Texto bajo la fila Atrás / Enviar / Siguiente */
+  privacyNoteBelowActions: true,
 };
 
 const CONTACT_AFTER_FILE: Question = {
@@ -567,6 +569,18 @@ function LandingFormSteps({
                 </button>
               </div>
             </div>
+
+            {currentQuestion.type === 'contact' &&
+              currentQuestion.privacyNoteBelowActions &&
+              currentQuestion.privacyNote && (
+                <div className="mx-auto mt-5 max-w-lg px-1 text-center">
+                  <ContactPrivacyNote
+                    note={currentQuestion.privacyNote}
+                    highlight={currentQuestion.privacyNoteHighlight}
+                    highlightHref={currentQuestion.privacyNoteHighlightHref}
+                  />
+                </div>
+              )}
           </div>
         </div>
         <AhorroLuzPublicFooter />

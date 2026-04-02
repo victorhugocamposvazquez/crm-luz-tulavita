@@ -19,6 +19,41 @@ import { cn } from '@/lib/utils';
 import { isValidEmail } from './utils';
 import type { Question } from './types';
 
+/** Párrafo de aviso de privacidad del paso contacto (reutilizable bajo el botón Enviar). */
+export function ContactPrivacyNote({
+  note,
+  highlight,
+  highlightHref,
+  className,
+}: {
+  note: string;
+  highlight?: string;
+  highlightHref?: string;
+  className?: string;
+}) {
+  if (!highlight || !note.includes(highlight)) {
+    return <p className={cn('text-sm text-neutral-500', className)}>{note}</p>;
+  }
+  const parts = note.split(highlight);
+  const mid = highlightHref ? (
+    <a
+      href={highlightHref}
+      className="font-medium text-neutral-600 underline underline-offset-2 hover:text-neutral-900"
+    >
+      {highlight}
+    </a>
+  ) : (
+    <span className="underline underline-offset-2">{highlight}</span>
+  );
+  return (
+    <p className={cn('text-sm text-neutral-500', className)}>
+      {parts[0]}
+      {mid}
+      {parts[1]}
+    </p>
+  );
+}
+
 export interface QuestionStepProps {
   question: Question;
   value: string | number | string[] | Record<string, string> | undefined;
@@ -357,22 +392,6 @@ export function QuestionStep({
       const updateContact = (field: string, v: string) => {
         onChange({ ...contactVal, [field]: v });
       };
-      // Render privacy note with optional highlighted (underlined) text
-      const renderPrivacyNote = () => {
-        if (!contactQ.privacyNote) return null;
-        const highlight = contactQ.privacyNoteHighlight;
-        if (!highlight || !contactQ.privacyNote.includes(highlight)) {
-          return <p className="text-sm text-gray-500">{contactQ.privacyNote}</p>;
-        }
-        const parts = contactQ.privacyNote.split(highlight);
-        return (
-          <p className="text-sm text-gray-500">
-            {parts[0]}
-            <span className="underline">{highlight}</span>
-            {parts[1]}
-          </p>
-        );
-      };
       return (
         <div className="space-y-6" ref={formContainerRef} style={{ ['--form-accent' as string]: accent }}>
           {contactQ.reviewPoints && contactQ.reviewPoints.length > 0 && (
@@ -387,8 +406,14 @@ export function QuestionStep({
               ))}
             </ul>
           )}
-          {contactQ.privacyNote && (
-            <div className="mb-6">{renderPrivacyNote()}</div>
+          {contactQ.privacyNote && !contactQ.privacyNoteBelowActions && (
+            <div className="mb-6">
+              <ContactPrivacyNote
+                note={contactQ.privacyNote}
+                highlight={contactQ.privacyNoteHighlight}
+                highlightHref={contactQ.privacyNoteHighlightHref}
+              />
+            </div>
           )}
           <div className="space-y-6">
             {/* Nombre - Material style */}
@@ -404,16 +429,18 @@ export function QuestionStep({
                 disabled={disabled}
               />
             </div>
-            {/* Teléfono - Material style con bandera y selector */}
+            {/* Teléfono — línea inferior en un solo trazo (evita corte bajo el input al enfocar) */}
             <div className="flex flex-col">
               <Label className="mb-1 text-sm font-medium text-neutral-900">Número de teléfono *</Label>
-              <div className="flex items-center border-b border-neutral-300 transition-colors focus-within:border-b focus-within:border-[color:var(--form-accent)]">
+              <div className="group relative flex w-full items-center">
                 <button
                   type="button"
-                  className="flex items-center gap-1 pl-0 pr-2 h-11 text-gray-700 hover:bg-gray-50 rounded transition-colors"
+                  className="flex h-11 shrink-0 items-center gap-1 pl-0 pr-2 text-gray-700 transition-colors hover:bg-gray-50 rounded"
                   tabIndex={-1}
                 >
-                  <span className="text-xl" aria-hidden>🇪🇸</span>
+                  <span className="text-xl" aria-hidden>
+                    🇪🇸
+                  </span>
                   <span className="text-sm font-medium">+34</span>
                   <ChevronDown className="h-4 w-4 text-gray-500" />
                 </button>
@@ -422,12 +449,16 @@ export function QuestionStep({
                   inputMode="numeric"
                   autoComplete="tel"
                   data-contact-field="phone"
-                  className="flex-1 h-11 border-0 rounded-none px-0 bg-transparent placeholder:text-neutral-400 focus-visible:ring-0 no-autofill-bg"
+                  className="relative z-[1] min-w-0 flex-1 border-0 bg-transparent px-0 shadow-none h-11 rounded-none placeholder:text-neutral-400 focus-visible:border-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:ring-offset-0 no-autofill-bg"
                   placeholder="612 34 56 78"
                   value={contactVal.phone ?? ''}
                   onChange={(e) => updateContact('phone', e.target.value)}
                   onInput={(e) => updateContact('phone', e.currentTarget.value)}
                   disabled={disabled}
+                />
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute bottom-0 left-0 right-0 z-0 h-px bg-neutral-300 transition-[height,background-color] group-focus-within:h-0.5 group-focus-within:bg-[color:var(--form-accent)]"
                 />
               </div>
             </div>

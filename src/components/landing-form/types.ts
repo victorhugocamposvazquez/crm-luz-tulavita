@@ -90,6 +90,10 @@ export interface ContactQuestion extends BaseQuestion {
   privacyNote?: string;
   /** Texto a subrayar dentro del aviso de privacidad */
   privacyNoteHighlight?: string;
+  /** Si existe, el texto destacado es un enlace */
+  privacyNoteHighlightHref?: string;
+  /** Si es true, el padre debe mostrar el aviso bajo la fila de acciones (p. ej. bajo Enviar) */
+  privacyNoteBelowActions?: boolean;
 }
 
 export type Question =
