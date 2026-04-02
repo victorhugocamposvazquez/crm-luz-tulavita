@@ -1,24 +1,28 @@
 /**
- * Extracción de datos de facturas energéticas españolas mediante GPT-4o Vision.
- *
- * Dos caminos según tarifa:
- *  - 2.0TD: prompt ligero + gpt-4o-mini (rápido, barato, fiable para facturas simples).
- *  - 3.0TD: prompt completo + gpt-4o-mini → fallback gpt-4o → retry si consumo sospechoso.
- *
- * Usa la Responses API de OpenAI que soporta PDFs nativamente.
+ * Extracción de facturas eléctricas vía OpenAI Responses API.
+ * Prioridad: texto filtrado (pocas tokens) → solo si falla validación, PDF/imagen (input_file / input_image).
  */
 
 import type { InvoiceExtraction } from './types.js';
 import { emptyExtraction } from './types.js';
+import {
+  extractRelevantText,
+  EXTRACT_RELEVANT_MAX_CHARS_20TD,
+  EXTRACT_RELEVANT_MAX_CHARS_30TD,
+} from './extract-relevant-text.js';
+import { extractTextFromPdf } from './pdf-text.js';
 
 const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
 const MODEL_FAST = 'gpt-4o-mini';
 const MODEL_FULL = 'gpt-4o';
 const CONFIDENCE_THRESHOLD = Number(process.env.INVOICE_LLM_CONFIDENCE_THRESHOLD ?? '0.7') || 0.7;
 
-const MAX_TOKENS_20TD = 500;
-const MAX_TOKENS_30TD = 2000;
-const MAX_TEXT_CHARS_20TD = 12_000;
+/** Salida JSON compacta. */
+const MAX_TOKENS_20TD = 300;
+const MAX_TOKENS_30TD = 700;
+const MAX_TOKENS_30TD_PDF_FALLBACK = 900;
+/** Tope de seguridad si llegara texto sin filtrar. */
+const MAX_INPUT_TEXT_CHARS = 8_000;
 
 // ────────────────────────────────────────────────────────────
 // Sección compartida de formato numérico
@@ -33,176 +37,28 @@ En España: PUNTO = separador de miles, COMA = separador decimal.
 Regla: si ves "NNN,NNN" con 3 decimales tras la coma, los 3 dígitos SON decimales.`;
 
 // ────────────────────────────────────────────────────────────
-// PROMPT 2.0TD — ligero (~2500 chars), solo P1-P2
+// PROMPT 2.0TD — mínimo (menos tokens)
 // ────────────────────────────────────────────────────────────
-const SYSTEM_PROMPT_20TD = `Eres un experto en facturas de energía eléctrica en España. Extrae datos estructurados de una factura 2.0TD (doméstica, 2 periodos).
-
-INSTRUCCIONES:
-1. Analiza todas las páginas.
-2. Convierte números del formato español (coma decimal) a punto decimal.
-3. Dato no visible → null.
-4. Responde SOLO con JSON válido, sin texto, sin markdown.
-
-${NUMERO_ESPANOL_BLOQUE}
-
-ESQUEMA JSON:
-{
-  "company_name": "string",
-  "consumption_kwh": number,
-  "total_factura": number,
-  "period_start": "YYYY-MM-DD",
-  "period_end": "YYYY-MM-DD",
-  "period_months": number,
-  "potencia_contratada_kw": number,
-  "potencia_p1_kw": number, "potencia_p2_kw": number,
-  "precio_energia_kwh": number,
-  "precio_p1_kwh": number, "precio_p2_kwh": number,
-  "consumo_p1_kwh": number, "consumo_p2_kwh": number,
-  "tipo_tarifa": "2.0TD",
-  "cups": "string",
-  "titular": "string",
-  "direccion_suministro": "string"
-}
-
-EXTRACCIÓN:
-- tipo_tarifa: siempre "2.0TD" (esta factura es 2.0TD).
-- consumption_kwh: consumo total kWh = consumo_p1_kwh + consumo_p2_kwh.
-- total_factura: importe TOTAL a pagar (IVA incluido).
-- potencia_contratada_kw: potencia de P1 (en 2.0TD P1≈P2).
-- potencia_p1_kw, potencia_p2_kw: potencia contratada por periodo.
-- precio_p1_kwh, precio_p2_kwh: €/kWh de energía activa por periodo.
-- precio_energia_kwh: media ponderada = (consumo_p1×precio_p1 + consumo_p2×precio_p2) / consumption_kwh.
-- period_start, period_end: fechas del periodo facturado (YYYY-MM-DD).
-- cups: código ES + 16 dígitos + 2 letras.
-- company_name: nombre comercial (Endesa, Iberdrola, Naturgy, Repsol, etc.)
-
-VERIFICACIÓN:
-1. consumption_kwh == consumo_p1_kwh + consumo_p2_kwh. Si no, corrige.
-2. precio_energia_kwh debe estar entre 0.05 y 0.35 €/kWh.
-3. NO incluyas P3–P6 en el JSON (esta tarifa solo tiene 2 periodos).`;
+const SYSTEM_PROMPT_20TD = `Extractor JSON factura eléctrica 2.0TD España. ${NUMERO_ESPANOL_BLOQUE}
+Salida: SOLO JSON, sin markdown ni texto.
+Campos: company_name, consumption_kwh, total_factura (IVA incl.), period_start/end YYYY-MM-DD, period_months, potencia_contratada_kw, potencia_p1_kw, potencia_p2_kw, precio_energia_kwh, precio_p1_kwh, precio_p2_kwh, consumo_p1_kwh, consumo_p2_kwh, tipo_tarifa "2.0TD", cups, titular, direccion_suministro.
+Reglas: consumption_kwh = p1+p2; precio_energia_kwh media ponderada; sin P3-P6; null si no consta.`;
 
 // ────────────────────────────────────────────────────────────
-// PROMPT 3.0TD — completo (~4500 chars), P1-P6, bloques múltiples
+// PROMPT 3.0TD — mínimo
 // ────────────────────────────────────────────────────────────
-const SYSTEM_PROMPT_30TD = `Eres un experto en facturas de energía eléctrica en España. Extrae datos estructurados de una factura 3.0TD (empresa/gran consumo, 6 periodos).
+const SYSTEM_PROMPT_30TD = `Extractor JSON factura 3.0TD España. ${NUMERO_ESPANOL_BLOQUE}
+Salida: SOLO JSON, sin markdown.
+Campos: company_name, consumption_kwh, total_factura, importe_energia_activa, importe_potencia, period_start/end, period_months, potencia_contratada_kw, potencia_p1…p6_kw, precio_energia_kwh, precio_p1…p6_kwh, consumo_p1…p6_kwh (0 si sin consumo), tipo_tarifa, cups, titular, direccion_suministro.
+Crítico: puede haber VARIOS bloques de energía por fechas; SUMA kWh por P1-P6 entre bloques. consumption_kwh = suma p1-p6. potencia_p6 puede diferir de p1.`;
 
-INSTRUCCIONES:
-1. Analiza TODAS las páginas de principio a fin, sin saltarte ninguna tabla.
-2. Convierte números del formato español (coma decimal) a punto decimal.
-3. Dato no visible → null. Periodo sin consumo → 0 (NO null).
-4. Responde SOLO con JSON válido, sin texto, sin markdown.
+const SYSTEM_PROMPT_GENERIC = `Extractor JSON factura eléctrica España. ${NUMERO_ESPANOL_BLOQUE}
+Salida: SOLO JSON. tipo_tarifa solo si consta explícito 2.0TD/3.0TD o peaje; 2.0TD no es 3.0TD por tener "P3" en una línea suelta.
+Mismo esquema completo P1-P6 (null o 0 según tarifa real).`;
 
-${NUMERO_ESPANOL_BLOQUE}
-
-ESQUEMA JSON:
-{
-  "company_name": "string",
-  "consumption_kwh": number,
-  "total_factura": number,
-  "importe_energia_activa": number,
-  "importe_potencia": number,
-  "period_start": "YYYY-MM-DD",
-  "period_end": "YYYY-MM-DD",
-  "period_months": number,
-  "potencia_contratada_kw": number,
-  "potencia_p1_kw": number, "potencia_p2_kw": number, "potencia_p3_kw": number,
-  "potencia_p4_kw": number, "potencia_p5_kw": number, "potencia_p6_kw": number,
-  "precio_energia_kwh": number,
-  "precio_p1_kwh": number, "precio_p2_kwh": number, "precio_p3_kwh": number,
-  "precio_p4_kwh": number, "precio_p5_kwh": number, "precio_p6_kwh": number,
-  "consumo_p1_kwh": number, "consumo_p2_kwh": number, "consumo_p3_kwh": number,
-  "consumo_p4_kwh": number, "consumo_p5_kwh": number, "consumo_p6_kwh": number,
-  "tipo_tarifa": "string",
-  "cups": "string",
-  "titular": "string",
-  "direccion_suministro": "string"
-}
-
-POTENCIA CONTRATADA:
-- Lee CADA fila P1…P6 individualmente. potencia_contratada_kw = P1.
-- En 3.0TD es frecuente que P1–P5 tengan un valor (ej. 26 kW) y P6 otro distinto (ej. 33 kW). NO copies el mismo a los 6.
-
-*** CONSUMO DE ENERGÍA — LO MÁS IMPORTANTE ***
-Las facturas 3.0TD casi siempre tienen DOS O MÁS BLOQUES de energía activa, separados por fechas distintas (ej. días 1–24 y 25–31, por cambio de precio regulado). Pueden estar en la MISMA o en DISTINTAS páginas.
-
-PROCEDIMIENTO OBLIGATORIO:
-1. Recorre TODAS las páginas buscando TODAS las tablas de "energía activa" / "Término de energía".
-2. Para cada periodo Px: SUMA los kWh de TODOS los bloques.
-3. Para precios (precio_pX_kwh): usa el del bloque con más kWh o más días.
-4. Periodo sin consumo en ningún bloque → 0 (NO null).
-5. consumption_kwh = suma de consumo_p1 a consumo_p6.
-6. importe_energia_activa = suma de TODOS los importes (€) de energía activa. Busca "Total energía activa" o suma las filas.
-7. importe_potencia = suma de importes del término de potencia.
-
-PRECIO MEDIO:
-- precio_energia_kwh = Σ(consumo_pX × precio_pX) / consumption_kwh. Debe estar entre 0.05 y 0.35.
-- Contraverificación: importe_energia_activa / consumption_kwh ≈ precio_energia_kwh.
-
-DATOS GENERALES:
-- total_factura: importe TOTAL a pagar (IVA incluido).
-- period_start, period_end: fechas del periodo facturado.
-- cups: código ES + 16 dígitos + 2 letras.
-- company_name: nombre comercial de la comercializadora.
-
-VERIFICACIÓN FINAL — OBLIGATORIA:
-1. consumption_kwh == suma P1…P6. Si no cuadra, corrige.
-2. total_factura / consumption_kwh: si > 0.40 €/kWh, FALTA CONSUMO — busca más tablas de energía.
-3. importe_energia_activa / consumption_kwh: si > 0.35, falta consumo.
-4. ¿Leíste TODOS los bloques de energía (suelen ser 2-3)?
-5. ¿potencia_p6_kw distinta de P1 si la factura lo indica?`;
-
-/** Prompt genérico cuando no se conoce la tarifa de antemano. */
-const SYSTEM_PROMPT_GENERIC = `Eres un experto en facturas de energía eléctrica en España. Extrae datos estructurados.
-
-INSTRUCCIONES:
-1. Analiza todas las páginas o toda la imagen.
-2. Convierte números del formato español (coma decimal) a punto decimal.
-3. Responde SOLO con JSON válido, sin texto, sin markdown.
-
-${NUMERO_ESPANOL_BLOQUE}
-
-REGLA CRÍTICA PARA DETERMINAR LA TARIFA:
-- Determina "tipo_tarifa" SOLO por una etiqueta explícita visible en la factura: "2.0TD", "3.0TD", "2.0A", "3.0A", "Peaje de transporte y distribución", "Peaje de acceso", "ATR".
-- Si ves explícitamente "2.0TD", entonces la tarifa es 2.0TD aunque aparezcan términos como "P3", "Valle", "punta/llano/valle" o lecturas desagregadas.
-- En algunas facturas 2.0TD el detalle regulatorio usa "P3" para el componente valle o para lecturas internas; ESO NO la convierte en 3.0TD.
-- NO infieras 3.0TD solo porque aparezca "P3" en una línea de potencia o consumos. Para 3.0TD debe verse explícitamente "3.0TD" / "3.0A" o una estructura clara P1...P6 en la propia tarifa.
-
-ESQUEMA JSON:
-{
-  "company_name": "string",
-  "consumption_kwh": number,
-  "total_factura": number,
-  "importe_energia_activa": number,
-  "importe_potencia": number,
-  "period_start": "YYYY-MM-DD",
-  "period_end": "YYYY-MM-DD",
-  "period_months": number,
-  "potencia_contratada_kw": number,
-  "potencia_p1_kw": number, "potencia_p2_kw": number, "potencia_p3_kw": number,
-  "potencia_p4_kw": number, "potencia_p5_kw": number, "potencia_p6_kw": number,
-  "precio_energia_kwh": number,
-  "precio_p1_kwh": number, "precio_p2_kwh": number, "precio_p3_kwh": number,
-  "precio_p4_kwh": number, "precio_p5_kwh": number, "precio_p6_kwh": number,
-  "consumo_p1_kwh": number, "consumo_p2_kwh": number, "consumo_p3_kwh": number,
-  "consumo_p4_kwh": number, "consumo_p5_kwh": number, "consumo_p6_kwh": number,
-  "tipo_tarifa": "string",
-  "cups": "string",
-  "titular": "string",
-  "direccion_suministro": "string"
-}
-
-SI LA TARIFA EXPLÍCITA ES 2.0TD:
-- Prioriza P1 y P2.
-- Si aparece P3 solo como detalle regulatorio/valle, no clasifiques como 3.0TD.
-
-SI LA TARIFA EXPLÍCITA ES 3.0TD:
-- Usa P1...P6 y suma todos los bloques de energía activa si hay varios.
-`;
-
-/** Prompt genérico de compatibilidad (usado si no se puede pre-clasificar). */
 const SYSTEM_PROMPT = SYSTEM_PROMPT_GENERIC;
 
-const USER_PROMPT = 'Extrae todos los datos de esta factura de energía. Devuelve SOLO el JSON, sin explicaciones.';
+const USER_PROMPT = 'Extrae los datos en JSON según instructions. Sin explicaciones.';
 
 const IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 
@@ -216,81 +72,9 @@ interface CallOptions {
   maxTokens: number;
 }
 
-const KEYWORDS_20TD = [
-  /2[\.\s]?0\s*TD/gi,
-  /CUPS/gi,
-  /Total factura/gi,
-  /TOTAL IMPORTE FACTURA/gi,
-  /IMPORTE TOTAL/gi,
-  /Consumo Total/gi,
-  /Consumo en este periodo/gi,
-  /Periodo de facturaci[oó]n/gi,
-  /Potencias contratadas/gi,
-  /Potencia contratada/gi,
-  /Potencia punta/gi,
-  /Potencia valle/gi,
-  /(?:€|Eur)\/kWh/gi,
-  /ha salido a/gi,
-  /Titular/gi,
-  /Nombre y Apellidos del titular/gi,
-  /Direcci[oó]n de suministro/gi,
-  /Peaje de transporte y distribuci[oó]n/gi,
-];
-
-function normalize20TDInputText(text: string): string {
-  return text
-    .replace(/\r/g, '\n')
-    .replace(/\u00A0/g, ' ')
-    .replace(/[ \t]{2,}/g, ' ')
-    .replace(/[ ]*\n[ ]*/g, '\n')
-    .replace(/\n{2,}/g, '\n')
-    .trim();
-}
-
-function mergeRanges(ranges: Array<[number, number]>, maxLength: number): Array<[number, number]> {
-  if (ranges.length === 0) return [];
-  const sorted = [...ranges]
-    .map(([start, end]) => [Math.max(0, start), Math.min(maxLength, end)] as [number, number])
-    .sort((a, b) => a[0] - b[0]);
-
-  const merged: Array<[number, number]> = [sorted[0]];
-  for (let i = 1; i < sorted.length; i++) {
-    const current = sorted[i];
-    const last = merged[merged.length - 1];
-    if (current[0] <= last[1] + 1) {
-      last[1] = Math.max(last[1], current[1]);
-    } else {
-      merged.push([...current] as [number, number]);
-    }
-  }
-  return merged;
-}
-
+/** Alias de `extractRelevantText` para 2.0TD (tests y callers legacy). */
 export function select20TDTextForLLM(text: string): string {
-  const normalized = normalize20TDInputText(text);
-  if (normalized.length <= MAX_TEXT_CHARS_20TD) return normalized;
-
-  const ranges: Array<[number, number]> = [[0, Math.min(normalized.length, 1800)]];
-  for (const regex of KEYWORDS_20TD) {
-    for (const match of normalized.matchAll(regex)) {
-      if (match.index == null) continue;
-      const start = Math.max(0, match.index - 260);
-      const end = Math.min(normalized.length, match.index + match[0].length + 520);
-      ranges.push([start, end]);
-    }
-  }
-
-  const merged = mergeRanges(ranges, normalized.length);
-  const selected = merged
-    .map(([start, end]) => normalized.slice(start, end).trim())
-    .filter(Boolean)
-    .join('\n...\n');
-
-  if (selected.length >= 1600) {
-    return selected.length > MAX_TEXT_CHARS_20TD ? selected.slice(0, MAX_TEXT_CHARS_20TD) : selected;
-  }
-
-  return normalized.slice(0, MAX_TEXT_CHARS_20TD);
+  return extractRelevantText(text, EXTRACT_RELEVANT_MAX_CHARS_20TD);
 }
 
 function readResponseOutput(
@@ -304,6 +88,37 @@ function readResponseOutput(
     ?? null;
 }
 
+async function getPdfTextFromBuffer(buffer: Buffer): Promise<string | null> {
+  const r = await extractTextFromPdf(buffer);
+  return r?.text ?? null;
+}
+
+function needsLlmPdfFallback20(e: InvoiceExtraction): boolean {
+  return !(
+    e.consumption_kwh != null && e.consumption_kwh > 0
+    && e.total_factura != null && e.total_factura > 0
+    && e.cups != null
+  );
+}
+
+function is30TDType(tipo: string | null | undefined): boolean {
+  const t = (tipo ?? '').toUpperCase().replace(/\s+/g, '');
+  return t.includes('3.0') || t.includes('30TD') || t.includes('30A');
+}
+
+function needsLlmPdfFallback30(e: InvoiceExtraction): boolean {
+  if (needsLlmPdfFallback20(e)) return true;
+  if (!is30TDType(e.tipo_tarifa)) return true;
+  const potCount = [e.potencia_p1_kw, e.potencia_p2_kw, e.potencia_p3_kw, e.potencia_p4_kw, e.potencia_p5_kw, e.potencia_p6_kw]
+    .filter((v) => v != null).length;
+  if (potCount < 3) return true;
+  const hasConsumoPx = [e.consumo_p1_kwh, e.consumo_p2_kwh, e.consumo_p3_kwh, e.consumo_p4_kwh, e.consumo_p5_kwh, e.consumo_p6_kwh]
+    .some((v) => v != null && v > 0);
+  if (!hasConsumoPx) return true;
+  return false;
+}
+
+/** Fallback explícito: PDF base64 o imagen (más lento, más tokens). */
 async function callResponsesAPI(
   fileBuffer: Buffer,
   mimeType: string,
@@ -369,6 +184,7 @@ async function callResponsesAPI(
   return parseLLMResponse(raw.trim());
 }
 
+/** Camino rápido: solo texto (input_text), sin input_file. */
 async function callResponsesAPIText(
   text: string,
   model: string,
@@ -377,7 +193,7 @@ async function callResponsesAPIText(
 ): Promise<InvoiceExtraction> {
   const prompt = opts?.systemPrompt ?? SYSTEM_PROMPT;
   const maxTokens = opts?.maxTokens ?? MAX_TOKENS_30TD;
-  const clippedText = text.length > 24_000 ? text.slice(0, 24_000) : text;
+  const clippedText = text.length > MAX_INPUT_TEXT_CHARS ? text.slice(0, MAX_INPUT_TEXT_CHARS) : text;
 
   const res = await fetch(OPENAI_RESPONSES_URL, {
     method: 'POST',
@@ -392,7 +208,7 @@ async function callResponsesAPIText(
         role: 'user',
         content: [
           { type: 'input_text', text: USER_PROMPT },
-          { type: 'input_text', text: `TEXTO EXTRAIDO DE PDF:\n${clippedText}` },
+          { type: 'input_text', text: `FACTURA (texto):\n${clippedText}` },
         ],
       }],
       max_output_tokens: maxTokens,
@@ -421,8 +237,7 @@ async function callResponsesAPIText(
 }
 
 function is30TD(e: InvoiceExtraction): boolean {
-  const t = (e.tipo_tarifa ?? '').toUpperCase().replace(/\s+/g, '');
-  return t.includes('3.0') || t.includes('30TD') || t.includes('30A');
+  return is30TDType(e.tipo_tarifa);
 }
 
 function computeConfidence(e: InvoiceExtraction): number {
@@ -470,8 +285,8 @@ function computeConfidence(e: InvoiceExtraction): number {
 }
 
 /**
- * Camino rápido para 2.0TD: solo gpt-4o-mini con prompt ligero.
- * Sin fallback ni retry (las 2.0TD son simples y salen bien a la primera).
+ * 2.0TD: PDF → texto filtrado → LLM (rápido); si faltan campos críticos → PDF (input_file).
+ * Imágenes: solo visión (input_image).
  */
 export async function extractWithLLM20TD(
   fileBuffer: Buffer,
@@ -483,12 +298,30 @@ export async function extractWithLLM20TD(
     return emptyExtraction();
   }
   const opts: CallOptions = { systemPrompt: SYSTEM_PROMPT_20TD, maxTokens: MAX_TOKENS_20TD };
-  const t0 = Date.now();
+
+  if (mimeType === 'application/pdf') {
+    const raw = await getPdfTextFromBuffer(fileBuffer);
+    if (raw) {
+      const prepared = extractRelevantText(raw, EXTRACT_RELEVANT_MAX_CHARS_20TD);
+      const t0 = Date.now();
+      const textResult = await callResponsesAPIText(prepared, MODEL_FAST, apiKey, opts);
+      textResult.confidence = computeConfidence(textResult);
+      if (!textResult.tipo_tarifa) textResult.tipo_tarifa = '2.0TD';
+      nullify30TDFields(textResult);
+      if (!needsLlmPdfFallback20(textResult)) {
+        console.log(`[llm-extract] 2.0TD text-only in ${Date.now() - t0}ms (confidence: ${textResult.confidence.toFixed(2)})`);
+        return textResult;
+      }
+      console.log('[llm-extract] 2.0TD texto insuficiente → fallback PDF');
+    }
+  }
+
+  const t1 = Date.now();
   const result = await callResponsesAPI(fileBuffer, mimeType, MODEL_FAST, apiKey, opts);
   result.confidence = computeConfidence(result);
   if (!result.tipo_tarifa) result.tipo_tarifa = '2.0TD';
   nullify30TDFields(result);
-  console.log(`[llm-extract] 2.0TD gpt-4o-mini in ${Date.now() - t0}ms (confidence: ${result.confidence.toFixed(2)})`);
+  console.log(`[llm-extract] 2.0TD file gpt-4o-mini in ${Date.now() - t1}ms (confidence: ${result.confidence.toFixed(2)})`);
   return result;
 }
 
@@ -506,7 +339,7 @@ export async function extractWithLLM20TDFromText(
   }
   const opts: CallOptions = { systemPrompt: SYSTEM_PROMPT_20TD, maxTokens: MAX_TOKENS_20TD };
   const t0 = Date.now();
-  const preparedText = select20TDTextForLLM(text);
+  const preparedText = extractRelevantText(text, EXTRACT_RELEVANT_MAX_CHARS_20TD);
   const result = await callResponsesAPIText(preparedText, MODEL_FAST, apiKey, opts);
   result.confidence = computeConfidence(result);
   if (!result.tipo_tarifa) result.tipo_tarifa = '2.0TD';
@@ -516,7 +349,8 @@ export async function extractWithLLM20TDFromText(
 }
 
 /**
- * Camino robusto para 3.0TD: gpt-4o-mini → fallback gpt-4o si confianza baja.
+ * 3.0TD: texto filtrado → mini; si validación/confianza floja → PDF (input_file) mini;
+ * si sigue bajo umbral → gpt-4o con PDF. Imágenes: archivo directo (misma escalera).
  */
 export async function extractWithLLM30TD(
   fileBuffer: Buffer,
@@ -527,34 +361,71 @@ export async function extractWithLLM30TD(
     console.error('[llm-extract] OPENAI_API_KEY not set');
     return emptyExtraction();
   }
-  const opts: CallOptions = { systemPrompt: SYSTEM_PROMPT_30TD, maxTokens: MAX_TOKENS_30TD };
+  const optsText: CallOptions = { systemPrompt: SYSTEM_PROMPT_30TD, maxTokens: MAX_TOKENS_30TD };
+  const optsPdf: CallOptions = { systemPrompt: SYSTEM_PROMPT_30TD, maxTokens: MAX_TOKENS_30TD_PDF_FALLBACK };
+
+  const noFallback = process.env.INVOICE_LLM_DISABLE_FALLBACK === '1'
+    || process.env.INVOICE_LLM_DISABLE_FALLBACK === 'true';
+
+  const tryFullModel = async (after: InvoiceExtraction): Promise<InvoiceExtraction> => {
+    if (noFallback) return after;
+    console.log(`[llm-extract] 3.0TD bajo umbral (${after.confidence.toFixed(2)} < ${CONFIDENCE_THRESHOLD}), fallback gpt-4o...`);
+    const tFull = Date.now();
+    const full = await callResponsesAPI(fileBuffer, mimeType, MODEL_FULL, apiKey, optsPdf);
+    full.confidence = computeConfidence(full);
+    console.log(`[llm-extract] 3.0TD gpt-4o in ${Date.now() - tFull}ms (confidence: ${full.confidence.toFixed(2)})`);
+    return full.confidence >= after.confidence ? full : after;
+  };
+
+  if (mimeType === 'application/pdf') {
+    const raw = await getPdfTextFromBuffer(fileBuffer);
+    if (raw && raw.length > 80) {
+      const prepared = extractRelevantText(raw, EXTRACT_RELEVANT_MAX_CHARS_30TD);
+      const tFast = Date.now();
+      let fast = await callResponsesAPIText(prepared, MODEL_FAST, apiKey, optsText);
+      fast.confidence = computeConfidence(fast);
+      console.log(`[llm-extract] 3.0TD text gpt-4o-mini in ${Date.now() - tFast}ms (confidence: ${fast.confidence.toFixed(2)})`);
+
+      if (fast.confidence >= CONFIDENCE_THRESHOLD && !needsLlmPdfFallback30(fast)) {
+        return fast;
+      }
+
+      if (noFallback) return fast;
+
+      const tPdf = Date.now();
+      const pdfMini = await callResponsesAPI(fileBuffer, mimeType, MODEL_FAST, apiKey, optsPdf);
+      pdfMini.confidence = computeConfidence(pdfMini);
+      console.log(`[llm-extract] 3.0TD PDF mini fallback in ${Date.now() - tPdf}ms (confidence: ${pdfMini.confidence.toFixed(2)})`);
+
+      const best = pdfMini.confidence >= fast.confidence ? pdfMini : fast;
+      if (best.confidence >= CONFIDENCE_THRESHOLD && !needsLlmPdfFallback30(best)) {
+        return best;
+      }
+      return tryFullModel(best);
+    }
+  }
 
   const tFast = Date.now();
-  const fast = await callResponsesAPI(fileBuffer, mimeType, MODEL_FAST, apiKey, opts);
+  const fast = await callResponsesAPI(fileBuffer, mimeType, MODEL_FAST, apiKey, optsPdf);
   fast.confidence = computeConfidence(fast);
-  console.log(`[llm-extract] 3.0TD gpt-4o-mini in ${Date.now() - tFast}ms (confidence: ${fast.confidence.toFixed(2)})`);
+  console.log(`[llm-extract] 3.0TD file gpt-4o-mini in ${Date.now() - tFast}ms (confidence: ${fast.confidence.toFixed(2)})`);
 
   if (fast.confidence >= CONFIDENCE_THRESHOLD) {
     return fast;
   }
 
-  const noFallback = process.env.INVOICE_LLM_DISABLE_FALLBACK === '1'
-    || process.env.INVOICE_LLM_DISABLE_FALLBACK === 'true';
-  if (noFallback) {
-    console.log('[llm-extract] 3.0TD fallback desactivado, devolviendo mini');
-    return fast;
-  }
+  if (noFallback) return fast;
 
-  console.log(`[llm-extract] 3.0TD gpt-4o-mini bajo umbral (${fast.confidence.toFixed(2)} < ${CONFIDENCE_THRESHOLD}), fallback gpt-4o...`);
-  const tFull = Date.now();
-  const full = await callResponsesAPI(fileBuffer, mimeType, MODEL_FULL, apiKey, opts);
-  full.confidence = computeConfidence(full);
-  console.log(`[llm-extract] 3.0TD gpt-4o in ${Date.now() - tFull}ms (confidence: ${full.confidence.toFixed(2)})`);
-
-  return full.confidence >= fast.confidence ? full : fast;
+  return tryFullModel(fast);
 }
 
-/** Camino genérico cuando la tarifa no se ha podido pre-detectar. */
+function needsLlmPdfFallbackGeneric(e: InvoiceExtraction): boolean {
+  if (needsLlmPdfFallback20(e)) return true;
+  if (is30TDType(e.tipo_tarifa)) return needsLlmPdfFallback30(e);
+  return false;
+}
+
+/** Camino genérico: texto filtrado primero; PDF si validación floja. */
 export async function extractWithLLMGeneric(
   fileBuffer: Buffer,
   mimeType: string,
@@ -564,11 +435,32 @@ export async function extractWithLLMGeneric(
     console.error('[llm-extract] OPENAI_API_KEY not set');
     return emptyExtraction();
   }
-  const opts: CallOptions = { systemPrompt: SYSTEM_PROMPT_GENERIC, maxTokens: MAX_TOKENS_30TD };
+  const optsText: CallOptions = { systemPrompt: SYSTEM_PROMPT_GENERIC, maxTokens: MAX_TOKENS_30TD };
+  const optsPdf: CallOptions = { systemPrompt: SYSTEM_PROMPT_GENERIC, maxTokens: MAX_TOKENS_30TD_PDF_FALLBACK };
+
+  if (mimeType === 'application/pdf') {
+    const raw = await getPdfTextFromBuffer(fileBuffer);
+    if (raw && raw.length > 80) {
+      const prepared = extractRelevantText(raw, EXTRACT_RELEVANT_MAX_CHARS_30TD);
+      const t0 = Date.now();
+      const textR = await callResponsesAPIText(prepared, MODEL_FAST, apiKey, optsText);
+      textR.confidence = computeConfidence(textR);
+      console.log(`[llm-extract] generic text gpt-4o-mini in ${Date.now() - t0}ms (confidence: ${textR.confidence.toFixed(2)})`);
+      if (!needsLlmPdfFallbackGeneric(textR) && textR.confidence >= 0.35) {
+        return textR;
+      }
+      const t1 = Date.now();
+      const pdfR = await callResponsesAPI(fileBuffer, mimeType, MODEL_FAST, apiKey, optsPdf);
+      pdfR.confidence = computeConfidence(pdfR);
+      console.log(`[llm-extract] generic PDF fallback in ${Date.now() - t1}ms (confidence: ${pdfR.confidence.toFixed(2)})`);
+      return pdfR.confidence >= textR.confidence ? pdfR : textR;
+    }
+  }
+
   const t0 = Date.now();
-  const result = await callResponsesAPI(fileBuffer, mimeType, MODEL_FAST, apiKey, opts);
+  const result = await callResponsesAPI(fileBuffer, mimeType, MODEL_FAST, apiKey, optsPdf);
   result.confidence = computeConfidence(result);
-  console.log(`[llm-extract] generic gpt-4o-mini in ${Date.now() - t0}ms (confidence: ${result.confidence.toFixed(2)})`);
+  console.log(`[llm-extract] generic file gpt-4o-mini in ${Date.now() - t0}ms (confidence: ${result.confidence.toFixed(2)})`);
   return result;
 }
 
@@ -585,7 +477,7 @@ export async function extractWithLLMForceFull(
     console.error('[llm-extract-force-full] OPENAI_API_KEY not set');
     return emptyExtraction();
   }
-  const opts: CallOptions = { systemPrompt: SYSTEM_PROMPT_30TD, maxTokens: MAX_TOKENS_30TD };
+  const opts: CallOptions = { systemPrompt: SYSTEM_PROMPT_30TD, maxTokens: MAX_TOKENS_30TD_PDF_FALLBACK };
   const t0 = Date.now();
   const result = await callResponsesAPI(fileBuffer, mimeType, MODEL_FULL, apiKey, opts);
   result.confidence = computeConfidence(result);

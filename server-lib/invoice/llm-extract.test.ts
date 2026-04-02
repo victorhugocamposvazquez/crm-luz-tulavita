@@ -6,6 +6,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { emptyExtraction } from './types.js';
+import { EXTRACT_RELEVANT_MAX_CHARS_20TD } from './extract-relevant-text.js';
 import { select20TDTextForLLM } from './llm-extract.js';
 
 /**
@@ -202,7 +203,7 @@ describe('select20TDTextForLLM', () => {
     const reduced = select20TDTextForLLM(text);
 
     expect(reduced.length).toBeLessThan(text.length);
-    expect(reduced.length).toBeLessThanOrEqual(12000);
+    expect(reduced.length).toBeLessThanOrEqual(EXTRACT_RELEVANT_MAX_CHARS_20TD);
     expect(reduced).toContain('2.0TD');
     expect(reduced).toContain('CUPS ES0022000004140388AF1P');
     expect(reduced).toContain('Total factura 201,96 €');

@@ -8,7 +8,11 @@
 import { createHash } from 'crypto';
 import type { InvoiceExtraction } from './types.js';
 import { emptyExtraction } from './types.js';
-import { parse20TDFromTextDetailed, type Parser20TDDiagnostics } from './parser-20td.js';
+import {
+  parse20TDFromTextDetailed,
+  shouldSkipLLMFor20tdParser,
+  type Parser20TDDiagnostics,
+} from './parser-20td.js';
 
 const IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
@@ -496,8 +500,18 @@ export async function extractInvoiceFromBufferDetailed(
       if (parsedResult) {
         console.log(`[pipeline] 2.0TD parser en sombra: accepted=${parsedResult.diagnostics.accepted} score=${parsedResult.diagnostics.score}`);
       }
-      if (parsedResult?.diagnostics.accepted && parsedResult.extraction) {
-        console.log(`[pipeline] 2.0TD sin LLM (parser aceptado, score=${parsedResult.diagnostics.score.toFixed(2)})`);
+      if (
+        parsedResult?.extraction
+        && parsedResult.diagnostics.accepted
+        && !shouldSkipLLMFor20tdParser(parsedResult.diagnostics)
+      ) {
+        const d = parsedResult.diagnostics;
+        console.log(
+          `[pipeline] 2.0TD parser aceptado pero se usa LLM (score=${d.score.toFixed(2)}, warnings=${d.warnings.length}${d.warnings.length ? `: ${d.warnings.join('; ')}` : ''})`,
+        );
+      }
+      if (parsedResult?.extraction && shouldSkipLLMFor20tdParser(parsedResult.diagnostics)) {
+        console.log(`[pipeline] 2.0TD sin LLM (parser fiable, score=${parsedResult.diagnostics.score.toFixed(2)})`);
         validated = validateExtraction(parsedResult.extraction);
         nullify30TDFields(validated);
         debug.usedLLM = false;
@@ -564,8 +578,18 @@ export async function extractInvoiceFromBufferDetailed(
         if (parsedResult) {
           console.log(`[pipeline] fallback 2.0TD parser en sombra: accepted=${parsedResult.diagnostics.accepted} score=${parsedResult.diagnostics.score}`);
         }
-        if (parsedResult?.diagnostics.accepted && parsedResult.extraction) {
-          console.log(`[pipeline] fallback 2.0TD sin LLM (parser aceptado, score=${parsedResult.diagnostics.score.toFixed(2)})`);
+        if (
+          parsedResult?.extraction
+          && parsedResult.diagnostics.accepted
+          && !shouldSkipLLMFor20tdParser(parsedResult.diagnostics)
+        ) {
+          const d = parsedResult.diagnostics;
+          console.log(
+            `[pipeline] fallback 2.0TD parser aceptado pero se usa LLM (score=${d.score.toFixed(2)}, warnings=${d.warnings.length}${d.warnings.length ? `: ${d.warnings.join('; ')}` : ''})`,
+          );
+        }
+        if (parsedResult?.extraction && shouldSkipLLMFor20tdParser(parsedResult.diagnostics)) {
+          console.log(`[pipeline] fallback 2.0TD sin LLM (parser fiable, score=${parsedResult.diagnostics.score.toFixed(2)})`);
           validated = validateExtraction(parsedResult.extraction);
           nullify30TDFields(validated);
           debug.usedLLM = false;
