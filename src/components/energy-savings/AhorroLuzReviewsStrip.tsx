@@ -47,8 +47,8 @@ export function AhorroLuzReviewsStrip({
   const countLabel = reviewCount.toLocaleString('es-ES');
 
   return (
-    <div className={cn('w-full border-t border-neutral-200 px-4 pt-6 sm:pt-8', className)}>
-      <div className="mx-auto flex max-w-lg items-center justify-center gap-2 pb-6 sm:max-w-none sm:pb-8 sm:gap-2.5">
+    <div className={cn('w-full px-4 pt-3 sm:pt-3.5', className)}>
+      <div className="mx-auto flex max-w-lg items-center justify-center gap-2 pb-2 sm:max-w-none sm:pb-2.5 sm:gap-2.5">
         <div
           className="flex flex-nowrap items-center justify-center gap-2 text-neutral-950 sm:gap-2.5"
           role="group"

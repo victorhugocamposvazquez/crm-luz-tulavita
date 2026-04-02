@@ -37,7 +37,7 @@ export function AhorroLuzBrandHeader({
           </span>
         </div>
       </a>
-      <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-600 sm:mt-7 sm:text-xs">
+      <div className="mt-10 inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-600 sm:text-xs">
         <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: AHORRO_PUBLIC_ACCENT }} aria-hidden />
         Ahorro en electricidad
       </div>

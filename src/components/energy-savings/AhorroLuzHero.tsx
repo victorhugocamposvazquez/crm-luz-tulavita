@@ -56,14 +56,14 @@ function ProviderLogoMarquee() {
 
   return (
     <>
-      <div className="hidden flex-wrap justify-center gap-x-10 gap-y-4 px-4 py-5 motion-reduce:flex sm:gap-x-14">
+      <div className="hidden flex-wrap justify-center gap-x-10 gap-y-3 px-4 py-2 motion-reduce:flex sm:gap-x-14 sm:py-2.5">
         {PROVIDER_LOGOS.map((p) => (
           <span key={p.name} className={logoClass(p)}>
             {p.name}
           </span>
         ))}
       </div>
-      <div className="motion-reduce:hidden w-full overflow-hidden py-5 sm:py-6" style={fadeMask}>
+      <div className="motion-reduce:hidden w-full overflow-hidden py-2 sm:py-2.5" style={fadeMask}>
         <div className="flex w-max animate-logo-marquee">
           {segment('a')}
           {segment('b')}
@@ -121,7 +121,10 @@ export function AhorroLuzHero({
         <div className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center text-center">
           <h1 className="max-w-[18ch] text-[1.75rem] font-extrabold leading-[1.1] tracking-tight text-neutral-950 sm:max-w-none sm:text-4xl md:text-[2.5rem]">
             Paga menos en tu{' '}
-            <span className="text-neutral-900 underline decoration-[3px] decoration-[#22c55e] underline-offset-[5px]">
+            <span
+              className="text-neutral-900 underline decoration-[3px] underline-offset-[5px]"
+              style={{ textDecorationColor: AHORRO_LUZ_CTA_GREEN }}
+            >
               factura de la luz
             </span>
           </h1>
@@ -238,27 +241,27 @@ export function AhorroLuzHero({
             </button>
           </div>
 
-          <div className="mt-3 grid w-full max-w-md grid-cols-3 gap-3 text-center sm:mt-16 sm:gap-4">
+          <div className="mt-3 grid w-full max-w-md grid-cols-3 gap-2 text-center sm:mt-8 sm:gap-3">
             <div className="min-w-0">
-              <p className="text-xl font-bold tabular-nums text-neutral-950 sm:text-2xl">
+              <p className="text-xl font-bold leading-none tabular-nums text-neutral-950 sm:text-2xl">
                 <span style={{ color: ACCENT }}>340€</span>
               </p>
-              <p className="mt-1 text-[10px] leading-snug text-neutral-500 sm:text-xs">ahorro medio/año</p>
+              <p className="mt-0.5 text-[10px] leading-tight text-neutral-500 sm:text-xs">ahorro medio/año</p>
             </div>
             <div className="relative min-w-0">
               <div className="absolute left-0 top-1/2 hidden h-8 w-px -translate-y-1/2 bg-neutral-200 sm:block" />
               <div className="absolute right-0 top-1/2 hidden h-8 w-px -translate-y-1/2 bg-neutral-200 sm:block" />
-              <p className="text-xl font-bold tabular-nums text-neutral-950 sm:text-2xl">2 min</p>
-              <p className="mt-1 text-[10px] leading-snug text-neutral-500 sm:text-xs">para ver resultado</p>
+              <p className="text-xl font-bold leading-none tabular-nums text-neutral-950 sm:text-2xl">2 min</p>
+              <p className="mt-0.5 text-[10px] leading-tight text-neutral-500 sm:text-xs">para ver resultado</p>
             </div>
             <div className="min-w-0">
-              <p className="text-xl font-bold tabular-nums text-neutral-950 sm:text-2xl">gratis</p>
-              <p className="mt-1 text-[10px] leading-snug text-neutral-500 sm:text-xs">sin permanencia</p>
+              <p className="text-xl font-bold leading-none tabular-nums text-neutral-950 sm:text-2xl">gratis</p>
+              <p className="mt-0.5 text-[10px] leading-tight text-neutral-500 sm:text-xs">sin permanencia</p>
             </div>
           </div>
         </div>
 
-        <div className="relative mt-auto w-full pt-8 sm:pt-12">
+        <div className="relative mt-auto w-full pt-4 sm:pt-5">
           <AhorroLuzReviewsStrip rating={4.89} reviewCount={750} className="pt-0" />
           <p className="sr-only">
             Comparativa con numerosas comercializadoras, entre otras Endesa, Naturgy, Iberdrola, Repsol, Octopus y
