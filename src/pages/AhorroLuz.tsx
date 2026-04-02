@@ -397,7 +397,7 @@ function LandingFormSteps({
       <AhorroLuzBrandHeader fixed />
 
       <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
-        <div className="flex min-h-[calc(100dvh-3.5rem)] flex-1 flex-col items-center justify-center px-4 pb-10 pt-[calc(env(safe-area-inset-top,0px)+5rem)] sm:px-6 sm:pt-24">
+        <div className="flex min-h-[calc(100dvh-6.75rem)] flex-1 flex-col items-center justify-center px-4 pb-10 pt-[calc(env(safe-area-inset-top,0px)+6.5rem)] sm:min-h-[calc(100dvh-7.25rem)] sm:px-6 sm:pt-28">
           <div
             key={currentQuestion.id}
             onKeyDown={handleKeyDown}
@@ -625,7 +625,7 @@ export default function AhorroLuz() {
         <AhorroLuzBrandHeader fixed />
         <div className="flex-1 overflow-y-auto min-h-0 flex flex-col">
           {showEnergyFlow ? (
-            <div className="flex min-h-[calc(100dvh-3.5rem)] flex-1 flex-col items-center justify-center px-4 py-10 pb-12 pt-[calc(env(safe-area-inset-top,0px)+5rem)] sm:px-6 sm:pt-24">
+            <div className="flex min-h-[calc(100dvh-6.75rem)] flex-1 flex-col items-center justify-center px-4 py-10 pb-12 pt-[calc(env(safe-area-inset-top,0px)+6.5rem)] sm:min-h-[calc(100dvh-7.25rem)] sm:px-6 sm:pt-28">
               <div className="w-full max-w-xl mx-auto text-center animate-in fade-in duration-300 space-y-6">
                 <EnergySavingsFlow
                   leadId={lastLeadId}
@@ -638,7 +638,7 @@ export default function AhorroLuz() {
               </div>
             </div>
           ) : (
-            <div className="flex min-h-[calc(100dvh-3.5rem)] flex-1 flex-col items-center justify-center px-4 py-10 pb-12 pt-[calc(env(safe-area-inset-top,0px)+5rem)] sm:px-6 sm:pt-24">
+            <div className="flex min-h-[calc(100dvh-6.75rem)] flex-1 flex-col items-center justify-center px-4 py-10 pb-12 pt-[calc(env(safe-area-inset-top,0px)+6.5rem)] sm:min-h-[calc(100dvh-7.25rem)] sm:px-6 sm:pt-28">
               <div className="mx-auto w-full max-w-lg space-y-6 text-center animate-in fade-in duration-500">
                 <h2 className="text-2xl font-semibold text-neutral-950 sm:text-3xl">¡Gracias!</h2>
                 {isManualThanks ? (

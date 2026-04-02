@@ -111,15 +111,8 @@ export function AhorroLuzHero({
 
       <AhorroLuzBrandHeader />
 
-      <section className="relative flex flex-1 flex-col px-4 pb-12 pt-5 sm:px-6 sm:pb-16 sm:pt-12">
+      <section className="relative flex flex-1 flex-col px-4 pb-12 pt-4 sm:px-6 sm:pb-16 sm:pt-8">
         <div className="mx-auto flex w-full max-w-lg flex-1 flex-col items-center text-center">
-          <div
-            className="mb-3 inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-600 sm:mb-8 sm:text-xs"
-          >
-            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: ACCENT }} aria-hidden />
-            Ahorro en electricidad
-          </div>
-
           <h1 className="max-w-[18ch] text-[1.75rem] font-extrabold leading-[1.1] tracking-tight text-neutral-950 sm:max-w-none sm:text-4xl md:text-[2.5rem]">
             Paga menos en tu{' '}
             <span className="text-neutral-900 underline decoration-[3px] decoration-[#22c55e] underline-offset-[5px]">
