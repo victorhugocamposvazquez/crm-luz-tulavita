@@ -6,7 +6,11 @@ import { useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { Check, ChevronRight, Pencil, Phone, Upload } from 'lucide-react';
-import { AHORRO_PUBLIC_ACCENT, AHORRO_LUZ_HEADER_SPACER_CLASS } from '@/lib/ahorro-luz-public-ui';
+import {
+  AHORRO_PUBLIC_ACCENT,
+  AHORRO_LUZ_CTA_GREEN,
+  AHORRO_LUZ_HEADER_SPACER_CLASS,
+} from '@/lib/ahorro-luz-public-ui';
 import { AhorroLuzBrandHeader } from '@/components/energy-savings/AhorroLuzBrandHeader';
 import { AhorroLuzReviewsStrip } from '@/components/energy-savings/AhorroLuzReviewsStrip';
 
@@ -188,9 +192,10 @@ export function AhorroLuzHero({
                   type="button"
                   onClick={() => onFileSelected(pickedFile)}
                   className={cn(
-                    'w-full max-w-xs rounded-xl border border-neutral-300 bg-white px-8 py-4 text-base font-semibold text-neutral-900 sm:max-w-sm sm:py-4 sm:text-lg',
-                    'hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2'
+                    'w-full max-w-xs rounded-xl border border-neutral-900/15 px-8 py-4 text-base font-semibold text-neutral-900 sm:max-w-sm sm:py-4 sm:text-lg',
+                    'transition-[filter] hover:brightness-[0.97] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2'
                   )}
+                  style={{ backgroundColor: AHORRO_LUZ_CTA_GREEN }}
                 >
                   Continuar
                 </button>

@@ -22,6 +22,7 @@ import { toast } from '@/hooks/use-toast';
 import { extractPdfTextFromFile } from '@/lib/pdf-text-client';
 import {
   AHORRO_FORM_CONTROL_ACCENT,
+  AHORRO_LUZ_CTA_GREEN,
   AHORRO_LUZ_MAIN_MIN_H_CLASS,
   AHORRO_LUZ_SCROLL_TOP_PAD_CLASS,
 } from '@/lib/ahorro-luz-public-ui';
@@ -397,6 +398,15 @@ function LandingFormSteps({
     return null;
   }
 
+  const centerIsElegirArchivo =
+    currentQuestion.type === 'file_upload' && !answers[currentQuestion.id];
+  const greenCenterCta =
+    submitStatus !== 'loading' &&
+    !(heroUploadStillPending && isLast) &&
+    !centerIsElegirArchivo;
+  const widerEnviar =
+    isLast && submitStatus !== 'loading' && !heroUploadStillPending;
+
   return (
     <div className="min-h-screen flex flex-col bg-white antialiased">
       <AhorroLuzBrandHeader fixed />
@@ -435,7 +445,7 @@ function LandingFormSteps({
               className={cn(
                 currentQuestion.type === 'contact' ? 'text-left' : 'text-center',
                 currentQuestion.type !== 'contact' &&
-                  '[&_input]:h-12 [&_input]:rounded-xl [&_input]:border-2 [&_input]:border-neutral-300 [&_input]:text-lg'
+                  '[&_input]:h-12 [&_input]:rounded-xl [&_input]:border [&_input]:border-neutral-300 [&_input]:text-lg'
               )}
             >
               <QuestionStep
@@ -505,9 +515,14 @@ function LandingFormSteps({
                     (currentQuestion?.type !== 'file_upload' && !hasSelection)
                   }
                   className={cn(
-                    'flex max-w-full items-center justify-center gap-2 rounded-xl border border-neutral-300 bg-white px-5 py-3 text-sm font-medium text-neutral-900 transition-colors sm:px-7 sm:text-base whitespace-nowrap',
-                    'hover:bg-neutral-50 disabled:cursor-not-allowed disabled:opacity-50'
+                    'flex max-w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm transition-[filter] sm:text-base whitespace-nowrap',
+                    'disabled:cursor-not-allowed disabled:opacity-50',
+                    greenCenterCta
+                      ? 'border border-neutral-900/15 font-semibold text-neutral-900 hover:brightness-[0.97]'
+                      : 'border border-neutral-300 bg-white font-medium text-neutral-900 hover:bg-neutral-50',
+                    widerEnviar && 'min-w-[13rem] max-w-[min(100%,18rem)] px-6 sm:min-w-[16rem] sm:px-10'
                   )}
+                  style={greenCenterCta ? { backgroundColor: AHORRO_LUZ_CTA_GREEN } : undefined}
                 >
                   {submitStatus === 'loading' ? (
                     <>

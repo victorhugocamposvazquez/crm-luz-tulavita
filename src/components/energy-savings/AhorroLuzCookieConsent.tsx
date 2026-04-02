@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Cookie } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { AHORRO_LUZ_CTA_GREEN } from '@/lib/ahorro-luz-public-ui';
+
+const ctaBtn =
+  'rounded-xl border border-neutral-900/15 px-4 py-2.5 text-sm font-semibold text-neutral-900 shadow-none transition-[filter] hover:brightness-[0.97] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2';
 import {
   Dialog,
   DialogContent,
@@ -43,13 +47,13 @@ export function AhorroLuzCookieConsent() {
 
   if (!mounted) return null;
 
-  const showBanner = consent === null || consent === '';
+  const showBanner = (consent === null || consent === '') && !policyOpen;
 
   return (
     <>
       {showBanner && (
         <div
-          className="pointer-events-auto fixed inset-x-0 bottom-0 z-[100] flex justify-center p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4 sm:pb-[max(1rem,env(safe-area-inset-bottom))]"
+          className="pointer-events-auto fixed inset-x-0 bottom-0 z-40 flex justify-center p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-4 sm:pb-[max(1rem,env(safe-area-inset-bottom))]"
           role="dialog"
           aria-label="Aviso de cookies"
         >
@@ -76,24 +80,20 @@ export function AhorroLuzCookieConsent() {
                 .
               </p>
             </div>
-            <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:gap-2">
+            <div className="flex w-full shrink-0 flex-row gap-2 sm:w-auto">
               <button
                 type="button"
                 onClick={() => persist('rejected')}
-                className={cn(
-                  'w-full rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm font-medium text-neutral-900 sm:w-auto sm:px-5 sm:py-2',
-                  'hover:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2'
-                )}
+                className={cn(ctaBtn, 'min-w-0 flex-1 sm:flex-none sm:px-5')}
+                style={{ backgroundColor: AHORRO_LUZ_CTA_GREEN }}
               >
                 Rechazar
               </button>
               <button
                 type="button"
                 onClick={() => persist('accepted')}
-                className={cn(
-                  'w-full rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm font-medium text-neutral-900 sm:w-auto sm:px-5 sm:py-2',
-                  'hover:bg-neutral-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2'
-                )}
+                className={cn(ctaBtn, 'min-w-0 flex-1 sm:flex-none sm:px-5')}
+                style={{ backgroundColor: AHORRO_LUZ_CTA_GREEN }}
               >
                 Aceptar
               </button>
@@ -103,7 +103,7 @@ export function AhorroLuzCookieConsent() {
       )}
 
       <Dialog open={policyOpen} onOpenChange={setPolicyOpen}>
-        <DialogContent className="max-h-[85dvh] max-w-lg overflow-y-auto rounded-xl border-neutral-200 bg-white p-6 sm:rounded-2xl">
+        <DialogContent className="z-[110] max-h-[85dvh] max-w-lg overflow-y-auto rounded-xl border border-neutral-200 bg-white p-6 sm:rounded-2xl">
           <DialogHeader>
             <DialogTitle className="text-left text-neutral-950">Política de cookies</DialogTitle>
           </DialogHeader>
@@ -114,10 +114,8 @@ export function AhorroLuzCookieConsent() {
             <button
               type="button"
               onClick={() => persist('accepted')}
-              className={cn(
-                'w-full rounded-xl border border-neutral-300 bg-neutral-100 px-4 py-3 text-sm font-semibold text-neutral-900',
-                'hover:bg-neutral-200/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2'
-              )}
+              className={cn(ctaBtn, 'w-full py-3')}
+              style={{ backgroundColor: AHORRO_LUZ_CTA_GREEN }}
             >
               Aceptar
             </button>

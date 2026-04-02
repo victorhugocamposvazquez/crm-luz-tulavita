@@ -8,6 +8,7 @@ import { useEnergyComparison } from '@/hooks/useEnergyComparison';
 import { EnergySavingsLoader } from './EnergySavingsLoader';
 import { EnergySavingsResult } from './EnergySavingsResult';
 import { cn } from '@/lib/utils';
+import { AHORRO_LUZ_CTA_GREEN } from '@/lib/ahorro-luz-public-ui';
 /** GIF celebración bajo el resultado (coloca el archivo en public/animatios/final.gif). */
 const RESULT_CELEBRATION_GIF = '/animations/final.gif';
 
@@ -134,9 +135,10 @@ export function EnergySavingsFlow({
             <button
               type="submit"
               className={cn(
-                'w-full rounded-xl border border-neutral-300 bg-white py-3 text-base font-medium text-neutral-900 transition-colors',
-                'hover:bg-neutral-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2'
+                'w-full rounded-xl border border-neutral-900/15 py-3 text-base font-semibold text-neutral-900 transition-[filter]',
+                'hover:brightness-[0.97] focus:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:ring-offset-2'
               )}
+              style={{ backgroundColor: AHORRO_LUZ_CTA_GREEN }}
             >
               Calcular ahorro
             </button>
