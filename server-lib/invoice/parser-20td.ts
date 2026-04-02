@@ -176,6 +176,20 @@ const TITULAR_SPECS: BetweenLabelSpec[] = [
   },
 ];
 
+/** Corta la dirección cuando en la misma línea del PDF viene el bloque contractual (p. ej. Endesa). */
+function trimDireccionSuministroTail(raw: string): string | null {
+  const v = raw.replace(/\r/g, ' ').replace(/\n+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+  if (!v) return null;
+  const stop =
+    /\s+(?:Contrato de mercado|Referencia de contrato(?:\s+de\s+suministro)?|Potencias contratadas|Fin de contrato(?:\s+de\s+sumin)?|Peaje de acceso|Contrato\s+ATR|Caudal\s+contratado)/i;
+  const m = v.match(stop);
+  if (m?.index != null && m.index > 0) {
+    const cut = v.slice(0, m.index).trim();
+    return cut || null;
+  }
+  return v;
+}
+
 const ADDRESS_SPECS: BetweenLabelSpec[] = [
   {
     label: 'direccion-suministro',
@@ -185,6 +199,12 @@ const ADDRESS_SPECS: BetweenLabelSpec[] = [
     ],
     endPatterns: [
       /\n/,
+      /\s+Contrato de mercado/i,
+      /\s+Referencia de contrato/i,
+      /\s+Potencias contratadas/i,
+      /\s+Fin de contrato/i,
+      /\s+Peaje de acceso/i,
+      /\s+Contrato\s+ATR/i,
       /Total factura/i,
       /T[eé]rmino fijo/i,
       /Periodo de facturaci[oó]n/i,
@@ -195,6 +215,7 @@ const ADDRESS_SPECS: BetweenLabelSpec[] = [
     ],
     confidence: 0.88,
     maxChars: 220,
+    transform: (value) => trimDireccionSuministroTail(value),
   },
 ];
 

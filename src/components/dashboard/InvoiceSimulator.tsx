@@ -68,6 +68,20 @@ import {
 } from '@/config/invoiceEstimateTaxes';
 
 const SIMULATE_API = import.meta.env.VITE_SIMULATE_INVOICE_API_URL ?? '/api/simulate-invoice';
+
+/** Campos de `debug` en la respuesta de simulate-invoice (ver también cabeceras x-extraction-*). */
+type SimulateExtractionDebug = {
+  usedLLM?: boolean;
+  path?: string;
+  cacheHit?: boolean;
+  parser20td?: { accepted?: boolean; score?: number | null } | null;
+};
+
+type ExtractionRequestMeta = {
+  /** Tiempo del fetch al API (incluye red + servidor). */
+  elapsedMs: number;
+  debug?: SimulateExtractionDebug | null;
+};
 const ACCEPTED_TYPES = '.pdf,.jpg,.jpeg,.png,.webp';
 const MAX_SIZE_MB = 20;
 
@@ -470,7 +484,7 @@ function UploadStep({
   onExtracted,
   onThumbnailReady,
 }: {
-  onExtracted: (data: InvoiceExtraction, fileName: string) => void;
+  onExtracted: (data: InvoiceExtraction, fileName: string, meta?: ExtractionRequestMeta) => void;
   onThumbnailReady: (fileName: string, thumbnail: string | null) => void;
 }) {
   const [dragging, setDragging] = useState(false);
@@ -505,18 +519,29 @@ function UploadStep({
       const form = new FormData();
       form.append('file', uploadFile);
       if (pdfText) form.append('pdfText', pdfText);
+      const tFetch = Date.now();
       const res = await fetch(SIMULATE_API, { method: 'POST', body: form });
+      const elapsedMs = Date.now() - tFetch;
       const raw = await res.text();
-      let data: { success?: boolean; error?: string; extraction?: InvoiceExtraction; debug?: unknown };
+      let data: { success?: boolean; error?: string; extraction?: InvoiceExtraction; debug?: SimulateExtractionDebug };
       try {
         data = JSON.parse(raw);
       } catch {
         throw new Error(raw.slice(0, 180) || 'El servidor devolvió una respuesta no válida');
       }
       if (!res.ok || !data.success) throw new Error(data.error || 'Error procesando la factura');
-      if (data.debug) console.info('[simulate-invoice debug]', data.debug);
+      const dbg = data.debug;
+      if (dbg) {
+        console.info(
+          '[simulate-invoice]',
+          dbg.usedLLM ? 'con LLM' : 'sin LLM',
+          `path=${dbg.path}`,
+          `cliente ${elapsedMs}ms`,
+          dbg,
+        );
+      }
       if (uploadSeqRef.current !== uploadSeq) return;
-      onExtracted(data.extraction as InvoiceExtraction, file.name);
+      onExtracted(data.extraction as InvoiceExtraction, file.name, { elapsedMs, debug: dbg ?? null });
     } catch (err) {
       toast({ title: 'Error al procesar', description: err instanceof Error ? err.message : 'Error desconocido', variant: 'destructive' });
     } finally {
@@ -570,11 +595,19 @@ function UploadStep({
 }
 
 function ExtractionStep({
-  extraction, fileName, onChange, onCalculate, onBack,
+  extraction,
+  fileName,
+  extractionMeta,
+  onChange,
+  onCalculate,
+  onBack,
 }: {
-  extraction: InvoiceExtraction; fileName: string;
+  extraction: InvoiceExtraction;
+  fileName: string;
+  extractionMeta?: ExtractionRequestMeta | null;
   onChange: (field: keyof InvoiceExtraction, value: string) => void;
-  onCalculate: () => void; onBack: () => void;
+  onCalculate: () => void;
+  onBack: () => void;
 }) {
   const numField = (label: string, field: keyof InvoiceExtraction, icon: React.ReactNode, suffix?: string) => (
     <div className="space-y-1.5">
@@ -603,7 +636,26 @@ function ExtractionStep({
         <div className="flex items-center justify-between">
           <div>
             <CardTitle className="flex items-center gap-2"><FileText className="h-5 w-5" />Datos extraídos</CardTitle>
-            <CardDescription className="mt-1">{fileName} · Confianza: {Math.round(extraction.confidence * 100)}%</CardDescription>
+            <CardDescription className="mt-1 space-y-1">
+              <span className="block">{fileName} · Confianza: {Math.round(extraction.confidence * 100)}%</span>
+              {extractionMeta != null && extractionMeta.debug != null ? (
+                <span className="block text-xs font-normal text-muted-foreground">
+                  {extractionMeta.debug.cacheHit
+                    ? 'Caché en servidor (mismo PDF reciente)'
+                    : extractionMeta.debug.usedLLM === false
+                      ? `Extracción sin LLM · ${extractionMeta.debug.path ?? '—'}`
+                      : extractionMeta.debug.usedLLM === true
+                        ? `Extracción con LLM · ${extractionMeta.debug.path ?? '—'}`
+                        : `Camino · ${extractionMeta.debug.path ?? '—'}`}
+                  {' · '}
+                  {(extractionMeta.elapsedMs / 1000).toLocaleString('es-ES', {
+                    minimumFractionDigits: 1,
+                    maximumFractionDigits: 1,
+                  })}{' '}
+                  s (petición completa)
+                </span>
+              ) : null}
+            </CardDescription>
           </div>
           <Badge variant={extraction.confidence >= 0.8 ? 'default' : 'secondary'}>{extraction.confidence >= 0.8 ? 'Alta confianza' : 'Revisar datos'}</Badge>
         </div>
@@ -1073,6 +1125,7 @@ export default function InvoiceSimulator() {
   const [simulations, setSimulations] = useState<SimulationRow[]>([]);
   const [loadingSims, setLoadingSims] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [extractionMeta, setExtractionMeta] = useState<ExtractionRequestMeta | null>(null);
 
   // save dialog
   const [saveOpen, setSaveOpen] = useState(false);
@@ -1175,6 +1228,7 @@ export default function InvoiceSimulator() {
     setFileName('');
     setThumbnail(null);
     setEditingId(null);
+    setExtractionMeta(null);
     setCurrentSnapshot(null);
     setCurrentOffersWithCost([]);
     setSelectedOfferId(null);
@@ -1188,10 +1242,11 @@ export default function InvoiceSimulator() {
     setSelectedOfferId(null);
   }, []);
 
-  const handleExtracted = useCallback((data: InvoiceExtraction, name: string) => {
+  const handleExtracted = useCallback((data: InvoiceExtraction, name: string, meta?: ExtractionRequestMeta) => {
     setExtraction(data);
     setFileName(name);
     setThumbnail(null);
+    setExtractionMeta(meta ?? null);
     setStep(2);
   }, []);
 
@@ -1398,6 +1453,7 @@ export default function InvoiceSimulator() {
             <ExtractionStep
               extraction={extraction}
               fileName={fileName}
+              extractionMeta={extractionMeta}
               onChange={handleFieldChange}
               onCalculate={handleCalculate}
               onBack={editingId ? goToList : goToWizard}
