@@ -20,8 +20,8 @@ export function AhorroLuzBrandHeader({
         className
       )}
     >
-      <div className="flex items-center justify-center gap-3.5 sm:gap-4">
-        <a href="/">
+      <a href="/ahorra-factura-luz">
+        <div className="flex items-center justify-center gap-3.5 sm:gap-4">
           <img
             src="/logo-tulavita.png"
             alt=""
@@ -32,8 +32,8 @@ export function AhorroLuzBrandHeader({
           <span className="text-center text-sm font-semibold tracking-tight text-neutral-900 sm:text-base">
             Tulavita Energía
           </span>
-        </a>
-      </div>
+        </div>
+      </a>
       <div className="mt-8 inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-neutral-600 sm:mt-5 sm:text-xs">
         <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: AHORRO_PUBLIC_ACCENT }} aria-hidden />
         Ahorro en electricidad
