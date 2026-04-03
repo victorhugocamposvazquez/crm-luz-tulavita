@@ -35,6 +35,12 @@ describe('parse20TDFromTextDetailed — CUPS', () => {
     expect(extraction?.cups).toBe('ES0022000004140388AF1P');
   });
 
+  it('CUPS Plenitude: quita sufijo 0F típico de OCR', () => {
+    const text = minimal20TDText('CUPS ES0033770058242001LA0F');
+    const { extraction } = parse20TDFromTextDetailed(text);
+    expect(extraction?.cups).toBe('ES0033770058242001LA');
+  });
+
   it('detecta CUPS en línea con espacios entre grupos', () => {
     const text = minimal20TDText('CUPS: ES 0022 0000 0414 0388 AF1P');
     const { diagnostics, extraction } = parse20TDFromTextDetailed(text);
@@ -54,6 +60,26 @@ describe('parse20TDFromTextDetailed — CUPS', () => {
     const { diagnostics, extraction } = parse20TDFromTextDetailed(text);
     expect(diagnostics.fields.cups.found).toBe(true);
     expect(extraction?.cups).toBe('ES0031408122850001AB');
+  });
+});
+
+describe('parse20TDFromTextDetailed — Iberdrola resumen (fixture texto)', () => {
+  it('periodo sin dos puntos, total, consumo y precio implícito', () => {
+    const text = [
+      '2.0TD FACTURA DE ELECTRICIDAD IBERDROLA CLIENTES S.A.U. RESUMEN DE FACTURA',
+      'PERIODO DE FACTURACIÓN 17/08/2025 - 17/09/2025',
+      'ENERGÍA 24,26 € IVA 6,74 € TOTAL 38,84 € Consumo total de esta factura. Total: 81,00 kWh',
+      'CUPS ES142100616230020030',
+    ].join('\n');
+    const { extraction } = parse20TDFromTextDetailed(text);
+    expect(extraction?.company_name).toBe('Iberdrola');
+    expect(extraction?.period_start).toBe('2025-08-17');
+    expect(extraction?.period_end).toBe('2025-09-17');
+    expect(extraction?.total_factura).toBe(38.84);
+    expect(extraction?.consumption_kwh).toBe(81);
+    expect(extraction?.precio_energia_kwh).toBeCloseTo(38.84 / 81, 4);
+    expect(extraction?.precio_p1_kwh).toBeCloseTo(38.84 / 81, 4);
+    expect(extraction?.precio_p2_kwh).toBeCloseTo(38.84 / 81, 4);
   });
 });
 

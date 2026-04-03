@@ -90,6 +90,7 @@ const COMPANY_PATTERNS: Array<{ label: string; pattern: RegExp; value: string; c
   { label: 'totalenergies', pattern: /TOTALENERGIES(?:\s+CLIENTES)?/i, value: 'TotalEnergies', confidence: 0.9 },
   { label: 'naturgy', pattern: /NATURGY/i, value: 'Naturgy', confidence: 0.88 },
   { label: 'plenitude', pattern: /PLENITUDE/i, value: 'Plenitude', confidence: 0.88 },
+  { label: 'eni-plenitude', pattern: /ENI\s+PLENITUDE|PLENITUDE\s+IBERIA/i, value: 'Plenitude', confidence: 0.88 },
   { label: 'contigo', pattern: /CONTIGO\s+ENERG[ÍI]A/i, value: 'Contigo Energía', confidence: 0.88 },
   { label: 'gaba', pattern: /GABA\s+ENERG[ÍI]A/i, value: 'Gaba Energía', confidence: 0.88 },
   { label: 'gesternova', pattern: /GESTERNOVA/i, value: 'Gesternova', confidence: 0.88 },
@@ -133,6 +134,11 @@ function normalizeCupsFromCapture(raw: string): string | null {
   const valid20 = (s: string) => /^\d{16}[A-Z0-9]{4}$/.test(s);
 
   if (rest.length === 18 && valid18(rest)) return `ES${rest}`;
+  /** Sufijos tipo "0F" pegados al CUPS 18 chars (Plenitude / OCR). */
+  if (rest.length === 20 && valid18(rest.slice(0, 18))) {
+    const tail = rest.slice(18);
+    if (/^0[A-Z]$/.test(tail)) return `ES${rest.slice(0, 18)}`;
+  }
   if (rest.length === 20 && valid20(rest)) return `ES${rest}`;
 
   if (rest.length >= 21) {
@@ -219,8 +225,8 @@ function extractCupsField(text: string): ExtractedField<string> {
 }
 
 const PERIOD_PATTERNS: RegExp[] = [
+  /PERIODO\s+DE\s+FACTURACI[ÓO]N:?\s*(\d{2}[./-]\d{2}[./-]\d{4})\s*[-–]\s*(\d{2}[./-]\d{2}[./-]\d{4})/i,
   /Periodo de facturaci[oó]n(?: elec\.)?:?\s*(?:del\s*)?(\d{2}[./-]\d{2}[./-]\d{4})\s*(?:a|-)\s*(\d{2}[./-]\d{2}[./-]\d{4})/i,
-  /PERIODO DE FACTURACI[ÓO]N:\s*(\d{2}[./-]\d{2}[./-]\d{4})\s*-\s*(\d{2}[./-]\d{2}[./-]\d{4})/i,
   /Del\s+(\d{2}[./-]\d{2}[./-]\d{4})\s+al\s+(\d{2}[./-]\d{2}[./-]\d{4})/i,
   /Desde\s+(\d{2}[./-]\d{2}[./-]\d{4})\s+hasta\s+(\d{2}[./-]\d{2}[./-]\d{4})/i,
 ];
@@ -235,6 +241,28 @@ const TITULAR_END_BEFORE_POWER: RegExp[] = [
 ];
 
 const TITULAR_SPECS: BetweenLabelSpec[] = [
+  {
+    label: 'titular-nombre-cliente',
+    startPatterns: [
+      /Nombre\s+del\s+cliente[:\s]+/i,
+      /Titular\s+del\s+punto\s+de\s+suministro[:\s]+/i,
+      /Contratante[:\s]+/i,
+    ],
+    endPatterns: [
+      ...TITULAR_END_BEFORE_POWER,
+      /\n/,
+      /\bDNI\b/i,
+      /CUPS[:\s]/i,
+      /N[ºo]\s*de contrato/i,
+      /N[ºo]\s*de factura/i,
+      /Fecha de emisi[oó]n/i,
+      /Direcci[oó]n/i,
+      /Domicilio/i,
+      /Total factura/i,
+    ],
+    confidence: 0.91,
+    maxChars: 100,
+  },
   {
     label: 'titular-cabecera',
     startPatterns: [/Esta es tu factura de luz,\s*/i],
@@ -258,7 +286,7 @@ const TITULAR_SPECS: BetweenLabelSpec[] = [
       /Nombre y Apellidos del titular[:\s]*/i,
       /Titular del contrato[:\s]*/i,
       /Titular[:\s]+(?!Potencia\b)/i,
-      /Cliente[:\s]*/i,
+      /\bCliente\b\s*[:\s]+/i,
     ],
     endPatterns: [
       ...TITULAR_END_BEFORE_POWER,
@@ -362,6 +390,8 @@ const ADDRESS_SPECS: BetweenLabelSpec[] = [
     startPatterns: [
       /Direcci[oó]n de suministro[:\s]*/i,
       /Direcci[oó]n suministro[:\s]*/i,
+      /Domicilio\s+de\s+suministro[:\s]*/i,
+      /Domicilio\s+del\s+suministro[:\s]*/i,
     ],
     endPatterns: [
       /\n/,
@@ -369,6 +399,7 @@ const ADDRESS_SPECS: BetweenLabelSpec[] = [
       /Total factura/i,
       /T[eé]rmino fijo/i,
       /Periodo de facturaci[oó]n/i,
+      /PERIODO\s+DE\s+FACTURACI/i,
       /D[ií]as facturados/i,
       /Consumo en este periodo/i,
       /Fecha de cobro/i,
@@ -785,6 +816,22 @@ export function parse20TDFromTextDetailed(text: string): Parse20TDTextResult {
       { label: 'precio-medio', pattern: /precio medio[^:]{0,40}:\s*([\d.,]+)\s*€\/kWh/i, confidence: 0.8 },
       { label: 'precio-medio-loose', pattern: /precio medio.*?([\d.,]+)\s*€\/kWh/i, confidence: 0.76 },
     ]);
+  }
+
+  if (
+    precioEnergia.value == null
+    && consumption.value != null
+    && totalFactura.value != null
+    && consumption.value > 0
+  ) {
+    const impl = totalFactura.value / consumption.value;
+    if (impl >= 0.05 && impl <= 0.55) {
+      precioEnergia = {
+        value: Math.round(impl * 1e6) / 1e6,
+        confidence: 0.56,
+        source: 'implied-total-div-consumo',
+      };
+    }
   }
 
   let precioP1Out = precioP1;

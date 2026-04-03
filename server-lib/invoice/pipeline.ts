@@ -383,6 +383,19 @@ function validateExtraction(e: InvoiceExtraction): InvoiceExtraction {
   }
 
   fixPeriodStartEveBeforeMonth(e, fixes);
+
+  const tarifaU = (e.tipo_tarifa ?? '').toUpperCase().replace(/\s+/g, '');
+  const looks20 = tarifaU.includes('2.0') || tarifaU.includes('20TD') || tarifaU.includes('20A');
+  if (
+    looks20
+    && e.precio_p1_kwh != null
+    && e.precio_p1_kwh > 0
+    && (e.precio_p2_kwh == null || e.precio_p2_kwh <= 0)
+  ) {
+    e.precio_p2_kwh = e.precio_p1_kwh;
+    fixes.push('precio_p2_kwh alineado con P1 (2.0TD, un solo precio en factura)');
+  }
+
   normalizeLikely20TD(e, fixes);
   crossCheckWithImporteEnergia(e, warnings);
   reconcileConsumoPorPeriodo(e, fixes);
