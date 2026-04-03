@@ -116,20 +116,40 @@ const CONSUMPTION_PATTERNS: NumberPatternSpec[] = [
 ];
 
 /**
- * CUPS España: prefijo ES + 18–20 caracteres alfanuméricos (según distribuidora / PDF).
- * Exige al menos 16 dígitos en el cuerpo para filtrar falsos positivos.
+ * CUPS España: ES + 18 o 20 caracteres típicos (16 dígitos + 2 o 4 de control).
+ * Recorta 21–22 chars cuando el PDF pega una letra suelta (p. ej. "N" de "Nº").
  */
 function normalizeCupsFromCapture(raw: string): string | null {
   const compact = raw.replace(/[\s.-]+/g, '').toUpperCase();
   const idx = compact.indexOf('ES');
   const body = idx >= 0 ? compact.slice(idx) : compact;
   if (!body.startsWith('ES')) return null;
-  const rest = body.slice(2);
-  if (rest.length < 18 || rest.length > 22) return null;
-  if (!/^[0-9A-Z]+$/.test(rest)) return null;
+  let rest = body.slice(2);
+  if (rest.length < 18 || rest.length > 22 || !/^[0-9A-Z]+$/.test(rest)) return null;
   const digitCount = (rest.match(/\d/g) ?? []).length;
   if (digitCount < 16) return null;
-  return `ES${rest}`;
+
+  const valid18 = (s: string) => /^\d{16}[A-Z0-9]{2}$/.test(s);
+  const valid20 = (s: string) => /^\d{16}[A-Z0-9]{4}$/.test(s);
+
+  if (rest.length === 18 && valid18(rest)) return `ES${rest}`;
+  if (rest.length === 20 && valid20(rest)) return `ES${rest}`;
+
+  if (rest.length >= 21) {
+    const t20 = rest.slice(0, 20);
+    if (valid20(t20)) return `ES${t20}`;
+  }
+  if (rest.length >= 19) {
+    const t18 = rest.slice(0, 18);
+    if (valid18(t18)) return `ES${t18}`;
+  }
+  if (rest.length === 20 && !valid20(rest)) {
+    const t18 = rest.slice(0, 18);
+    if (valid18(t18)) return `ES${t18}`;
+  }
+
+  if (rest.length >= 18 && rest.length <= 22) return `ES${rest}`;
+  return null;
 }
 
 const CUPS_PATTERNS: StringPatternSpec[] = [
@@ -266,7 +286,22 @@ function sanitizeTitularValue(raw: string | null | undefined): string | null {
   const cut2 = cut.split(/\bPotencias\s+contratadas\b/i)[0];
   const cut3 = cut2.split(/\bDirecci[oó]n\s+de\s+suministro\b/i)[0];
   const out = cut3.replace(/\s{2,}/g, ' ').trim();
-  return out.length >= 2 ? out : null;
+  if (out.length < 2) return null;
+  if (!isPlausibleTitularPersonName(out)) return null;
+  return out;
+}
+
+/** Rechaza cabeceras societarias / basura OCR que a veces matchea como "titular" (Iberdrola, etc.). */
+function isPlausibleTitularPersonName(s: string): boolean {
+  const t = s.trim();
+  if (t.length > 85) return false;
+  if (/\bCIF\b/i.test(t)) return false;
+  if (/\bS\.\s*A\.?\s*U\.?\b/i.test(t) || /\bS\.\s*L\.?\b/i.test(t)) return false;
+  if (/[<>\\]/.test(t)) return false;
+  if (/\d{12,}/.test(t)) return false;
+  const digits = (t.match(/\d/g) ?? []).length;
+  if (digits > 8 && digits > t.length * 0.25) return false;
+  return true;
 }
 
 /**
@@ -531,12 +566,15 @@ function extractPrecioP2(text: string): ExtractedField<number> {
   return emptyField<number>();
 }
 
+const CONSUMO_P1_P2_LINE =
+  /(?:^|\n)\s*(?:Punta|Llano|Valle|Horas\s+promocionadas|Horas\s+no\s+promocionadas|Energ[íi]a\s+en\s+horas?\s+punta|Energ[íi]a\s+en\s+horas?\s+llano|Energ[íi]a\s+punta|Energ[íi]a\s+valle|Consumo\s+P[12])\s*[:\s]+([\d.,]+)\s*kWh/gim;
+
 function extractConsumosPorPeriodo(text: string): {
   p1: ExtractedField<number>;
   p2: ExtractedField<number>;
   warnings: string[];
 } {
-  const matches = [...text.matchAll(/(?:Punta|Llano|Valle|Horas promocionadas|Horas no promocionadas|Consumo)\s*[: ]*([\d.,]+)\s*kWh/gi)]
+  const matches = [...text.matchAll(CONSUMO_P1_P2_LINE)]
     .map((match) => parseSpanishNum(match[1]))
     .filter((value): value is number => value != null && value >= 0);
 
@@ -550,9 +588,9 @@ function extractConsumosPorPeriodo(text: string): {
 
   if (matches.length > 2) {
     return {
-      p1: emptyField<number>(),
-      p2: emptyField<number>(),
-      warnings: ['desglose de consumo por periodo ambiguo; se deja vacío para no inventar P1/P2'],
+      p1: { value: matches[0], confidence: 0.55, source: 'consumo-matchall-1ofmany' },
+      p2: { value: matches[1], confidence: 0.55, source: 'consumo-matchall-2ofmany' },
+      warnings: ['varias líneas de consumo por periodo; se usan las dos primeras reconocidas'],
     };
   }
 
@@ -709,7 +747,9 @@ export function parse20TDFromTextDetailed(text: string): Parse20TDTextResult {
   let titular = extractBetweenLabels(searchText, TITULAR_SPECS);
   if (titular.value) {
     const s = sanitizeTitularValue(titular.value);
-    if (s) titular = { value: s, confidence: titular.confidence, source: titular.source };
+    titular = s
+      ? { value: s, confidence: titular.confidence, source: titular.source }
+      : emptyField<string>();
   }
   const direccion = extractBetweenLabels(searchText, ADDRESS_SPECS);
   const periodRange = extractPeriodRange(searchText);
@@ -739,9 +779,28 @@ export function parse20TDFromTextDetailed(text: string): Parse20TDTextResult {
     };
   } else {
     precioEnergia = extractNumberField(searchText, [
-      { label: 'precio-medio-ha-salido', pattern: /ha salido a\s*([\d.,]+)\s*€\/kWh/i, confidence: 0.82 },
-      { label: 'precio-medio', pattern: /precio medio.*?([\d.,]+)\s*€\/kWh/i, confidence: 0.8 },
+      { label: 'precio-consumo-ha-salido', pattern: /consumo\s+ha\s+salido\s+a\s*([\d.,]+)\s*€\/kWh/i, confidence: 0.84 },
+      { label: 'precio-medio-ha-salido', pattern: /ha\s+salido\s+a\s*([\d.,]+)\s*€\/kWh/i, confidence: 0.82 },
+      { label: 'precio-factura-ha-salido', pattern: /factura\s+el\s+consumo\s+ha\s+salido\s+a\s*([\d.,]+)\s*€\/kWh/i, confidence: 0.83 },
+      { label: 'precio-medio', pattern: /precio medio[^:]{0,40}:\s*([\d.,]+)\s*€\/kWh/i, confidence: 0.8 },
+      { label: 'precio-medio-loose', pattern: /precio medio.*?([\d.,]+)\s*€\/kWh/i, confidence: 0.76 },
     ]);
+  }
+
+  let precioP1Out = precioP1;
+  let precioP2Out = precioP2;
+  if (
+    precioEnergia.value != null
+    && precioEnergia.value > 0
+    && (precioP1Out.value == null || precioP2Out.value == null)
+  ) {
+    const fill = precioEnergia.value;
+    if (precioP1Out.value == null) {
+      precioP1Out = { value: fill, confidence: precioEnergia.confidence * 0.92, source: `${precioEnergia.source}-as-p1` };
+    }
+    if (precioP2Out.value == null) {
+      precioP2Out = { value: fill, confidence: precioEnergia.confidence * 0.92, source: `${precioEnergia.source}-as-p2` };
+    }
   }
 
   const diagnostics = buildDiagnostics({
@@ -756,8 +815,8 @@ export function parse20TDFromTextDetailed(text: string): Parse20TDTextResult {
     powerP1,
     powerP2,
     precioEnergia,
-    precioP1,
-    precioP2,
+    precioP1: precioP1Out,
+    precioP2: precioP2Out,
     consumoP1: consumoSplit.p1,
     consumoP2: consumoSplit.p2,
     warnings: consumoSplit.warnings,
@@ -782,8 +841,8 @@ export function parse20TDFromTextDetailed(text: string): Parse20TDTextResult {
     potencia_p1_kw: powerP1.value,
     potencia_p2_kw: powerP2.value,
     precio_energia_kwh: precioEnergia.value,
-    precio_p1_kwh: precioP1.value,
-    precio_p2_kwh: precioP2.value,
+    precio_p1_kwh: precioP1Out.value,
+    precio_p2_kwh: precioP2Out.value,
     consumo_p1_kwh: consumoSplit.p1.value,
     consumo_p2_kwh: consumoSplit.p2.value,
     tipo_tarifa: '2.0TD',

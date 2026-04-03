@@ -29,6 +29,12 @@ describe('parse20TDFromTextDetailed — titular (Iberdrola / misma línea)', () 
 });
 
 describe('parse20TDFromTextDetailed — CUPS', () => {
+  it('recorta carácter extra al final del CUPS (p. ej. N pegada)', () => {
+    const text = minimal20TDText('CUPS ES0022000004140388AF1PN');
+    const { extraction } = parse20TDFromTextDetailed(text);
+    expect(extraction?.cups).toBe('ES0022000004140388AF1P');
+  });
+
   it('detecta CUPS en línea con espacios entre grupos', () => {
     const text = minimal20TDText('CUPS: ES 0022 0000 0414 0388 AF1P');
     const { diagnostics, extraction } = parse20TDFromTextDetailed(text);
@@ -48,5 +54,26 @@ describe('parse20TDFromTextDetailed — CUPS', () => {
     const { diagnostics, extraction } = parse20TDFromTextDetailed(text);
     expect(diagnostics.fields.cups.found).toBe(true);
     expect(extraction?.cups).toBe('ES0031408122850001AB');
+  });
+});
+
+describe('parse20TDFromTextDetailed — precios y consumo por periodo (oferta)', () => {
+  it('rellena precio medio Repsol y duplica P1/P2 para comparativa', () => {
+    const text = [
+      'Factura 2.0TD Repsol',
+      'Total factura 201,96 €',
+      'Consumo en este periodo 936,39 kWh',
+      'Horas promocionadas 400,00 kWh',
+      'Horas no promocionadas 536,39 kWh',
+      'En esta factura el consumo ha salido a 0,157740 €/kWh',
+      'Periodo de facturación 21/12/2025 - 21/01/2026',
+      'CUPS ES0022000004140388AF1P',
+    ].join('\n');
+    const { extraction } = parse20TDFromTextDetailed(text);
+    expect(extraction?.precio_energia_kwh).toBeCloseTo(0.15774, 5);
+    expect(extraction?.precio_p1_kwh).toBeCloseTo(0.15774, 5);
+    expect(extraction?.precio_p2_kwh).toBeCloseTo(0.15774, 5);
+    expect(extraction?.consumo_p1_kwh).toBe(400);
+    expect(extraction?.consumo_p2_kwh).toBeCloseTo(536.39, 2);
   });
 });
