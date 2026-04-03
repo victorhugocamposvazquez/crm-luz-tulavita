@@ -54,6 +54,7 @@ interface StringPatternSpec {
   label: string;
   pattern: RegExp;
   confidence: number;
+  /** Si devuelve null, se prueba el siguiente patrón. */
   transform?: (value: string) => string | null;
 }
 
@@ -114,20 +115,88 @@ const CONSUMPTION_PATTERNS: NumberPatternSpec[] = [
   },
 ];
 
+/**
+ * CUPS España: prefijo ES + 18–20 caracteres alfanuméricos (según distribuidora / PDF).
+ * Exige al menos 16 dígitos en el cuerpo para filtrar falsos positivos.
+ */
+function normalizeCupsFromCapture(raw: string): string | null {
+  const compact = raw.replace(/[\s.-]+/g, '').toUpperCase();
+  const idx = compact.indexOf('ES');
+  const body = idx >= 0 ? compact.slice(idx) : compact;
+  if (!body.startsWith('ES')) return null;
+  const rest = body.slice(2);
+  if (rest.length < 18 || rest.length > 22) return null;
+  if (!/^[0-9A-Z]+$/.test(rest)) return null;
+  const digitCount = (rest.match(/\d/g) ?? []).length;
+  if (digitCount < 16) return null;
+  return `ES${rest}`;
+}
+
 const CUPS_PATTERNS: StringPatternSpec[] = [
   {
     label: 'cups-inline',
-    pattern: /CUPS[:\s]+(ES[0-9A-Z]{16,24})\b/i,
+    pattern: /CUPS[:\s]+(ES[0-9A-Z\s.-]{18,32})\b/i,
     confidence: 0.99,
-    transform: (value) => value.replace(/\s+/g, '').toUpperCase(),
+    transform: (value) => normalizeCupsFromCapture(value),
   },
   {
     label: 'cups-identified',
-    pattern: /Identificaci[oó]n punto de suministro \(CUPS\):\s*(ES[0-9A-Z]{16,24})\b/i,
+    pattern: /Identificaci[oó]n punto de suministro \(CUPS\):\s*(ES[0-9A-Z\s.-]{18,32})\b/i,
     confidence: 0.99,
-    transform: (value) => value.replace(/\s+/g, '').toUpperCase(),
+    transform: (value) => normalizeCupsFromCapture(value),
+  },
+  {
+    label: 'cups-codigo-label',
+    pattern: /C[oó]digo\s+CUPS[:\s]+(ES[0-9A-Z\s.-]{18,32})/i,
+    confidence: 0.98,
+    transform: (value) => normalizeCupsFromCapture(value),
+  },
+  {
+    label: 'cups-numero-label',
+    pattern: /N[ºo°\.]?\s*CUPS[:\s]+(ES[0-9A-Z\s.-]{18,32})/i,
+    confidence: 0.98,
+    transform: (value) => normalizeCupsFromCapture(value),
+  },
+  {
+    label: 'cups-punto-suministro',
+    pattern: /Punto de suministro[:\s]*(?:\n\s*)?(ES[0-9A-Z\s.-]{18,32})/i,
+    confidence: 0.96,
+    transform: (value) => normalizeCupsFromCapture(value),
+  },
+  {
+    label: 'cups-tight-es',
+    pattern: /\b(ES\d{16}[A-Z0-9]{2,6})\b/i,
+    confidence: 0.97,
+    transform: (value) => normalizeCupsFromCapture(value),
+  },
+  {
+    label: 'cups-spaced-groups',
+    pattern: /\b(ES\s*\d{4}\s*\d{4}\s*\d{4}\s*\d{4}\s*[A-Z0-9]{2,6})\b/i,
+    confidence: 0.96,
+    transform: (value) => normalizeCupsFromCapture(value),
   },
 ];
+
+function extractCupsField(text: string): ExtractedField<string> {
+  const fromPatterns = extractStringField(text, CUPS_PATTERNS);
+  if (fromPatterns.value) return fromPatterns;
+
+  const looseRes = [
+    /\bES\s*\d{4}\s*\d{4}\s*\d{4}\s*\d{4}\s*[A-Z0-9]{2,6}\b/gi,
+    /\bES\d{16}[A-Z0-9]{2,6}\b/gi,
+  ];
+  for (const re of looseRes) {
+    const r = new RegExp(re.source, re.flags);
+    let m: RegExpExecArray | null;
+    while ((m = r.exec(text)) != null) {
+      const n = normalizeCupsFromCapture(m[0]);
+      if (n) {
+        return { value: n, confidence: 0.88, source: 'cups-loose-scan' };
+      }
+    }
+  }
+  return emptyField<string>();
+}
 
 const PERIOD_PATTERNS = [
   /Periodo de facturaci[oó]n(?: elec\.)?:?\s*(?:del\s*)?(\d{2}[./-]\d{2}[./-]\d{4})\s*(?:a|-)\s*(\d{2}[./-]\d{2}[./-]\d{4})/i,
@@ -603,7 +672,7 @@ export function parse20TDFromTextDetailed(text: string): Parse20TDTextResult {
   const companyName = detectCompany(searchText);
   const totalFactura = extractNumberField(searchText, TOTAL_PATTERNS);
   const consumption = extractNumberField(searchText, CONSUMPTION_PATTERNS);
-  const cups = extractStringField(searchText, CUPS_PATTERNS);
+  const cups = extractCupsField(searchText);
   const titular = extractBetweenLabels(searchText, TITULAR_SPECS);
   const direccion = extractBetweenLabels(searchText, ADDRESS_SPECS);
   const periodRange = extractPeriodRange(searchText);
