@@ -198,9 +198,20 @@ function extractCupsField(text: string): ExtractedField<string> {
   return emptyField<string>();
 }
 
-const PERIOD_PATTERNS = [
+const PERIOD_PATTERNS: RegExp[] = [
   /Periodo de facturaci[oó]n(?: elec\.)?:?\s*(?:del\s*)?(\d{2}[./-]\d{2}[./-]\d{4})\s*(?:a|-)\s*(\d{2}[./-]\d{2}[./-]\d{4})/i,
   /PERIODO DE FACTURACI[ÓO]N:\s*(\d{2}[./-]\d{2}[./-]\d{4})\s*-\s*(\d{2}[./-]\d{2}[./-]\d{4})/i,
+  /Del\s+(\d{2}[./-]\d{2}[./-]\d{4})\s+al\s+(\d{2}[./-]\d{2}[./-]\d{4})/i,
+  /Desde\s+(\d{2}[./-]\d{2}[./-]\d{4})\s+hasta\s+(\d{2}[./-]\d{2}[./-]\d{4})/i,
+];
+
+/** Cortes antes de datos técnicos cuando titular y potencia van en la misma línea (p. ej. Iberdrola). */
+const TITULAR_END_BEFORE_POWER: RegExp[] = [
+  /\bPotencia\s+punta\b/i,
+  /\bPotencia\s+valle\b/i,
+  /\bPotencia\s+P[12]\b/i,
+  /\bPotencias\s+contratadas\b/i,
+  /\bPeaje\s+de\s+acceso\b/i,
 ];
 
 const TITULAR_SPECS: BetweenLabelSpec[] = [
@@ -208,6 +219,7 @@ const TITULAR_SPECS: BetweenLabelSpec[] = [
     label: 'titular-cabecera',
     startPatterns: [/Esta es tu factura de luz,\s*/i],
     endPatterns: [
+      ...TITULAR_END_BEFORE_POWER,
       /\n/,
       /\bDNI\b/i,
       /CUPS[:\s]/i,
@@ -225,10 +237,11 @@ const TITULAR_SPECS: BetweenLabelSpec[] = [
     startPatterns: [
       /Nombre y Apellidos del titular[:\s]*/i,
       /Titular del contrato[:\s]*/i,
-      /Titular Potencia[:\s]*/i,
+      /Titular[:\s]+(?!Potencia\b)/i,
       /Cliente[:\s]*/i,
     ],
     endPatterns: [
+      ...TITULAR_END_BEFORE_POWER,
       /\n/,
       /\bDNI\b/i,
       /Cuenta bancaria/i,
@@ -245,6 +258,17 @@ const TITULAR_SPECS: BetweenLabelSpec[] = [
   },
 ];
 
+/** Evita que queden restos de potencia/dirección pegados al nombre (misma línea PDF). */
+function sanitizeTitularValue(raw: string | null | undefined): string | null {
+  const cleaned = cleanCapturedText(raw);
+  if (!cleaned) return null;
+  const cut = cleaned.split(/\bPotencia\s+(?:punta|valle|P[12])\b/i)[0];
+  const cut2 = cut.split(/\bPotencias\s+contratadas\b/i)[0];
+  const cut3 = cut2.split(/\bDirecci[oó]n\s+de\s+suministro\b/i)[0];
+  const out = cut3.replace(/\s{2,}/g, ' ').trim();
+  return out.length >= 2 ? out : null;
+}
+
 /**
  * Texto típico que en facturas eléctricas va *después* de la dirección en la misma línea (Endesa, etc.).
  * Frases largas y específicas para no cortar direcciones normales por casualidad.
@@ -253,6 +277,8 @@ const DIRECCION_SUMINISTRO_TAIL_MARKERS: RegExp[] = [
   /\s+Contrato de mercado\s+(?:libre|fijo|indexado|t[íi]pico)\b/i,
   /\s+Referencia de contrato de suministro\b/i,
   /\s+Potencias contratadas\s*[:\s]/i,
+  /\s+Potencia\s+punta\s*[:\s]/i,
+  /\s+Potencia\s+valle\s*[:\s]/i,
   /\s+Fin de contrato de sumin/i,
   /\s+Peaje de acceso\b/i,
   /\s+Contrato\s+ATR\b/i,
@@ -335,6 +361,13 @@ const POWER_P2_PATTERNS: NumberPatternSpec[] = [
 const PRICE_P1_PATTERNS: NumberPatternSpec[] = [
   { label: 'precio-consumo-generico', pattern: /Consumo\s+[\d.,]+\s*kWh\s*x\s*([\d.,]+)\s*(?:Eur|€)\/kWh/i, confidence: 0.72 },
   { label: 'precio-horas-no-promocionadas', pattern: /Horas no promocionadas\s+[\d.,]+\s*kWh\s*x\s*([\d.,]+)\s*€\/kWh/i, confidence: 0.72 },
+  {
+    label: 'precio-linea-consumo-kwh',
+    pattern: /Consumo(?:\s+total|\s+facturado)?[:\s]+[\d.,]+\s*kWh[^\n]{0,120}?([\d.,]+)\s*(?:€|eur)\s*\/\s*kWh/i,
+    confidence: 0.76,
+  },
+  { label: 'precio-termino-energia', pattern: /T[ée]rmino\s+(?:de\s+)?energ[íi]a[:\s]+([\d.,]+)\s*(?:€|eur)?\s*\/?\s*kWh/i, confidence: 0.74 },
+  { label: 'precio-medio-etiqueta', pattern: /[Pp]recio\s+medio[^:]{0,30}:\s*([\d.,]+)\s*(?:€|eur)\s*\/\s*kWh/i, confidence: 0.8 },
 ];
 
 function emptyField<T>(): ExtractedField<T> {
@@ -673,7 +706,11 @@ export function parse20TDFromTextDetailed(text: string): Parse20TDTextResult {
   const totalFactura = extractNumberField(searchText, TOTAL_PATTERNS);
   const consumption = extractNumberField(searchText, CONSUMPTION_PATTERNS);
   const cups = extractCupsField(searchText);
-  const titular = extractBetweenLabels(searchText, TITULAR_SPECS);
+  let titular = extractBetweenLabels(searchText, TITULAR_SPECS);
+  if (titular.value) {
+    const s = sanitizeTitularValue(titular.value);
+    if (s) titular = { value: s, confidence: titular.confidence, source: titular.source };
+  }
   const direccion = extractBetweenLabels(searchText, ADDRESS_SPECS);
   const periodRange = extractPeriodRange(searchText);
   const powerP1 = extractNumberField(searchText, POWER_P1_PATTERNS);

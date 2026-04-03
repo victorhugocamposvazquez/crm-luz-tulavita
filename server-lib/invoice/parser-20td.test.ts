@@ -11,6 +11,23 @@ function minimal20TDText(overrides: string): string {
   ].join('\n');
 }
 
+describe('parse20TDFromTextDetailed — titular (Iberdrola / misma línea)', () => {
+  it('corta el titular antes de Potencia punta en la misma línea', () => {
+    const text = [
+      'Factura 2.0TD IBERDROLA',
+      'Cliente: MARTIN KAMGA NKENGNE Potencia punta: 2,2 kW Potencia valle: 2,2 kW',
+      'Dirección de suministro: CALLE PRUEBA 12, 28001 MADRID',
+      'Total factura 38,84 €',
+      'Consumo en este periodo 81,00 kWh',
+      'Periodo de facturación 01/01/2025 - 31/01/2025',
+      'CUPS ES142100616230020030',
+    ].join('\n');
+    const { extraction } = parse20TDFromTextDetailed(text);
+    expect(extraction?.titular).toBe('MARTIN KAMGA NKENGNE');
+    expect(extraction?.direccion_suministro).toMatch(/CALLE PRUEBA/i);
+  });
+});
+
 describe('parse20TDFromTextDetailed — CUPS', () => {
   it('detecta CUPS en línea con espacios entre grupos', () => {
     const text = minimal20TDText('CUPS: ES 0022 0000 0414 0388 AF1P');

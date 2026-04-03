@@ -16,7 +16,7 @@ const MODEL_FAST = 'gpt-4o-mini';
 const MODEL_FULL = 'gpt-4o';
 const CONFIDENCE_THRESHOLD = Number(process.env.INVOICE_LLM_CONFIDENCE_THRESHOLD ?? '0.7') || 0.7;
 
-const MAX_TOKENS_20TD = 500;
+const MAX_TOKENS_20TD = 400;
 const MAX_TOKENS_30TD = 2000;
 /** Tope de texto enviado al LLM en 2.0TD (menos tokens → menos latencia). */
 const MAX_TEXT_CHARS_20TD = 5_500;
