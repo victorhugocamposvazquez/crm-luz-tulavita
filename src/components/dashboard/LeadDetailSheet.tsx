@@ -307,11 +307,20 @@ export default function LeadDetailSheet({
       toast({ title: 'Sin teléfono', description: 'Este lead no tiene número', variant: 'destructive' });
       return;
     }
+    const num = lead.phone.replace(/\D/g, '').replace(/^34/, '');
+    const waUrl = `https://wa.me/34${num}`;
+    // Abrir en el mismo tick que el clic: si hay await antes, el bloqueador de ventanas suele bloquear _blank.
+    const opened = window.open(waUrl, '_blank', 'noopener,noreferrer');
+    if (!opened) {
+      toast({
+        title: 'No se pudo abrir WhatsApp',
+        description: 'Permite ventanas emergentes para este sitio o copia el número y ábrelo en WhatsApp.',
+        variant: 'destructive',
+      });
+    }
     const convId = await getOrCreateConversation('whatsapp');
     if (convId) await sendOutboundMessage(convId, 'Contacto iniciado por WhatsApp');
-    markContactedIfNew();
-    const num = lead.phone.replace(/\D/g, '').replace(/^34/, '');
-    window.open(`https://wa.me/34${num}`, '_blank');
+    void markContactedIfNew();
   };
 
   const handleCall = async () => {
@@ -330,10 +339,18 @@ export default function LeadDetailSheet({
       toast({ title: 'Sin email', description: 'Este lead no tiene email', variant: 'destructive' });
       return;
     }
+    const mailUrl = `mailto:${lead.email}`;
+    const opened = window.open(mailUrl, '_blank', 'noopener,noreferrer');
+    if (!opened) {
+      toast({
+        title: 'No se pudo abrir el cliente de correo',
+        description: 'Permite ventanas emergentes o usa el enlace de email en los datos del lead.',
+        variant: 'destructive',
+      });
+    }
     const convId = await getOrCreateConversation('email');
     if (convId) await sendOutboundMessage(convId, 'Email enviado');
-    markContactedIfNew();
-    window.open(`mailto:${lead.email}`, '_blank');
+    void markContactedIfNew();
   };
 
   useEffect(() => {
