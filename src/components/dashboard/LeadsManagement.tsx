@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
-import { Search, RefreshCw, ExternalLink, Loader2, Plus, Eye, Trash2 } from 'lucide-react';
+import { Search, RefreshCw, ExternalLink, Loader2, Plus, Eye, Trash2, Handshake } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
 import {
   AlertDialog,
@@ -356,9 +356,16 @@ export default function LeadsManagement() {
                       <TableCell>{lead.phone || '—'}</TableCell>
                       <TableCell>{lead.email || '—'}</TableCell>
                       <TableCell>
-                        <Badge variant="outline" className="font-normal">
-                          {SOURCE_LABELS[lead.source] ?? lead.source}
-                        </Badge>
+                        {lead.source === 'collaborator_referral' ? (
+                          <Badge className="font-normal gap-1.5 bg-emerald-100 text-emerald-800 hover:bg-emerald-100 border border-emerald-200">
+                            <Handshake className="h-3.5 w-3.5" />
+                            Colaborador
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="font-normal">
+                            {SOURCE_LABELS[lead.source] ?? lead.source}
+                          </Badge>
+                        )}
                       </TableCell>
                       <TableCell>
                         <Badge

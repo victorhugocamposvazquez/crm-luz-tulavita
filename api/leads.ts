@@ -16,9 +16,14 @@ function normalizePhone(phone: string | undefined | null): string | null {
   if (/^\+34[679]\d{8}$/.test(cleaned)) return cleaned;
   if (/^\+\d{10,15}$/.test(cleaned)) return cleaned;
   const digits = cleaned.replace(/\D/g, '');
-  if (digits.length >= 9 && digits.length <= 15) {
+  if (digits.length >= 10 && digits.length <= 15) {
     return digits.startsWith('34') ? `+${digits}` : `+34${digits}`;
   }
+  if (digits.length === 9) {
+    return /^[679]\d{8}$/.test(digits) ? `+34${digits}` : digits;
+  }
+  // No perder el dato si el usuario envía un teléfono corto (p.ej. 8 dígitos).
+  if (digits.length >= 6) return digits;
   return null;
 }
 

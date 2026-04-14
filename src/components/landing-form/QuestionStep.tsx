@@ -529,7 +529,7 @@ export function validateQuestion(
   if (question.type === 'contact') {
     const v = value as Record<string, string> | undefined;
     const phone = (v?.phone ?? v?.telefono ?? '').toString().replace(/\s/g, '').replace(/\D/g, '');
-    if (!phone || phone.length < 6) return 'El teléfono es obligatorio';
+    if (!phone || phone.length < 9) return 'Introduce un teléfono válido (mínimo 9 dígitos)';
     if (!v?.email?.trim()) return 'El email es obligatorio';
     if (v.email && !isValidEmail(v.email)) return 'Email no válido';
     return null;

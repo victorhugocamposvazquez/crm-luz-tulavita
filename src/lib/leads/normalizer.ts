@@ -9,6 +9,7 @@ const LEAD_SOURCES_SET = new Set<string>([
   'web_form',
   'meta_lead_ads',
   'meta_ads_web',
+  'collaborator_referral',
   'csv_import',
   'manual',
 ]);
@@ -41,8 +42,15 @@ export function normalizePhone(phone: string | undefined | null): string | null 
 
   // Fallback: devolver solo dígitos con + si parece válido
   const digits = cleaned.replace(/\D/g, '');
-  if (digits.length >= 9 && digits.length <= 15) {
+  if (digits.length >= 10 && digits.length <= 15) {
     return digits.startsWith('34') ? `+${digits}` : `+34${digits}`;
+  }
+  if (digits.length === 9) {
+    return /^[679]\d{8}$/.test(digits) ? `+34${digits}` : digits;
+  }
+  // No perder el dato si viene corto (error de entrada del usuario) para revisión comercial.
+  if (digits.length >= 6) {
+    return digits;
   }
 
   return null;

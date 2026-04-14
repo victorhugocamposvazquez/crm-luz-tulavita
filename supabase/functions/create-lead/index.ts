@@ -16,9 +16,11 @@ function normalizePhone(phone: string | undefined | null): string | null {
   if (/^\+34[679]\d{8}$/.test(cleaned)) return cleaned;
   if (/^\+\d{10,15}$/.test(cleaned)) return cleaned;
   const digits = cleaned.replace(/\D/g, '');
-  if (digits.length >= 9 && digits.length <= 15) {
+  if (digits.length >= 10 && digits.length <= 15) {
     return digits.startsWith('34') ? `+${digits}` : `+34${digits}`;
   }
+  if (digits.length === 9) return /^[679]\d{8}$/.test(digits) ? `+34${digits}` : digits;
+  if (digits.length >= 6) return digits;
   return null;
 }
 
@@ -34,7 +36,7 @@ function normalizeName(name: string | undefined | null): string | null {
   return t.length > 0 ? t : null;
 }
 
-const SOURCES = new Set(['web_form', 'meta_lead_ads', 'meta_ads_web', 'csv_import', 'manual']);
+const SOURCES = new Set(['web_form', 'meta_lead_ads', 'meta_ads_web', 'collaborator_referral', 'csv_import', 'manual']);
 function normalizeSource(s: string | undefined | null): string {
   if (!s || typeof s !== 'string') return 'manual';
   const l = s.trim().toLowerCase();
