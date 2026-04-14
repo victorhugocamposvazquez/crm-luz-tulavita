@@ -59,6 +59,7 @@ const SOURCE_LABELS: Record<string, string> = {
   web_form: 'Formulario web',
   meta_lead_ads: 'Meta Lead Ads',
   meta_ads_web: 'Meta Ads Web',
+  collaborator_referral: 'Colaborador',
   csv_import: 'Importación CSV',
   manual: 'Manual',
 };

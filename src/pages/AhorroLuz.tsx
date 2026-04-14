@@ -10,6 +10,7 @@ import { useFormState } from '@/components/landing-form';
 import { ContactPrivacyNote, QuestionStep, validateQuestion } from '@/components/landing-form';
 import type { FormConfig, Question, LeadPayload } from '@/components/landing-form';
 import { useMetaAttribution } from '@/hooks/useMetaAttribution';
+import { useCollaboratorReferral } from '@/hooks/useCollaboratorReferral';
 import { EnergySavingsFlow } from '@/components/energy-savings/EnergySavingsFlow';
 import { AhorroLuzHero } from '@/components/energy-savings/AhorroLuzHero';
 import { AhorroLuzBrandHeader } from '@/components/energy-savings/AhorroLuzBrandHeader';
@@ -36,10 +37,8 @@ const IMAGE_COMPRESSION_OPTIONS = {
   useWebWorker: true,
 };
 
-const AHORRO_LUZ_META: Pick<FormConfig, 'source' | 'campaign'> = {
-  source: 'web_form',
-  campaign: 'ahorro_luz_gas',
-};
+const AHORRO_LUZ_DEFAULT_SOURCE: NonNullable<FormConfig['source']> = 'web_form';
+const AHORRO_LUZ_DEFAULT_CAMPAIGN: NonNullable<FormConfig['campaign']> = 'ahorro_luz_gas';
 
 const CONTACT_QUESTION_SHARED = {
   id: 'contact',
@@ -139,6 +138,13 @@ const QUESTIONS_CALLBACK: Question[] = [CONTACT_CALLBACK];
 
 export type LandingFormMode = 'upload' | 'manual' | 'callback';
 
+function readForcedEntryModeFromUrl(): LandingFormMode | null {
+  const params = new URLSearchParams(window.location.search);
+  const entry = params.get('entry')?.trim().toLowerCase();
+  if (entry === 'upload' || entry === 'manual' || entry === 'callback') return entry;
+  return null;
+}
+
 function LandingFormSteps({
   mode,
   initialFile,
@@ -146,6 +152,9 @@ function LandingFormSteps({
   onLeadSuccess,
   attribution,
   clearAttribution,
+  leadSource,
+  leadCampaign,
+  collaboratorMeta,
 }: {
   mode: LandingFormMode;
   initialFile: File | null;
@@ -153,6 +162,9 @@ function LandingFormSteps({
   onLeadSuccess: (lead: { id: string }, payload: LeadPayload) => void;
   attribution: ReturnType<typeof useMetaAttribution>['attribution'];
   clearAttribution: () => void;
+  leadSource: string;
+  leadCampaign?: string;
+  collaboratorMeta?: Record<string, unknown>;
 }) {
   const questions = useMemo(() => {
     if (mode === 'upload') return QUESTIONS_UPLOAD;
@@ -165,8 +177,9 @@ function LandingFormSteps({
     if (mode === 'upload') o.tiene_factura = 'subir';
     if (mode === 'manual') o.tiene_factura = 'no';
     if (mode === 'callback') o.landing_callback_only = true;
+    if (collaboratorMeta) Object.assign(o, collaboratorMeta);
     return o;
-  }, [mode]);
+  }, [mode, collaboratorMeta]);
 
   const [validationError, setValidationError] = useState<string | null>(null);
   const [direction, setDirection] = useState<'next' | 'prev'>('next');
@@ -231,8 +244,8 @@ function LandingFormSteps({
     submitError,
   } = useFormState({
     questions,
-    source: AHORRO_LUZ_META.source,
-    campaign: AHORRO_LUZ_META.campaign,
+    source: leadSource,
+    campaign: leadCampaign,
     attribution,
     clearAttribution,
     leadEntryApiUrl: import.meta.env.VITE_LEAD_ENTRIES_API_URL ?? '/api/lead-entries',
@@ -591,8 +604,9 @@ function LandingFormSteps({
 }
 
 export default function AhorroLuz() {
-  const [phase, setPhase] = useState<'hero' | 'form' | 'success'>('hero');
-  const [formMode, setFormMode] = useState<LandingFormMode | null>(null);
+  const forcedEntryMode = useMemo(readForcedEntryModeFromUrl, []);
+  const [phase, setPhase] = useState<'hero' | 'form' | 'success'>(() => (forcedEntryMode ? 'form' : 'hero'));
+  const [formMode, setFormMode] = useState<LandingFormMode | null>(() => forcedEntryMode);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
 
   const [lastLeadId, setLastLeadId] = useState<string | null>(null);
@@ -601,6 +615,19 @@ export default function AhorroLuz() {
   const [successEntryPath, setSuccessEntryPath] = useState<string | null>(null);
 
   const { attribution, clearAttribution } = useMetaAttribution();
+  const { collaborator, requestedCode, hasCollaboratorInUrl, loading: collaboratorLoading } = useCollaboratorReferral();
+
+  const collaboratorMeta = useMemo(() => {
+    if (!collaborator) return undefined;
+    return {
+      collaborator_id: collaborator.id,
+      collaborator_code: collaborator.code,
+      collaborator_name: collaborator.name,
+    };
+  }, [collaborator]);
+
+  const leadSource = collaborator ? 'collaborator_referral' : AHORRO_LUZ_DEFAULT_SOURCE;
+  const leadCampaign = collaborator ? `collaborator:${collaborator.code}` : AHORRO_LUZ_DEFAULT_CAMPAIGN;
 
   const handleLeadSuccess = useCallback((lead: { id: string }, payload: LeadPayload) => {
     setLastLeadId(lead.id);
@@ -621,10 +648,10 @@ export default function AhorroLuz() {
     setLastFacturaPath(null);
     setInvoicePdfTextForFlow(null);
     setSuccessEntryPath(null);
-    setPhase('hero');
-    setFormMode(null);
+    setPhase(forcedEntryMode ? 'form' : 'hero');
+    setFormMode(forcedEntryMode);
     setPendingFile(null);
-  }, []);
+  }, [forcedEntryMode]);
 
   const onFormSuccessWrapper = useCallback(
     (lead: { id: string }, payload: LeadPayload) => {
@@ -727,9 +754,22 @@ export default function AhorroLuz() {
           initialFile={pendingFile}
           onBackToHero={backToHero}
           onLeadSuccess={onFormSuccessWrapper}
-          attribution={attribution}
+          attribution={collaborator ? null : attribution}
           clearAttribution={clearAttribution}
+          leadSource={leadSource}
+          leadCampaign={leadCampaign}
+          collaboratorMeta={collaboratorMeta}
         />
+        {collaborator && (
+          <p className="px-4 pb-2 text-center text-sm text-muted-foreground">
+            Solicitud vinculada al colaborador <span className="font-medium">{collaborator.name}</span>.
+          </p>
+        )}
+        {!collaboratorLoading && !collaborator && hasCollaboratorInUrl && requestedCode && (
+          <p className="px-4 pb-2 text-center text-sm text-amber-700">
+            El colaborador <span className="font-medium">{requestedCode}</span> no esta activo.
+          </p>
+        )}
         <AhorroLuzCookieConsent />
       </>
     );

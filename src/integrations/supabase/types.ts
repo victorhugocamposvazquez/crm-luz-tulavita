@@ -164,6 +164,42 @@ export type Database = {
         }
         Relationships: []
       }
+      collaborators: {
+        Row: {
+          id: string
+          code: string
+          name: string
+          email: string | null
+          phone: string | null
+          notes: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          code: string
+          name: string
+          email?: string | null
+          phone?: string | null
+          notes?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          code?: string
+          name?: string
+          email?: string | null
+          phone?: string | null
+          notes?: string | null
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       invoice_estimate_settings: {
         Row: {
           id: number

@@ -6,6 +6,7 @@ export const LEAD_ENTRY_SOURCES = [
   'meta_lead_ads',
   'meta_ads_web',
   'web_form',
+  'collaborator_referral',
   'manual',
   'csv_import',
 ] as const;

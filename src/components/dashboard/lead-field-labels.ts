@@ -13,7 +13,7 @@ export const WEB_FORM_AHORRO_LUZ_LABELS: Record<string, string> = {
 
 /** Obtener etiqueta para un custom_field key según la fuente del lead */
 export function getLeadFieldLabel(source: string, fieldKey: string): string {
-  if (source === 'web_form') {
+  if (source === 'web_form' || source === 'collaborator_referral') {
     return WEB_FORM_AHORRO_LUZ_LABELS[fieldKey] ?? fieldKey;
   }
   return fieldKey;

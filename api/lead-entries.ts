@@ -6,7 +6,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
 
-const SOURCES = new Set(['web_form', 'meta_lead_ads', 'meta_ads_web', 'csv_import', 'manual']);
+const SOURCES = new Set(['web_form', 'meta_lead_ads', 'meta_ads_web', 'csv_import', 'manual', 'collaborator_referral']);
 function normalizeSource(source: string | undefined | null): string {
   if (!source || typeof source !== 'string') return 'manual';
   const lower = source.trim().toLowerCase();

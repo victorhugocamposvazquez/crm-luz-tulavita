@@ -34,7 +34,7 @@ function normalizeName(name: string | undefined | null): string | null {
   return trimmed.length > 0 ? trimmed : null;
 }
 
-const SOURCES = new Set(['web_form', 'meta_lead_ads', 'meta_ads_web', 'csv_import', 'manual']);
+const SOURCES = new Set(['web_form', 'meta_lead_ads', 'meta_ads_web', 'csv_import', 'manual', 'collaborator_referral']);
 function normalizeSource(source: string | undefined | null): string {
   if (!source || typeof source !== 'string') return 'manual';
   const lower = source.trim().toLowerCase();
