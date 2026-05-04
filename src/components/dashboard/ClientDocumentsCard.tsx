@@ -3,8 +3,15 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
-import { FileText, IdCard, Loader2, Receipt, Trash2, Upload } from 'lucide-react';
+import { ExternalLink, FileText, IdCard, Loader2, Receipt, Trash2, Upload } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
@@ -19,6 +26,9 @@ import {
 } from '@/components/ui/alert-dialog';
 
 const BUCKET = 'client-documents';
+const IMAGE_EXT = /\.(jpe?g|png|webp|gif)$/i;
+const PREVIEW_TRANSFORM = { width: 1200, height: 900, quality: 85, resize: 'contain' as const };
+
 const MAX_BYTES = 10 * 1024 * 1024;
 const ALLOWED_MIME = new Set([
   'application/pdf',
@@ -30,6 +40,134 @@ const ALLOWED_MIME = new Set([
 
 type ClientDocRow = Database['public']['Tables']['client_documents']['Row'];
 type DocKind = 'dni' | 'invoice';
+
+function isDocumentImage(doc: ClientDocRow): boolean {
+  if (doc.mime_type === 'application/pdf') return false;
+  if (doc.mime_type?.startsWith('image/')) return true;
+  const name = doc.file_name || doc.storage_path;
+  if (/\.pdf$/i.test(name)) return false;
+  return IMAGE_EXT.test(name);
+}
+
+function isDocumentPdf(doc: ClientDocRow): boolean {
+  if (doc.mime_type === 'application/pdf') return true;
+  const name = doc.file_name || doc.storage_path;
+  return /\.pdf$/i.test(name);
+}
+
+async function getClientDocumentSignedUrl(path: string, withImageTransform: boolean): Promise<string | null> {
+  const opts = withImageTransform ? { transform: PREVIEW_TRANSFORM } : undefined;
+  let result = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600, opts);
+  if (result.error && withImageTransform) {
+    result = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600);
+  }
+  if (result.error) {
+    console.error(result.error);
+    return null;
+  }
+  return result.data?.signedUrl ?? null;
+}
+
+function ClientDocumentPreviewModal({
+  doc,
+  open,
+  onOpenChange,
+}: {
+  doc: ClientDocRow | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const title = doc?.file_name || doc?.storage_path.split('/').pop() || 'Documento';
+  const isImage = doc ? isDocumentImage(doc) : false;
+  const isPdf = doc ? isDocumentPdf(doc) : false;
+
+  useEffect(() => {
+    if (!open || !doc) {
+      setSignedUrl(null);
+      setLoadError(null);
+      setLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(null);
+    setSignedUrl(null);
+
+    void (async () => {
+      const url = await getClientDocumentSignedUrl(doc.storage_path, isImage);
+      if (cancelled) return;
+      if (!url) {
+        setLoadError('No se pudo generar el enlace de vista previa.');
+        setLoading(false);
+        return;
+      }
+      setSignedUrl(url);
+      setLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, doc?.id, doc?.storage_path, isImage]);
+
+  const openInNewTab = () => {
+    if (signedUrl) window.open(signedUrl, '_blank', 'noopener,noreferrer');
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-5xl w-[95vw] max-h-[92vh] flex flex-col gap-3 p-4">
+        <DialogHeader className="space-y-1 shrink-0 text-left">
+          <DialogTitle className="text-base leading-snug pr-8">{title}</DialogTitle>
+        </DialogHeader>
+
+        <div className="flex-1 min-h-0 flex flex-col items-center justify-center rounded-md border bg-muted/30 overflow-hidden">
+          {loading && (
+            <div className="flex items-center gap-2 text-muted-foreground text-sm py-16">
+              <Loader2 className="h-5 w-5 animate-spin" />
+              Cargando vista previa…
+            </div>
+          )}
+          {!loading && loadError && <p className="text-sm text-destructive px-4 py-8 text-center">{loadError}</p>}
+          {!loading && !loadError && signedUrl && isImage && (
+            <img
+              src={signedUrl}
+              alt={title}
+              className="max-h-[min(75vh,800px)] w-full object-contain"
+            />
+          )}
+          {!loading && !loadError && signedUrl && isPdf && (
+            <iframe title={title} src={signedUrl} className="w-full min-h-[70vh] h-[70vh] border-0 bg-background" />
+          )}
+          {!loading && !loadError && signedUrl && !isImage && !isPdf && (
+            <div className="text-center py-10 px-4 space-y-3">
+              <p className="text-sm text-muted-foreground">Vista previa no disponible para este formato.</p>
+              <Button type="button" variant="outline" size="sm" className="gap-2" onClick={openInNewTab}>
+                <ExternalLink className="h-4 w-4" />
+                Abrir archivo
+              </Button>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter className="shrink-0 flex flex-row flex-wrap gap-2 sm:justify-end">
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+            Cerrar
+          </Button>
+          <Button type="button" variant="secondary" className="gap-2" disabled={!signedUrl} onClick={openInNewTab}>
+            <ExternalLink className="h-4 w-4" />
+            Nueva pestaña
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 function fileExtension(file: File): string {
   const fromName = file.name.match(/\.([a-z0-9]{2,5})$/i)?.[1]?.toLowerCase();
@@ -62,6 +200,7 @@ export default function ClientDocumentsCard({ clientId }: ClientDocumentsCardPro
   const dniInputRef = useRef<HTMLInputElement>(null);
   const invoiceInputRef = useRef<HTMLInputElement>(null);
   const [deleteTarget, setDeleteTarget] = useState<ClientDocRow | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<ClientDocRow | null>(null);
 
   const fetchDocs = useCallback(async () => {
     setLoading(true);
@@ -89,19 +228,6 @@ export default function ClientDocumentsCard({ clientId }: ClientDocumentsCardPro
   useEffect(() => {
     void fetchDocs();
   }, [fetchDocs]);
-
-  const openSignedUrl = async (path: string) => {
-    const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600);
-    if (error || !data?.signedUrl) {
-      toast({
-        title: 'Error',
-        description: error?.message ?? 'No se pudo abrir el archivo',
-        variant: 'destructive',
-      });
-      return;
-    }
-    window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
-  };
 
   const handleFile = async (file: File, kind: DocKind) => {
     const err = validateFile(file);
@@ -205,7 +331,7 @@ export default function ClientDocumentsCard({ clientId }: ClientDocumentsCardPro
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-1">
-              <Button type="button" variant="ghost" size="sm" onClick={() => void openSignedUrl(doc.storage_path)}>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setPreviewDoc(doc)}>
                 Ver
               </Button>
               <Button
@@ -319,6 +445,14 @@ export default function ClientDocumentsCard({ clientId }: ClientDocumentsCardPro
           )}
         </CardContent>
       </Card>
+
+      <ClientDocumentPreviewModal
+        doc={previewDoc}
+        open={previewDoc !== null}
+        onOpenChange={(o) => {
+          if (!o) setPreviewDoc(null);
+        }}
+      />
 
       <AlertDialog open={deleteTarget !== null} onOpenChange={(o) => !o && setDeleteTarget(null)}>
         <AlertDialogContent>
