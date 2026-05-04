@@ -10,7 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { ArrowLeft, MapPin, Calendar, DollarSign, TrendingUp, Building2, Phone, Mail, MapPinIcon, Eye, Euro, Bell } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, DollarSign, TrendingUp, Building2, Phone, Mail, MapPinIcon, Eye, Euro, Bell, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
@@ -36,6 +36,12 @@ interface Client {
   longitude?: number;
   status?: 'active' | 'inactive';
   note?: string;
+  assigned_commercial_id?: string | null;
+  assigned_commercial?: {
+    first_name: string | null;
+    last_name: string | null;
+    email: string;
+  } | null;
 }
 
 interface Visit {
@@ -153,9 +159,13 @@ export default function ClientDetailView({ clientId, onBack }: ClientDetailViewP
   };
 
   const fetchClient = async () => {
+    const clientSelect = isAdmin
+      ? '*, assigned_commercial:profiles!clients_assigned_commercial_id_fkey(first_name, last_name, email)'
+      : '*';
+
     const { data, error } = await supabase
       .from('clients')
-      .select('*')
+      .select(clientSelect)
       .eq('id', clientId)
       .single();
 
@@ -490,6 +500,37 @@ const fetchVisits = async () => {
               <div className="flex items-center gap-3 p-4 bg-muted/30 rounded-lg border">
                 <span className="text-sm font-medium flex-shrink-0">DNI:</span>
                 <span className="text-sm">{client.dni}</span>
+              </div>
+            )}
+            {isAdmin && (
+              <div className="flex items-center gap-3 p-4 bg-muted/30 rounded-lg border">
+                <User className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                <div className="text-sm min-w-0">
+                  <span className="font-medium text-muted-foreground block text-xs mb-0.5">
+                    Comercial asignado
+                  </span>
+                  {client.assigned_commercial ? (
+                    <>
+                      {(() => {
+                        const name = [client.assigned_commercial.first_name, client.assigned_commercial.last_name]
+                          .filter(Boolean)
+                          .join(' ')
+                          .trim();
+                        const email = client.assigned_commercial.email;
+                        return (
+                          <>
+                            <span className="block">{name || email}</span>
+                            {name && email ? (
+                              <span className="text-muted-foreground text-xs block">{email}</span>
+                            ) : null}
+                          </>
+                        );
+                      })()}
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground">Sin asignar</span>
+                  )}
+                </div>
               </div>
             )}
             {client.note && (

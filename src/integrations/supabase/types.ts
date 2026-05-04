@@ -233,6 +233,7 @@ export type Database = {
       }
       clients: {
         Row: {
+          assigned_commercial_id: string | null
           codigo_postal: string | null
           created_at: string
           direccion: string
@@ -251,6 +252,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          assigned_commercial_id?: string | null
           codigo_postal?: string | null
           created_at?: string
           direccion: string
@@ -269,6 +271,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          assigned_commercial_id?: string | null
           codigo_postal?: string | null
           created_at?: string
           direccion?: string
@@ -286,7 +289,15 @@ export type Database = {
           telefono2?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clients_assigned_commercial_id_fkey"
+            columns: ["assigned_commercial_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       collaborators: {
         Row: {

@@ -40,6 +40,12 @@ interface Client {
   status: 'active' | 'inactive';
   note?: string;
   prospect: boolean;
+  assigned_commercial_id?: string | null;
+  assigned_commercial?: {
+    first_name: string | null;
+    last_name: string | null;
+    email: string;
+  } | null;
 }
 
 export default function ClientManagement() {
@@ -96,6 +102,42 @@ export default function ClientManagement() {
 
   const isAdmin = userRole?.role === 'admin';
   const totalPages = Math.ceil(totalItems / pageSize);
+  const tableColCount = isAdmin ? 8 : 7;
+
+  const [assignedCommercialId, setAssignedCommercialId] = useState<string>('__none__');
+  const [commercialUsers, setCommercialUsers] = useState<Array<{ id: string; label: string }>>([]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    void (async () => {
+      const { data: roles } = await supabase.from('user_roles').select('user_id').eq('role', 'commercial');
+      if (!roles?.length) {
+        setCommercialUsers([]);
+        return;
+      }
+      const ids = roles.map((r) => r.user_id);
+      const { data: profs } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', ids)
+        .order('first_name');
+      setCommercialUsers(
+        (profs || []).map((p) => ({
+          id: p.id,
+          label: `${[p.first_name, p.last_name].filter(Boolean).join(' ')}`.trim() || p.email || p.id,
+        })),
+      );
+    })();
+  }, [isAdmin]);
+
+  useEffect(() => {
+    if (!dialogOpen || !isAdmin) return;
+    if (editingClient?.assigned_commercial_id) {
+      setAssignedCommercialId(editingClient.assigned_commercial_id);
+    } else {
+      setAssignedCommercialId('__none__');
+    }
+  }, [dialogOpen, isAdmin, editingClient?.id, editingClient?.assigned_commercial_id]);
 
   useEffect(() => {
     if (!dialogOpen) {
@@ -165,9 +207,11 @@ export default function ClientManagement() {
       setLoading(true);
       
       // Build query with filters
-      let query = supabase
-        .from('clients')
-        .select('*, updated_at', { count: 'exact' });
+      const clientSelect = isAdmin
+        ? '*, assigned_commercial:profiles!clients_assigned_commercial_id_fkey(first_name, last_name, email)'
+        : '*';
+
+      let query = supabase.from('clients').select(clientSelect, { count: 'exact' });
 
       // Apply filters
       if (filters.nombre.trim()) {
@@ -274,10 +318,15 @@ export default function ClientManagement() {
     console.log('Raw nombre before normalization:', rawClientData.nombre_apellidos);
     
     const clientData = normalizeClientData(rawClientData);
-    
+    const payload: Record<string, unknown> = { ...clientData };
+    if (isAdmin) {
+      payload.assigned_commercial_id =
+        assignedCommercialId === '__none__' ? null : assignedCommercialId;
+    }
+
     // Add prospect field if editing and DNI is empty
     if (editingClient && (!clientData.dni || clientData.dni.trim() === '')) {
-      (clientData as any).prospect = true;
+      (payload as any).prospect = true;
     }
     
     console.log('Normalized DNI:', clientData.dni);
@@ -287,11 +336,11 @@ export default function ClientManagement() {
     try {
       if (editingClient) {
         console.log('=== DATOS ENVIADOS A SUPABASE PARA UPDATE ===');
-        console.log('clientData:', JSON.stringify(clientData, null, 2));
+        console.log('clientData:', JSON.stringify(payload, null, 2));
         console.log('DNI específico:', `"${clientData.dni}"`);
         const { error } = await supabase
           .from('clients')
-          .update(clientData)
+          .update(payload)
           .eq('id', editingClient.id);
 
         if (error) throw error;
@@ -310,7 +359,7 @@ export default function ClientManagement() {
       } else {
         const { data: created, error } = await supabase
           .from('clients')
-          .insert(clientData)
+          .insert(payload)
           .select('id')
           .single();
 
@@ -778,6 +827,22 @@ export default function ClientManagement() {
                     </div>
                   </div>
                   <div className="space-y-2">
+                    <Label htmlFor="assigned_commercial">Comercial asignado</Label>
+                    <Select value={assignedCommercialId} onValueChange={setAssignedCommercialId}>
+                      <SelectTrigger id="assigned_commercial">
+                        <SelectValue placeholder="Sin asignar" />
+                      </SelectTrigger>
+                      <SelectContent className="z-[300]">
+                        <SelectItem value="__none__">Sin asignar</SelectItem>
+                        {commercialUsers.map((u) => (
+                          <SelectItem key={u.id} value={u.id}>
+                            {u.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
                     <Label htmlFor="note">Nota</Label>
                     <Textarea 
                       id="note" 
@@ -877,13 +942,14 @@ export default function ClientManagement() {
                       <TableHead>Dirección</TableHead>
                       <TableHead>Coordenadas</TableHead>
                       <TableHead>Teléfono</TableHead>
+                      {isAdmin && <TableHead>Comercial</TableHead>}
                       <TableHead>Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8">
+                    <TableCell colSpan={tableColCount} className="text-center py-8">
                       <div className="flex items-center justify-center">
                         <Loader2 className="h-4 w-4 animate-spin mr-2" />
                         <span className="text-muted-foreground">Cargando clientes...</span>
@@ -892,7 +958,7 @@ export default function ClientManagement() {
                   </TableRow>
                ) : clients.length === 0 ? (
                  <TableRow>
-                     <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                     <TableCell colSpan={tableColCount} className="text-center py-8 text-muted-foreground">
                        {Object.entries(filters).some(([key, value]) => {
                          if (typeof value === 'boolean') return value;
                          return value.trim() !== '';
@@ -991,6 +1057,22 @@ export default function ClientManagement() {
                          )}
                       </TableCell>
                       <TableCell>{client.telefono1 || '-'}</TableCell>
+                      {isAdmin && (
+                        <TableCell className="max-w-[200px] text-sm text-muted-foreground">
+                          {client.assigned_commercial ? (
+                            <span className="line-clamp-2">
+                              {[
+                                client.assigned_commercial.first_name,
+                                client.assigned_commercial.last_name,
+                              ]
+                                .filter(Boolean)
+                                .join(' ') || client.assigned_commercial.email}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground/70">—</span>
+                          )}
+                        </TableCell>
+                      )}
                        <TableCell>
                          <div className="flex space-x-2">
                            <Button 
