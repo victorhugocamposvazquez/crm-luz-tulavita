@@ -1,3 +1,4 @@
+import type { SetStateAction } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,9 +8,11 @@ import { Plus, Trash2 } from 'lucide-react';
 import type { SupplyAddressDraft } from '@/lib/clients/supplyAddresses';
 import { emptySupplyAddressDraft } from '@/lib/clients/supplyAddresses';
 
+export type SupplyDraftsUpdater = SetStateAction<SupplyAddressDraft[]>;
+
 interface ClientSupplyAddressesEditorProps {
   value: SupplyAddressDraft[];
-  onChange: (next: SupplyAddressDraft[]) => void;
+  onChange: (next: SupplyDraftsUpdater) => void;
   disabled?: boolean;
 }
 
@@ -19,11 +22,11 @@ export default function ClientSupplyAddressesEditor({
   disabled,
 }: ClientSupplyAddressesEditorProps) {
   const updateRow = (localId: string, patch: Partial<SupplyAddressDraft>) => {
-    onChange(value.map((r) => (r.localId === localId ? { ...r, ...patch } : r)));
+    onChange((prev) => prev.map((r) => (r.localId === localId ? { ...r, ...patch } : r)));
   };
 
   const removeRow = (localId: string) => {
-    onChange(value.filter((r) => r.localId !== localId));
+    onChange((prev) => prev.filter((r) => r.localId !== localId));
   };
 
   return (
@@ -125,7 +128,7 @@ export default function ClientSupplyAddressesEditor({
         size="sm"
         className="w-full sm:w-auto gap-1.5"
         disabled={disabled}
-        onClick={() => onChange([...value, emptySupplyAddressDraft()])}
+        onClick={() => onChange((prev) => [...prev, emptySupplyAddressDraft()])}
       >
         <Plus className="h-4 w-4" />
         Añadir punto de suministro

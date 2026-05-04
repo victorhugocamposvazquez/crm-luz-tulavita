@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, useLayoutEffect, type SetStateAction } from 'react';
 import Papa from 'papaparse';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -21,11 +21,8 @@ import ClientPagination from './ClientPagination';
 import { MapSelector } from '@/components/ui/map-selector';
 import ReminderDialog from '@/components/reminders/ReminderDialog';
 import ClientSupplyAddressesEditor from './ClientSupplyAddressesEditor';
-import {
-  draftFromSupplyRow,
-  syncClientSupplyAddresses,
-  type SupplyAddressDraft,
-} from '@/lib/clients/supplyAddresses';
+import type { SupplyAddressDraft } from '@/lib/clients/supplyAddresses';
+import { draftFromSupplyRow, syncClientSupplyAddresses } from '@/lib/clients/supplyAddresses';
 
 interface Client {
   id: string;
@@ -80,6 +77,22 @@ export default function ClientManagement() {
   const [convertDNI, setConvertDNI] = useState('');
   const [supplyDrafts, setSupplyDrafts] = useState<SupplyAddressDraft[]>([]);
   const [supplyFormLoading, setSupplyFormLoading] = useState(false);
+  const supplyDraftsRef = useRef<SupplyAddressDraft[]>([]);
+
+  useLayoutEffect(() => {
+    supplyDraftsRef.current = supplyDrafts;
+  }, [supplyDrafts]);
+
+  const applySupplyDrafts = useCallback((update: SetStateAction<SupplyAddressDraft[]>) => {
+    setSupplyDrafts((prev) => {
+      const next =
+        typeof update === 'function'
+          ? (update as (p: SupplyAddressDraft[]) => SupplyAddressDraft[])(prev)
+          : update;
+      supplyDraftsRef.current = next;
+      return next;
+    });
+  }, []);
 
   const isAdmin = userRole?.role === 'admin';
   const totalPages = Math.ceil(totalItems / pageSize);
@@ -90,7 +103,7 @@ export default function ClientManagement() {
       return;
     }
     if (!editingClient) {
-      setSupplyDrafts([]);
+      applySupplyDrafts([]);
       setSupplyFormLoading(false);
       return;
     }
@@ -106,21 +119,21 @@ export default function ClientManagement() {
       if (cancelled) return;
       if (error) {
         console.error(error);
-        setSupplyDrafts([]);
+        applySupplyDrafts([]);
         toast({
           title: 'Aviso',
           description: 'No se pudieron cargar los puntos de suministro para editar.',
           variant: 'destructive',
         });
       } else {
-        setSupplyDrafts((data ?? []).map(draftFromSupplyRow));
+        applySupplyDrafts((data ?? []).map(draftFromSupplyRow));
       }
       setSupplyFormLoading(false);
     })();
     return () => {
       cancelled = true;
     };
-  }, [dialogOpen, editingClient?.id]);
+  }, [dialogOpen, editingClient?.id, applySupplyDrafts]);
 
   // Debounced fetch function
   const debouncedFetchClients = useCallback(
@@ -210,6 +223,10 @@ export default function ClientManagement() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    // Deja que React aplique el último onChange de los inputs antes de leer borradores (p. ej. Enter en un campo).
+    await Promise.resolve();
+    const supplySnapshot = supplyDraftsRef.current;
+
     const formData = new FormData(e.currentTarget);
     
     // Parse coordinates from DMS format
@@ -282,7 +299,7 @@ export default function ClientManagement() {
         const { error: syncErr } = await syncClientSupplyAddresses(
           supabase,
           editingClient.id,
-          supplyDrafts,
+          supplySnapshot,
         );
         if (syncErr) throw syncErr;
 
@@ -303,7 +320,7 @@ export default function ClientManagement() {
           const { error: syncErr } = await syncClientSupplyAddresses(
             supabase,
             created.id,
-            supplyDrafts,
+            supplySnapshot,
           );
           if (syncErr) {
             toast({
@@ -771,7 +788,7 @@ export default function ClientManagement() {
                   </div>
                   <ClientSupplyAddressesEditor
                     value={supplyDrafts}
-                    onChange={setSupplyDrafts}
+                    onChange={applySupplyDrafts}
                     disabled={supplyFormLoading}
                   />
                   <div className="space-y-4">
