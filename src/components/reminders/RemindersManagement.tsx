@@ -9,12 +9,19 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { toast } from '@/hooks/use-toast';
 import { Bell, BellOff, Trash2, UserPlus, Calendar, Search, Filter, X, CheckSquare } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import ReminderDialog from './ReminderDialog';
 import { reminderKindDisplay } from '@/lib/reminders/reminderKinds';
+import {
+  desktopNotificationsSupported,
+  getReminderDesktopNotificationsEnabled,
+  setReminderDesktopNotificationsEnabled,
+} from '@/lib/reminders/desktopNotificationPrefs';
 
 interface Reminder {
   id: string;
@@ -48,6 +55,16 @@ export default function RemindersManagement() {
     start_date: '',
     end_date: ''
   });
+  const [desktopNotifyOn, setDesktopNotifyOn] = useState(() =>
+    getReminderDesktopNotificationsEnabled(),
+  );
+  const desktopNotifySupported = desktopNotificationsSupported();
+
+  useEffect(() => {
+    const sync = () => setDesktopNotifyOn(getReminderDesktopNotificationsEnabled());
+    window.addEventListener('crm-reminder-desktop-pref', sync);
+    return () => window.removeEventListener('crm-reminder-desktop-pref', sync);
+  }, []);
   const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<{ id: string; name: string } | null>(null);
   const [selectedReminders, setSelectedReminders] = useState<string[]>([]);
@@ -60,6 +77,38 @@ export default function RemindersManagement() {
   const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([]);
 
   const isAdmin = userRole?.role === 'admin';
+
+  const handleDesktopNotifyToggle = async (checked: boolean) => {
+    if (!desktopNotificationsSupported()) {
+      toast({
+        variant: 'destructive',
+        title: 'No disponible',
+        description: 'Tu navegador no soporta notificaciones de escritorio.',
+      });
+      return;
+    }
+    if (!checked) {
+      setReminderDesktopNotificationsEnabled(false);
+      setDesktopNotifyOn(false);
+      return;
+    }
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') {
+      toast({
+        variant: 'destructive',
+        title: 'Permiso denegado',
+        description: 'Permite notificaciones para este sitio en la configuración del navegador.',
+      });
+      return;
+    }
+    setReminderDesktopNotificationsEnabled(true);
+    setDesktopNotifyOn(true);
+    toast({
+      title: 'Avisos activados',
+      description:
+        'Te avisaremos cuando llegue la hora de un recordatorio pendiente (con el backoffice abierto).',
+    });
+  };
 
   const fetchReminders = useCallback(async () => {
     try {
@@ -492,6 +541,38 @@ export default function RemindersManagement() {
           Nuevo recordatorio
         </Button>
       </div>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Notificaciones en el escritorio</CardTitle>
+          <CardDescription>
+            El sistema del navegador te avisa cuando la fecha y hora del recordatorio ya han pasado. Debe estar
+            abierta una pestaña con el backoffice (no hace falta estar en Recordatorios).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3 pt-0">
+          <div className="flex flex-wrap items-center gap-3">
+            <Switch
+              id="reminder-desktop-notify"
+              checked={desktopNotifyOn}
+              onCheckedChange={handleDesktopNotifyToggle}
+              disabled={!desktopNotifySupported}
+            />
+            <Label htmlFor="reminder-desktop-notify" className="cursor-pointer font-normal">
+              Activar avisos de recordatorios
+            </Label>
+          </div>
+          {!desktopNotifySupported && (
+            <p className="text-sm text-muted-foreground">No disponible en este navegador.</p>
+          )}
+          {desktopNotifySupported && Notification.permission === 'denied' && (
+            <p className="text-sm text-amber-800 dark:text-amber-200">
+              Las notificaciones están bloqueadas para este sitio. Ábrelas en los ajustes del navegador si quieres
+              usar esta función.
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Filters */}
       <Card>

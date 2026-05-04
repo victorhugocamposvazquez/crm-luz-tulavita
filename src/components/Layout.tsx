@@ -7,6 +7,7 @@ import AdminPasswordDialog from '@/components/AdminPasswordDialog';
 import AdminNotifications from '@/components/dashboard/AdminNotifications';
 import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
 import { useGeolocation } from '@/hooks/useGeolocation';
+import { useReminderDesktopNotifications } from '@/hooks/useReminderDesktopNotifications';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
@@ -32,6 +33,8 @@ export default function Layout({ children, currentView, onViewChange }: LayoutPr
   const isAdmin = userRole?.role === 'admin';
   const isCommercial = userRole?.role === 'commercial';
   const totalNotifications = pendingTasks.length + pendingApprovals.length;
+
+  useReminderDesktopNotifications(isAdmin);
   
   const showGpsButton = isCommercial && !location && !geoLoading;
 
