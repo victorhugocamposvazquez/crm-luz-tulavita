@@ -15,11 +15,7 @@ export default function AdminNotifications() {
   const totalNotifications = pendingTasks.length + pendingApprovals.length;
 
   if (totalNotifications === 0) {
-    return (
-      <div className="p-4 text-center">
-        <p className="text-muted-foreground text-sm">No hay notificaciones pendientes</p>
-      </div>
-    );
+    return null;
   }
 
   return (

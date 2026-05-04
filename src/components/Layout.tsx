@@ -4,12 +4,9 @@ import { Users, Building2, MapPin, TrendingUp, LogOut, Menu, User, ChevronDown, 
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import AdminPasswordDialog from '@/components/AdminPasswordDialog';
-import AdminNotifications from '@/components/dashboard/AdminNotifications';
-import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
+import AdminHeaderAlertsBell from '@/components/dashboard/AdminHeaderAlertsBell';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { useReminderDesktopNotifications } from '@/hooks/useReminderDesktopNotifications';
-import { Badge } from '@/components/ui/badge';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,13 +23,11 @@ interface LayoutProps {
 
 export default function Layout({ children, currentView, onViewChange }: LayoutProps) {
   const { signOut, profile, userRole } = useAuth();
-  const { pendingTasks, pendingApprovals } = useRealtimeNotifications();
   const { location, loading: geoLoading, hasPermission, requestLocation } = useGeolocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const isAdmin = userRole?.role === 'admin';
   const isCommercial = userRole?.role === 'commercial';
-  const totalNotifications = pendingTasks.length + pendingApprovals.length;
 
   useReminderDesktopNotifications(isAdmin);
   
@@ -71,6 +66,12 @@ export default function Layout({ children, currentView, onViewChange }: LayoutPr
           </Button>
           <h1 className="text-lg font-semibold flex items-center space-x-2">
             <span>Backoffice</span>
+            {isAdmin && (
+              <AdminHeaderAlertsBell
+                onViewChange={onViewChange}
+                onAfterNavigate={() => setSidebarOpen(false)}
+              />
+            )}
             {showGpsButton && (
               <Button
                 variant="ghost"
@@ -145,27 +146,11 @@ export default function Layout({ children, currentView, onViewChange }: LayoutPr
                     </Button>
                   )}
                 </div>
-                {isAdmin && totalNotifications > 0 && (
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button variant="ghost" size="sm" className="relative">
-                        <Bell className="h-4 w-4" />
-                        <Badge 
-                          variant="destructive" 
-                          className="absolute -top-1 -right-1 h-5 w-5 text-xs p-0 flex items-center justify-center"
-                        >
-                          {totalNotifications}
-                        </Badge>
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-96 p-0" align="start">
-                      <div className="p-4 border-b">
-                        <h3 className="font-semibold">Notificaciones</h3>
-                        <p className="text-sm text-muted-foreground">{totalNotifications} pendientes</p>
-                      </div>
-                      <AdminNotifications />
-                    </PopoverContent>
-                  </Popover>
+                {isAdmin && (
+                  <AdminHeaderAlertsBell
+                    onViewChange={onViewChange}
+                    onAfterNavigate={() => setSidebarOpen(false)}
+                  />
                 )}
               </div>
               
