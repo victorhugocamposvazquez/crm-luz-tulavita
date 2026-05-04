@@ -1,4 +1,17 @@
-/* Service worker: Web Push para recordatorios CRM (scope /). */
+/* PWA + Web Push: instalación en escritorio y notificaciones de recordatorio. */
+
+self.addEventListener('install', (event) => {
+  event.waitUntil(self.skipWaiting());
+});
+
+self.addEventListener('activate', (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
+self.addEventListener('fetch', (event) => {
+  event.respondWith(fetch(event.request));
+});
+
 self.addEventListener('push', (event) => {
   let payload = { title: 'Recordatorio CRM', body: '', url: '/dashboard' };
   try {

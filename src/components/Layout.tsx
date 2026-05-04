@@ -1,12 +1,15 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { Users, Building2, MapPin, TrendingUp, LogOut, Menu, User, ChevronDown, Key, Bell, Navigation, UserPlus, Zap, FileSearch, Percent, Handshake } from 'lucide-react';
+import { Users, Building2, MapPin, TrendingUp, LogOut, Menu, User, ChevronDown, Key, Bell, Navigation, UserPlus, Zap, FileSearch, Percent, Handshake, Download } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import AdminPasswordDialog from '@/components/AdminPasswordDialog';
 import AdminHeaderAlertsBell from '@/components/dashboard/AdminHeaderAlertsBell';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { useReminderDesktopNotifications } from '@/hooks/useReminderDesktopNotifications';
+import { usePwaInstallPrompt } from '@/hooks/usePwaInstallPrompt';
+import { isRunningAsInstalledPwa } from '@/lib/pwa/registerCrmServiceWorker';
+import { useToast } from '@/hooks/use-toast';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,6 +28,9 @@ export default function Layout({ children, currentView, onViewChange }: LayoutPr
   const { signOut, profile, userRole } = useAuth();
   const { location, loading: geoLoading, hasPermission, requestLocation } = useGeolocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { toast } = useToast();
+  const { canInstall, promptInstall } = usePwaInstallPrompt();
+  const runsAsPwa = isRunningAsInstalledPwa();
 
   const isAdmin = userRole?.role === 'admin';
   const isCommercial = userRole?.role === 'commercial';
@@ -215,6 +221,31 @@ export default function Layout({ children, currentView, onViewChange }: LayoutPr
                 </Button>
               ))}
             </nav>
+
+            {canInstall && !runsAsPwa && (
+              <div className="p-4 border-t mt-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full gap-2 text-xs"
+                  onClick={async () => {
+                    const accepted = await promptInstall();
+                    if (accepted) {
+                      toast({
+                        title: 'App instalada',
+                        description: 'Busca el acceso en el escritorio o en el menú de aplicaciones.',
+                      });
+                    }
+                  }}
+                >
+                  <Download className="h-4 w-4 shrink-0" />
+                  Instalar como app
+                </Button>
+                <p className="text-[10px] text-muted-foreground mt-2 text-center leading-tight">
+                  Chrome / Edge en escritorio. Safari: compartir → «Añadir a pantalla de inicio».
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
