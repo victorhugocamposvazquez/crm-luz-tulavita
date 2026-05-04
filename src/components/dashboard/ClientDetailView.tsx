@@ -20,6 +20,7 @@ import { calculateCommission, calculateTotalExcludingNulls, calculateSaleCommiss
 import RemindersTable from '@/components/reminders/RemindersTable';
 import ReminderDialog from '@/components/reminders/ReminderDialog';
 import ClientDocumentsCard from './ClientDocumentsCard';
+import ClientSupplyAddressesCard from './ClientSupplyAddressesCard';
 
 interface Client {
   id: string;
@@ -499,6 +500,8 @@ const fetchVisits = async () => {
           </div>
         </CardContent>
       </Card>
+
+      {canManageClientDocs && <ClientSupplyAddressesCard clientId={clientId} />}
 
       {canManageClientDocs && <ClientDocumentsCard clientId={clientId} />}
 

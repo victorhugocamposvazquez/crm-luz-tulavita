@@ -151,6 +151,56 @@ export type Database = {
           },
         ]
       }
+      client_supply_addresses: {
+        Row: {
+          id: string
+          client_id: string
+          label: string | null
+          direccion: string
+          localidad: string | null
+          codigo_postal: string | null
+          cups: string | null
+          note: string | null
+          sort_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          client_id: string
+          label?: string | null
+          direccion: string
+          localidad?: string | null
+          codigo_postal?: string | null
+          cups?: string | null
+          note?: string | null
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          client_id?: string
+          label?: string | null
+          direccion?: string
+          localidad?: string | null
+          codigo_postal?: string | null
+          cups?: string | null
+          note?: string | null
+          sort_order?: number
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_supply_addresses_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           codigo_postal: string | null

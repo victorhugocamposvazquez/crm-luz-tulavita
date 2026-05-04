@@ -20,6 +20,12 @@ import ClientFilters from './ClientFilters';
 import ClientPagination from './ClientPagination';
 import { MapSelector } from '@/components/ui/map-selector';
 import ReminderDialog from '@/components/reminders/ReminderDialog';
+import ClientSupplyAddressesEditor from './ClientSupplyAddressesEditor';
+import {
+  draftFromSupplyRow,
+  syncClientSupplyAddresses,
+  type SupplyAddressDraft,
+} from '@/lib/clients/supplyAddresses';
 
 interface Client {
   id: string;
@@ -72,9 +78,49 @@ export default function ClientManagement() {
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
   const [convertingClient, setConvertingClient] = useState<Client | null>(null);
   const [convertDNI, setConvertDNI] = useState('');
+  const [supplyDrafts, setSupplyDrafts] = useState<SupplyAddressDraft[]>([]);
+  const [supplyFormLoading, setSupplyFormLoading] = useState(false);
 
   const isAdmin = userRole?.role === 'admin';
   const totalPages = Math.ceil(totalItems / pageSize);
+
+  useEffect(() => {
+    if (!dialogOpen) {
+      setSupplyFormLoading(false);
+      return;
+    }
+    if (!editingClient) {
+      setSupplyDrafts([]);
+      setSupplyFormLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setSupplyFormLoading(true);
+    void (async () => {
+      const { data, error } = await supabase
+        .from('client_supply_addresses')
+        .select('*')
+        .eq('client_id', editingClient.id)
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: true });
+      if (cancelled) return;
+      if (error) {
+        console.error(error);
+        setSupplyDrafts([]);
+        toast({
+          title: 'Aviso',
+          description: 'No se pudieron cargar los puntos de suministro para editar.',
+          variant: 'destructive',
+        });
+      } else {
+        setSupplyDrafts((data ?? []).map(draftFromSupplyRow));
+      }
+      setSupplyFormLoading(false);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [dialogOpen, editingClient?.id]);
 
   // Debounced fetch function
   const debouncedFetchClients = useCallback(
@@ -233,24 +279,51 @@ export default function ClientManagement() {
 
         if (error) throw error;
 
+        const { error: syncErr } = await syncClientSupplyAddresses(
+          supabase,
+          editingClient.id,
+          supplyDrafts,
+        );
+        if (syncErr) throw syncErr;
+
         toast({
           title: "Cliente actualizado",
           description: "El cliente ha sido actualizado exitosamente",
         });
       } else {
-        console.log('=== DATOS ENVIADOS A SUPABASE PARA INSERT ===');
-        console.log('clientData:', JSON.stringify(clientData, null, 2));
-        console.log('DNI específico:', `"${clientData.dni}"`);
-        const { error } = await supabase
+        const { data: created, error } = await supabase
           .from('clients')
-          .insert(clientData);
+          .insert(clientData)
+          .select('id')
+          .single();
 
         if (error) throw error;
 
-        toast({
-          title: "Cliente creado",
-          description: "El cliente ha sido creado exitosamente",
-        });
+        if (created?.id) {
+          const { error: syncErr } = await syncClientSupplyAddresses(
+            supabase,
+            created.id,
+            supplyDrafts,
+          );
+          if (syncErr) {
+            toast({
+              title: "Cliente creado",
+              description:
+                "El cliente se guardó pero hubo un problema al guardar los puntos de suministro. Puedes añadirlos desde la ficha.",
+              variant: "destructive",
+            });
+          } else {
+            toast({
+              title: "Cliente creado",
+              description: "El cliente ha sido creado exitosamente",
+            });
+          }
+        } else {
+          toast({
+            title: "Cliente creado",
+            description: "El cliente ha sido creado exitosamente",
+          });
+        }
       }
 
       setDialogOpen(false);
@@ -601,7 +674,7 @@ export default function ClientManagement() {
                     Nuevo cliente
                   </Button>
                 </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
                   {editingClient ? 'Editar cliente' : 'Crear nuevo cliente'}
@@ -696,6 +769,11 @@ export default function ClientManagement() {
                       defaultValue={editingClient?.note || ''}
                     />
                   </div>
+                  <ClientSupplyAddressesEditor
+                    value={supplyDrafts}
+                    onChange={setSupplyDrafts}
+                    disabled={supplyFormLoading}
+                  />
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -737,8 +815,17 @@ export default function ClientManagement() {
                   <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
                     Cancelar
                   </Button>
-                  <Button type="submit">
-                    {editingClient ? 'Actualizar' : 'Crear cliente'}
+                  <Button type="submit" disabled={!!editingClient && supplyFormLoading}>
+                    {editingClient && supplyFormLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Cargando suministros…
+                      </>
+                    ) : editingClient ? (
+                      'Actualizar'
+                    ) : (
+                      'Crear cliente'
+                    )}
                   </Button>
                 </DialogFooter>
               </form>
