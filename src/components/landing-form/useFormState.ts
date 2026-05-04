@@ -8,6 +8,7 @@ import { getUrlParams } from './utils';
 
 export interface UseFormStateOptions {
   questions: Question[];
+  collaboratorId?: string;
   source?: string;
   campaign?: string;
   adset?: string;
@@ -28,6 +29,7 @@ export interface UseFormStateOptions {
 
 export function useFormState({
   questions,
+  collaboratorId,
   source: defaultSource,
   campaign: defaultCampaign,
   adset: defaultAdset,
@@ -120,13 +122,14 @@ export function useFormState({
       name,
       email,
       phone,
+      collaborator_id: collaboratorId ?? undefined,
       source,
       campaign: campaign ?? undefined,
       adset: adset ?? undefined,
       ad: ad ?? undefined,
       custom_fields,
     };
-  }, [answers, questions, source, campaign, adset, ad, extraCustomFields]);
+  }, [answers, questions, collaboratorId, source, campaign, adset, ad, extraCustomFields]);
 
   const submit = useCallback(async () => {
     const payload = buildPayload();
@@ -166,6 +169,7 @@ export function useFormState({
             body: JSON.stringify({
               lead_id: leadId,
               source: payload.source,
+              collaborator_id: payload.collaborator_id ?? null,
               campaign: payload.campaign ?? null,
               adset: payload.adset ?? null,
               ad: payload.ad ?? null,

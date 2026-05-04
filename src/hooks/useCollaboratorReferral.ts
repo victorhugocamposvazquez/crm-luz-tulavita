@@ -1,11 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 
 export interface CollaboratorReferral {
   id: string;
   code: string;
   name: string;
-  is_active: boolean;
 }
 
 function normalizeCode(raw: string | null): string | null {
@@ -25,35 +23,60 @@ function readCollaboratorCodeFromUrl(): string | null {
   );
 }
 
+function readCollaboratorRefTokenFromUrl(): string | null {
+  const params = new URLSearchParams(window.location.search);
+  return normalizeCode(params.get('ref') ?? params.get('collab_ref'));
+}
+
+export type CollaboratorEntryMode = 'auto' | 'upload' | 'manual' | 'callback';
+
 export function useCollaboratorReferral() {
   const [collaborator, setCollaborator] = useState<CollaboratorReferral | null>(null);
   const [loading, setLoading] = useState(false);
   const [requestedCode, setRequestedCode] = useState<string | null>(() => readCollaboratorCodeFromUrl());
+  const [requestedRef, setRequestedRef] = useState<string | null>(() => readCollaboratorRefTokenFromUrl());
+  const [entryMode, setEntryMode] = useState<CollaboratorEntryMode>('auto');
 
   useEffect(() => {
     const code = readCollaboratorCodeFromUrl();
+    const ref = readCollaboratorRefTokenFromUrl();
     setRequestedCode(code);
+    setRequestedRef(ref);
   }, []);
 
   useEffect(() => {
     let cancelled = false;
     const fetchCollaborator = async () => {
-      if (!requestedCode) {
+      if (!requestedCode && !requestedRef) {
         setCollaborator(null);
+        setEntryMode('auto');
         return;
       }
       setLoading(true);
       try {
-        const { data, error } = await supabase
-          .from('collaborators')
-          .select('id, code, name, is_active')
-          .eq('code', requestedCode)
-          .eq('is_active', true)
-          .maybeSingle();
-        if (error) throw error;
-        if (!cancelled) setCollaborator((data as CollaboratorReferral | null) ?? null);
+        const apiUrl = import.meta.env.VITE_RESOLVE_COLLABORATOR_REF_API_URL ?? '/api/resolve-collaborator-ref';
+        const res = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: requestedCode, ref: requestedRef }),
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          success?: boolean;
+          collaborator?: CollaboratorReferral | null;
+          entry_mode?: CollaboratorEntryMode;
+        };
+        if (!res.ok || data.success === false) {
+          throw new Error('No se pudo resolver el colaborador');
+        }
+        if (!cancelled) {
+          setCollaborator(data.collaborator ?? null);
+          setEntryMode(data.entry_mode ?? 'auto');
+        }
       } catch {
-        if (!cancelled) setCollaborator(null);
+        if (!cancelled) {
+          setCollaborator(null);
+          setEntryMode('auto');
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -63,16 +86,18 @@ export function useCollaboratorReferral() {
     return () => {
       cancelled = true;
     };
-  }, [requestedCode]);
+  }, [requestedCode, requestedRef]);
 
   return useMemo(
     () => ({
       collaborator,
       loading,
       requestedCode,
-      hasCollaboratorInUrl: !!requestedCode,
+      requestedRef,
+      entryMode,
+      hasCollaboratorInUrl: !!requestedCode || !!requestedRef,
       isResolved: !!collaborator,
     }),
-    [collaborator, loading, requestedCode]
+    [collaborator, loading, requestedCode, requestedRef, entryMode]
   );
 }

@@ -28,6 +28,7 @@ export type MessageStatus = (typeof MESSAGE_STATUSES)[number];
 export interface LeadEntry {
   id: string;
   lead_id: string;
+  collaborator_id: string | null;
   source: string;
   campaign: string | null;
   adset: string | null;
@@ -57,6 +58,7 @@ export interface LeadMessage {
 
 export interface CreateLeadEntryInput {
   lead_id: string;
+  collaborator_id?: string | null;
   source: string;
   campaign?: string | null;
   adset?: string | null;

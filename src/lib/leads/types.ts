@@ -7,6 +7,7 @@ export const LEAD_SOURCES = [
   'web_form',
   'meta_lead_ads',
   'meta_ads_web',
+  'collaborator_referral',
   'csv_import',
   'manual',
 ] as const;
@@ -31,6 +32,7 @@ export interface LeadInput {
   campaign?: string;
   adset?: string;
   ad?: string;
+  collaborator_id?: string;
   status?: LeadStatus;
   owner_id?: string;
   tags?: string[];
@@ -48,6 +50,7 @@ export interface Lead {
   ad: string | null;
   status: LeadStatus;
   owner_id: string | null;
+  collaborator_id: string | null;
   tags: string[];
   custom_fields: Record<string, unknown>;
   created_at: string;

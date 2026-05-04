@@ -19,6 +19,7 @@ import VisitsTable from '@/components/visits/VisitsTable';
 import { calculateCommission, calculateTotalExcludingNulls, calculateSaleCommission, calculateEffectiveAmount } from '@/lib/commission';
 import RemindersTable from '@/components/reminders/RemindersTable';
 import ReminderDialog from '@/components/reminders/ReminderDialog';
+import ClientDocumentsCard from './ClientDocumentsCard';
 
 interface Client {
   id: string;
@@ -121,6 +122,8 @@ export default function ClientDetailView({ clientId, onBack }: ClientDetailViewP
   const [selectedClient, setSelectedClient] = useState<{ id: string; name: string } | null>(null);
 
   const isAdmin = userRole?.role === 'admin';
+  const canManageClientDocs =
+    userRole?.role === 'admin' || userRole?.role === 'commercial';
 
   useEffect(() => {
     if (clientId) {
@@ -496,6 +499,8 @@ const fetchVisits = async () => {
           </div>
         </CardContent>
       </Card>
+
+      {canManageClientDocs && <ClientDocumentsCard clientId={clientId} />}
 
       {/* Recordatorios de renovación (solo admin) */}
       {isAdmin && (

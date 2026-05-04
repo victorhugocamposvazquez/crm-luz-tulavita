@@ -14,6 +14,11 @@ function normalizeSource(source: string | undefined | null): string {
   return 'manual';
 }
 
+function isUuid(value: string | undefined): boolean {
+  if (!value) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   const cors = () => res.setHeader('Access-Control-Allow-Origin', '*');
 
@@ -56,7 +61,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return;
     }
 
-    const source = normalizeSource((body.source as string) ?? 'manual');
+    const collaborator_id = typeof body.collaborator_id === 'string' ? body.collaborator_id : undefined;
+    if (typeof body.collaborator_id === 'string' && !isUuid(collaborator_id)) {
+      cors();
+      res.status(400).json({ success: false, error: 'collaborator_id inválido', code: 'VALIDATION_ERROR' });
+      return;
+    }
+
+    const source = collaborator_id ? 'collaborator_referral' : normalizeSource((body.source as string) ?? 'manual');
     const campaign = (body.campaign as string) ?? null;
     const adset = (body.adset as string) ?? null;
     const ad = (body.ad as string) ?? null;
@@ -70,6 +82,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       .insert({
         lead_id,
         source,
+        collaborator_id: collaborator_id ?? null,
         campaign: campaign || null,
         adset: adset || null,
         ad: ad || null,

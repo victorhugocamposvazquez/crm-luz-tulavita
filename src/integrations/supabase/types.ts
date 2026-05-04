@@ -107,6 +107,50 @@ export type Database = {
           },
         ]
       }
+      client_documents: {
+        Row: {
+          id: string
+          client_id: string
+          doc_type: string
+          storage_path: string
+          file_name: string | null
+          mime_type: string | null
+          size_bytes: number | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          client_id: string
+          doc_type: string
+          storage_path: string
+          file_name?: string | null
+          mime_type?: string | null
+          size_bytes?: number | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          client_id?: string
+          doc_type?: string
+          storage_path?: string
+          file_name?: string | null
+          mime_type?: string | null
+          size_bytes?: number | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_documents_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           codigo_postal: string | null
@@ -169,6 +213,7 @@ export type Database = {
           id: string
           code: string
           name: string
+          commission_per_converted_eur: number
           email: string | null
           phone: string | null
           notes: string | null
@@ -180,6 +225,7 @@ export type Database = {
           id?: string
           code: string
           name: string
+          commission_per_converted_eur?: number
           email?: string | null
           phone?: string | null
           notes?: string | null
@@ -191,6 +237,7 @@ export type Database = {
           id?: string
           code?: string
           name?: string
+          commission_per_converted_eur?: number
           email?: string | null
           phone?: string | null
           notes?: string | null
@@ -199,6 +246,175 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      collaborator_referral_links: {
+        Row: {
+          id: string
+          collaborator_id: string
+          token: string
+          entry_mode: string
+          is_active: boolean
+          expires_at: string | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          collaborator_id: string
+          token: string
+          entry_mode?: string
+          is_active?: boolean
+          expires_at?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          collaborator_id?: string
+          token?: string
+          entry_mode?: string
+          is_active?: boolean
+          expires_at?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collaborator_referral_links_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      collaborator_lead_rate_log: {
+        Row: {
+          id: number
+          ip: string
+          collaborator_id: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: number
+          ip: string
+          collaborator_id?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: number
+          ip?: string
+          collaborator_id?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collaborator_lead_rate_log_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      collaborator_payouts: {
+        Row: {
+          id: string
+          collaborator_id: string
+          period_from: string | null
+          period_to: string | null
+          leads_count: number
+          amount_total_eur: number
+          status: string
+          paid_at: string | null
+          notes: string | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          collaborator_id: string
+          period_from?: string | null
+          period_to?: string | null
+          leads_count?: number
+          amount_total_eur?: number
+          status?: string
+          paid_at?: string | null
+          notes?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          collaborator_id?: string
+          period_from?: string | null
+          period_to?: string | null
+          leads_count?: number
+          amount_total_eur?: number
+          status?: string
+          paid_at?: string | null
+          notes?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collaborator_payouts_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      collaborator_payout_leads: {
+        Row: {
+          id: string
+          payout_id: string
+          collaborator_id: string
+          lead_id: string
+          amount_eur: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          payout_id: string
+          collaborator_id: string
+          lead_id: string
+          amount_eur?: number
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          payout_id?: string
+          collaborator_id?: string
+          lead_id?: string
+          amount_eur?: number
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collaborator_payout_leads_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collaborator_payout_leads_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collaborator_payout_leads_payout_id_fkey"
+            columns: ["payout_id"]
+            isOneToOne: false
+            referencedRelation: "collaborator_payouts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       invoice_estimate_settings: {
         Row: {
@@ -275,6 +491,7 @@ export type Database = {
           ad: string | null
           status: string
           owner_id: string | null
+          collaborator_id: string | null
           tags: string[]
           custom_fields: Json
           created_at: string
@@ -291,6 +508,7 @@ export type Database = {
           ad?: string | null
           status?: string
           owner_id?: string | null
+          collaborator_id?: string | null
           tags?: string[]
           custom_fields?: Json
           created_at?: string
@@ -307,17 +525,27 @@ export type Database = {
           ad?: string | null
           status?: string
           owner_id?: string | null
+          collaborator_id?: string | null
           tags?: string[]
           custom_fields?: Json
           created_at?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "leads_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       lead_entries: {
         Row: {
           id: string
           lead_id: string
+          collaborator_id: string | null
           source: string
           campaign: string | null
           adset: string | null
@@ -328,6 +556,7 @@ export type Database = {
         Insert: {
           id?: string
           lead_id: string
+          collaborator_id?: string | null
           source?: string
           campaign?: string | null
           adset?: string | null
@@ -338,6 +567,7 @@ export type Database = {
         Update: {
           id?: string
           lead_id?: string
+          collaborator_id?: string | null
           source?: string
           campaign?: string | null
           adset?: string | null
@@ -351,6 +581,13 @@ export type Database = {
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_entries_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
             referencedColumns: ["id"]
           },
         ]

@@ -50,6 +50,31 @@ function normalizeSource(source: string | undefined | null): string {
   return 'manual';
 }
 
+function isUuid(value: string | undefined): boolean {
+  if (!value) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function parseEnvInt(name: string, fallback: number): number {
+  const raw = process.env[name];
+  if (raw == null || raw === '') return fallback;
+  const n = Number.parseInt(raw, 10);
+  return Number.isFinite(n) && n >= 0 ? n : fallback;
+}
+
+function getClientIp(req: VercelRequest): string {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string') return forwarded.split(',')[0].trim();
+  const real = req.headers['x-real-ip'];
+  if (typeof real === 'string') return real.trim();
+  return 'unknown';
+}
+
+const COLLAB_RATE_LIMIT_ENABLED =
+  process.env.COLLAB_LEAD_RATE_LIMIT_ENABLED !== 'false' &&
+  process.env.COLLAB_LEAD_RATE_LIMIT_ENABLED !== '0';
+const COLLAB_RATE_LIMIT_PER_IP_PER_HOUR = parseEnvInt('COLLAB_LEAD_RATE_LIMIT_PER_IP_PER_HOUR', 30);
+
 // --- Deduplicator (inline) ---
 async function findExistingLead(
   supabase: SupabaseClient,
@@ -78,6 +103,7 @@ async function createLead(
     campaign?: string;
     adset?: string;
     ad?: string;
+    collaborator_id?: string;
     status?: string;
     owner_id?: string;
     tags?: string[];
@@ -92,7 +118,7 @@ async function createLead(
   }
 
   const name = normalizeName(input.name);
-  const source = normalizeSource(input.source);
+  const source = input.collaborator_id ? 'collaborator_referral' : normalizeSource(input.source);
   const { existingId, matchBy } = await findExistingLead(supabase, phone, email);
 
   if (existingId) {
@@ -106,6 +132,7 @@ async function createLead(
         campaign: input.campaign ?? undefined,
         adset: input.adset ?? undefined,
         ad: input.ad ?? undefined,
+        collaborator_id: input.collaborator_id ?? undefined,
         tags: input.tags ?? undefined,
         custom_fields: input.custom_fields ?? undefined,
         updated_at: new Date().toISOString(),
@@ -119,7 +146,7 @@ async function createLead(
     await supabase.from('lead_events').insert({
       lead_id: existingId,
       type: 'lead_updated',
-      content: { matchBy, updatedFields: input, source },
+      content: { matchBy, updatedFields: input, source, collaborator_id: input.collaborator_id ?? null },
     });
 
     if (options?.createInitialTask && (updated as { owner_id?: string }).owner_id) {
@@ -151,6 +178,7 @@ async function createLead(
       campaign: input.campaign ?? null,
       adset: input.adset ?? null,
       ad: input.ad ?? null,
+      collaborator_id: input.collaborator_id ?? null,
       status: input.status ?? 'new',
       owner_id: ownerId,
       tags: input.tags ?? [],
@@ -164,7 +192,13 @@ async function createLead(
   await supabase.from('lead_events').insert({
     lead_id: (inserted as { id: string }).id,
     type: 'lead_created',
-    content: { source, campaign: input.campaign, adset: input.adset, ad: input.ad },
+    content: {
+      source,
+      campaign: input.campaign,
+      adset: input.adset,
+      ad: input.ad,
+      collaborator_id: input.collaborator_id ?? null,
+    },
   });
 
   if (options?.createInitialTask && ownerId) {
@@ -230,6 +264,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       campaign: typeof body.campaign === 'string' ? body.campaign : undefined,
       adset: typeof body.adset === 'string' ? body.adset : undefined,
       ad: typeof body.ad === 'string' ? body.ad : undefined,
+      collaborator_id: typeof body.collaborator_id === 'string' && isUuid(body.collaborator_id) ? body.collaborator_id : undefined,
       status: typeof body.status === 'string' ? body.status : undefined,
       owner_id: typeof body.owner_id === 'string' ? body.owner_id : undefined,
       tags: Array.isArray(body.tags)
@@ -240,6 +275,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           ? (body.custom_fields as Record<string, unknown>)
           : undefined,
     };
+
+    if (typeof body.collaborator_id === 'string' && !input.collaborator_id) {
+      cors();
+      res.status(400).json({ success: false, error: 'collaborator_id no tiene formato UUID válido', code: 'VALIDATION_ERROR' });
+      return;
+    }
+
+    if (COLLAB_RATE_LIMIT_ENABLED && input.collaborator_id) {
+      const ip = getClientIp(req);
+      const windowStart = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+      const { count } = await supabase
+        .from('collaborator_lead_rate_log')
+        .select('*', { count: 'exact', head: true })
+        .eq('ip', ip)
+        .gte('created_at', windowStart);
+      if ((count ?? 0) >= COLLAB_RATE_LIMIT_PER_IP_PER_HOUR) {
+        cors();
+        res.status(429).json({
+          success: false,
+          error: 'Demasiadas solicitudes desde esta IP. Intenta de nuevo más tarde.',
+          code: 'RATE_LIMIT_IP',
+        });
+        return;
+      }
+      await supabase.from('collaborator_lead_rate_log').insert({
+        ip,
+        collaborator_id: input.collaborator_id,
+      });
+      await supabase
+        .from('collaborator_lead_rate_log')
+        .delete()
+        .lt('created_at', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString());
+    }
 
     const result = await createLead(supabase, input, {
       defaultOwnerId: body.default_owner_id as string | undefined,

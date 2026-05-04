@@ -48,6 +48,11 @@ function normalizeSource(s: string | undefined | null): string {
   return 'manual';
 }
 
+function isUuid(value: string | undefined): boolean {
+  if (!value) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 async function findExisting(sb: ReturnType<typeof createClient>, phone: string | null, email: string | null) {
   if (phone) {
     const { data } = await sb.from('leads').select('id').eq('phone', phone).limit(1).maybeSingle();
@@ -88,7 +93,10 @@ serve(async (req) => {
     const phone = normalizePhone(body.phone);
     const email = normalizeEmail(body.email);
     const name = normalizeName(body.name);
-    const source = normalizeSource(body.source);
+    const collaborator_id = typeof body.collaborator_id === 'string' && isUuid(body.collaborator_id)
+      ? body.collaborator_id
+      : undefined;
+    const source = collaborator_id ? 'collaborator_referral' : normalizeSource(body.source);
 
     if (!phone && !email) {
       return new Response(
@@ -110,6 +118,7 @@ serve(async (req) => {
           campaign: body.campaign ?? undefined,
           adset: body.adset ?? undefined,
           ad: body.ad ?? undefined,
+          collaborator_id: collaborator_id ?? undefined,
           tags: body.tags ?? undefined,
           custom_fields: body.custom_fields ?? undefined,
         })
@@ -127,7 +136,7 @@ serve(async (req) => {
       await supabase.from('lead_events').insert({
         lead_id: existing.id,
         type: 'lead_updated',
-        content: { matchBy: existing.by, updatedFields: body, source },
+        content: { matchBy: existing.by, updatedFields: body, source, collaborator_id: collaborator_id ?? null },
       });
 
       return new Response(
@@ -148,6 +157,7 @@ serve(async (req) => {
         campaign: body.campaign ?? null,
         adset: body.adset ?? null,
         ad: body.ad ?? null,
+        collaborator_id: collaborator_id ?? null,
         status: body.status ?? 'new',
         owner_id: ownerId,
         tags: body.tags ?? [],
@@ -166,7 +176,7 @@ serve(async (req) => {
     await supabase.from('lead_events').insert({
       lead_id: inserted.id,
       type: 'lead_created',
-      content: { source, campaign: body.campaign, adset: body.adset, ad: body.ad },
+      content: { source, campaign: body.campaign, adset: body.adset, ad: body.ad, collaborator_id: collaborator_id ?? null },
     });
 
     return new Response(

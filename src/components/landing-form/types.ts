@@ -143,6 +143,7 @@ export interface LeadPayload {
   name?: string;
   email?: string;
   phone?: string;
+  collaborator_id?: string;
   source: string;
   campaign?: string;
   adset?: string;

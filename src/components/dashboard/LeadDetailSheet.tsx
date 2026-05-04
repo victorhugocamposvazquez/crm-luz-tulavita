@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, MessageSquarePlus, User, Mail, Phone, FileText, History, ExternalLink, MessageCircle, Expand, Tag, Pencil, Trash2 } from 'lucide-react';
+import { Loader2, MessageSquarePlus, User, Mail, Phone, FileText, History, ExternalLink, MessageCircle, Expand, Tag, Pencil, Trash2, Handshake } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -584,7 +584,14 @@ export default function LeadDetailSheet({
                     )}
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    <Badge variant="outline">{SOURCE_LABELS[lead.source] ?? lead.source}</Badge>
+                    {lead.source === 'collaborator_referral' ? (
+                      <Badge className="gap-1.5 bg-emerald-100 text-emerald-800 hover:bg-emerald-100 border border-emerald-200">
+                        <Handshake className="h-3.5 w-3.5" />
+                        Colaborador
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline">{SOURCE_LABELS[lead.source] ?? lead.source}</Badge>
+                    )}
                     <Badge variant="secondary">
                       {format(new Date(lead.created_at), "d MMM yyyy, HH:mm", { locale: es })}
                     </Badge>

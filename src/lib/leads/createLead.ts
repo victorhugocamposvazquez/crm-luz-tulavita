@@ -47,7 +47,7 @@ export async function createLead(
   const phone = normalizePhone(input.phone);
   const email = normalizeEmail(input.email);
   const name = normalizeName(input.name);
-  const source = normalizeSource(input.source);
+  const source = input.collaborator_id ? 'collaborator_referral' : normalizeSource(input.source);
 
   const { existingId, matchBy } = await findExistingLead(supabase, phone, email);
 
@@ -62,6 +62,7 @@ export async function createLead(
         campaign: input.campaign ?? undefined,
         adset: input.adset ?? undefined,
         ad: input.ad ?? undefined,
+        collaborator_id: input.collaborator_id ?? undefined,
         tags: input.tags ?? undefined,
         custom_fields: input.custom_fields ?? undefined,
         updated_at: new Date().toISOString(),
@@ -85,6 +86,7 @@ export async function createLead(
         matchBy,
         updatedFields: input,
         source,
+        collaborator_id: input.collaborator_id ?? null,
       },
     });
 
@@ -114,6 +116,7 @@ export async function createLead(
       campaign: input.campaign ?? null,
       adset: input.adset ?? null,
       ad: input.ad ?? null,
+      collaborator_id: input.collaborator_id ?? null,
       status: input.status ?? 'new',
       owner_id: ownerId,
       tags: input.tags ?? [],
@@ -140,6 +143,7 @@ export async function createLead(
       campaign: input.campaign,
       adset: input.adset,
       ad: input.ad,
+      collaborator_id: input.collaborator_id ?? null,
     },
   });
 

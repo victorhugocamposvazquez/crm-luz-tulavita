@@ -155,6 +155,7 @@ function LandingFormSteps({
   leadSource,
   leadCampaign,
   collaboratorMeta,
+  collaboratorId,
 }: {
   mode: LandingFormMode;
   initialFile: File | null;
@@ -165,6 +166,7 @@ function LandingFormSteps({
   leadSource: string;
   leadCampaign?: string;
   collaboratorMeta?: Record<string, unknown>;
+  collaboratorId?: string;
 }) {
   const questions = useMemo(() => {
     if (mode === 'upload') return QUESTIONS_UPLOAD;
@@ -244,6 +246,7 @@ function LandingFormSteps({
     submitError,
   } = useFormState({
     questions,
+    collaboratorId,
     source: leadSource,
     campaign: leadCampaign,
     attribution,
@@ -615,7 +618,13 @@ export default function AhorroLuz() {
   const [successEntryPath, setSuccessEntryPath] = useState<string | null>(null);
 
   const { attribution, clearAttribution } = useMetaAttribution();
-  const { collaborator, requestedCode, hasCollaboratorInUrl, loading: collaboratorLoading } = useCollaboratorReferral();
+  const {
+    collaborator,
+    requestedCode,
+    hasCollaboratorInUrl,
+    loading: collaboratorLoading,
+    entryMode: collaboratorEntryMode,
+  } = useCollaboratorReferral();
 
   const collaboratorMeta = useMemo(() => {
     if (!collaborator) return undefined;
@@ -628,6 +637,13 @@ export default function AhorroLuz() {
 
   const leadSource = collaborator ? 'collaborator_referral' : AHORRO_LUZ_DEFAULT_SOURCE;
   const leadCampaign = collaborator ? `collaborator:${collaborator.code}` : AHORRO_LUZ_DEFAULT_CAMPAIGN;
+  const collaboratorEntryModeResolved = collaboratorEntryMode !== 'auto' ? collaboratorEntryMode : null;
+
+  useEffect(() => {
+    if (forcedEntryMode || !collaboratorEntryModeResolved || phase === 'success') return;
+    setFormMode(collaboratorEntryModeResolved);
+    setPhase('form');
+  }, [forcedEntryMode, collaboratorEntryModeResolved, phase]);
 
   const handleLeadSuccess = useCallback((lead: { id: string }, payload: LeadPayload) => {
     setLastLeadId(lead.id);
@@ -759,6 +775,7 @@ export default function AhorroLuz() {
           leadSource={leadSource}
           leadCampaign={leadCampaign}
           collaboratorMeta={collaboratorMeta}
+          collaboratorId={collaborator?.id}
         />
         {collaborator && (
           <p className="px-4 pb-2 text-center text-sm text-muted-foreground">
