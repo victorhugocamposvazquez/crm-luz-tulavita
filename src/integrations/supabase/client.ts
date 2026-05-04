@@ -28,3 +28,21 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     autoRefreshToken: true,
   }
 });
+
+/** Referencia del proyecto (subdominio *.supabase.co). Debe coincidir con el que ves en dashboard.supabase.com al revisar tablas. */
+export const SUPABASE_PROJECT_REF = (() => {
+  try {
+    const host = new URL(SUPABASE_URL).hostname;
+    return host.replace('.supabase.co', '');
+  } catch {
+    return null;
+  }
+})();
+
+if (import.meta.env.DEV) {
+  console.info(
+    '[Supabase] La app usa el proyecto:',
+    SUPABASE_PROJECT_REF ?? SUPABASE_URL,
+    '— al buscar clientes en el panel, abre este mismo proyecto.',
+  );
+}
