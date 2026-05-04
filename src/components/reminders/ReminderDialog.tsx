@@ -10,10 +10,15 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { CalendarIcon, X } from 'lucide-react';
-import { format, addDays, addMonths, addYears, startOfDay, setHours } from 'date-fns';
+import { format, addDays, addMonths, addYears, startOfDay, setHours, setMinutes } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import {
+  REMINDER_KIND_VALUES,
+  type ReminderKind,
+  reminderKindLabel,
+} from '@/lib/reminders/reminderKinds';
 
 interface ReminderDialogProps {
   open: boolean;
@@ -23,28 +28,87 @@ interface ReminderDialogProps {
   onReminderCreated: () => void;
 }
 
+type DatePreset = 'specific' | 'today' | 'tomorrow' | 'six_months' | 'eleven_months' | 'five_years';
+
+const DATE_PRESET_LABELS: Record<DatePreset, string> = {
+  specific: 'Fecha concreta',
+  today: 'Hoy',
+  tomorrow: 'Mañana',
+  six_months: 'Dentro de 6 meses (día 1)',
+  eleven_months: 'Dentro de 11 meses (día 1)',
+  five_years: 'Dentro de 5 años (día 1)',
+};
+
+function dateForPreset(preset: Exclude<DatePreset, 'specific'>): Date {
+  const today = new Date();
+  switch (preset) {
+    case 'today':
+      return today;
+    case 'tomorrow':
+      return addDays(today, 1);
+    case 'six_months': {
+      const d = addMonths(today, 6);
+      return new Date(d.getFullYear(), d.getMonth(), 1);
+    }
+    case 'eleven_months': {
+      const d = addMonths(today, 11);
+      return new Date(d.getFullYear(), d.getMonth(), 1);
+    }
+    case 'five_years': {
+      const d = addYears(today, 5);
+      return new Date(d.getFullYear(), d.getMonth(), 1);
+    }
+  }
+}
+
+function applyTimeToDate(base: Date, timeStr: string | undefined): Date {
+  const d = startOfDay(base);
+  if (timeStr && /^\d{1,2}:\d{2}$/.test(timeStr)) {
+    const [h, m] = timeStr.split(':').map((x) => parseInt(x, 10));
+    return setMinutes(setHours(d, h), m);
+  }
+  return setHours(d, 9, 0, 0, 0);
+}
+
 export default function ReminderDialog({
   open,
   onOpenChange,
   clientId,
   clientName,
-  onReminderCreated
+  onReminderCreated,
 }: ReminderDialogProps) {
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [reminderType, setReminderType] = useState<'specific' | 'today' | 'tomorrow' | 'six_months' | 'eleven_months' | 'five_years'>('specific');
-  const [specificDate, setSpecificDate] = useState<Date>();
+  const [reminderKind, setReminderKind] = useState<ReminderKind>('renewal');
+  const [customLabel, setCustomLabel] = useState('');
+  const [datePreset, setDatePreset] = useState<DatePreset>('specific');
+  const [specificDate, setSpecificDate] = useState<Date | undefined>();
+  const [timeStr, setTimeStr] = useState('');
   const [notes, setNotes] = useState('');
-  const [selectedClient, setSelectedClient] = useState<{id: string, name: string} | null>(null);
-  const [clients, setClients] = useState<Array<{id: string, nombre_apellidos: string}>>([]);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<{ id: string; name: string } | null>(null);
+  const [clients, setClients] = useState<Array<{ id: string; nombre_apellidos: string }>>([]);
   const [clientSearch, setClientSearch] = useState('');
 
-  // Fetch clients when dialog opens and no client is pre-selected
   useEffect(() => {
-    if (open && !clientId) {
-      fetchClients();
+    if (!open) return;
+    setReminderKind('renewal');
+    setCustomLabel('');
+    setDatePreset('specific');
+    setSpecificDate(undefined);
+    setTimeStr('');
+    setNotes('');
+    if (!clientId) {
+      setSelectedClient(null);
+      setClientSearch('');
+      void fetchClients();
     }
   }, [open, clientId]);
+
+  useEffect(() => {
+    if (!open || datePreset === 'specific') return;
+    setSpecificDate(dateForPreset(datePreset));
+  }, [datePreset, open]);
 
   const fetchClients = async () => {
     try {
@@ -67,52 +131,32 @@ export default function ReminderDialog({
     return selectedClient;
   };
 
-  // Auto-calculate date based on reminder type
-  const getCalculatedDate = () => {
-    const today = new Date();
-    switch (reminderType) {
-      case 'today':
-        return today;
-      case 'tomorrow':
-        return addDays(today, 1);
-      case 'six_months': {
-        const futureDate = addMonths(today, 6);
-        // Set to day 1 of the month
-        return new Date(futureDate.getFullYear(), futureDate.getMonth(), 1);
-      }
-      case 'eleven_months': {
-        const futureDate = addMonths(today, 11);
-        // Set to day 1 of the month
-        return new Date(futureDate.getFullYear(), futureDate.getMonth(), 1);
-      }
-      case 'five_years': {
-        const futureDate = addYears(today, 5);
-        // Set to day 1 of the month
-        return new Date(futureDate.getFullYear(), futureDate.getMonth(), 1);
-      }
-      default:
-        return specificDate;
-    }
-  };
-
-  // Update specificDate when reminder type changes
-  useEffect(() => {
-    if (reminderType !== 'specific') {
-      const calculatedDate = getCalculatedDate();
-      setSpecificDate(calculatedDate);
-    }
-  }, [reminderType]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user?.id) {
+      toast({
+        title: 'Error',
+        description: 'No hay sesión activa.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (reminderKind === 'custom' && !customLabel.trim()) {
+      toast({
+        title: 'Describe el recordatorio',
+        description: 'Cuando eliges «Otro», escribe un título o motivo.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     const effectiveClient = getEffectiveClient();
     if (!effectiveClient) {
       toast({
-        title: "Error",
-        description: "Selecciona un cliente",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Selecciona un cliente',
+        variant: 'destructive',
       });
       return;
     }
@@ -120,81 +164,80 @@ export default function ReminderDialog({
     const finalDate = specificDate;
     if (!finalDate) {
       toast({
-        title: "Error",
-        description: "Selecciona una fecha para el recordatorio",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Selecciona una fecha para el recordatorio',
+        variant: 'destructive',
       });
       return;
     }
 
     setLoading(true);
     try {
-      // Set time to 9:00 AM
-      const reminderDate = setHours(startOfDay(finalDate), 9);
-      
-      const { error } = await supabase
-        .from('renewal_reminders')
-        .insert([{
+      const reminderDate = applyTimeToDate(finalDate, timeStr || undefined);
+
+      const { error } = await supabase.from('renewal_reminders').insert([
+        {
           client_id: effectiveClient.id,
           reminder_date: reminderDate.toISOString(),
-          notes: notes || null,
-          created_by: user.id
-        }]);
+          notes: notes.trim() || null,
+          created_by: user.id,
+          reminder_kind: reminderKind,
+          custom_label:
+            reminderKind === 'custom' ? customLabel.trim().slice(0, 200) : null,
+        },
+      ]);
 
       if (error) throw error;
 
       toast({
-        title: "Recordatorio creado",
-        description: `Se ha creado el recordatorio para ${effectiveClient.name}`,
+        title: 'Recordatorio creado',
+        description: `Para ${effectiveClient.name} el ${format(reminderDate, "PPP 'a las' HH:mm", { locale: es })}.`,
       });
 
       onReminderCreated();
       onOpenChange(false);
-      setReminderType('specific');
+      setReminderKind('renewal');
+      setCustomLabel('');
+      setDatePreset('specific');
       setSpecificDate(undefined);
+      setTimeStr('');
       setNotes('');
       setSelectedClient(null);
       setClientSearch('');
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error creating reminder:', error);
       toast({
-        title: "Error",
-        description: error.message || "No se pudo crear el recordatorio",
-        variant: "destructive",
+        title: 'Error',
+        description:
+          error instanceof Error ? error.message : 'No se pudo crear el recordatorio',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
     }
   };
 
-  const typeLabels = {
-    specific: 'Fecha específica',
-    today: 'Hoy',
-    tomorrow: 'Al día siguiente',
-    six_months: 'Dentro de 6 meses',
-    eleven_months: 'Dentro de 11 meses',
-    five_years: 'Dentro de 5 años'
-  };
-
-  const filteredClients = clients.filter(client =>
-    client.nombre_apellidos.toLowerCase().includes(clientSearch.toLowerCase())
+  const filteredClients = clients.filter((client) =>
+    client.nombre_apellidos.toLowerCase().includes(clientSearch.toLowerCase()),
   );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Crear recordatorio de renovación</DialogTitle>
+      <DialogContent className="max-w-md max-h-[90vh] flex flex-col sm:max-w-md">
+        <DialogHeader className="flex-shrink-0">
+          <DialogTitle>Crear recordatorio</DialogTitle>
           <DialogDescription>
             {clientName ? (
-              <>Cliente: <strong>{clientName}</strong></>
+              <>
+                Cliente: <strong>{clientName}</strong>
+              </>
             ) : (
-              'Selecciona un cliente y configura el recordatorio'
+              'Selecciona un cliente y configura fecha, hora opcional y motivo.'
             )}
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 overflow-y-auto flex-1 min-h-0 pr-1">
           {!clientId && (
             <div className="space-y-2">
               <Label>Cliente</Label>
@@ -202,12 +245,12 @@ export default function ReminderDialog({
                 {!selectedClient ? (
                   <>
                     <Input
-                      placeholder="Buscar cliente..."
+                      placeholder="Buscar cliente…"
                       value={clientSearch}
                       onChange={(e) => setClientSearch(e.target.value)}
                     />
                     {clientSearch.length > 0 && filteredClients.length > 0 && (
-                      <div className="border rounded-md max-h-40 overflow-y-auto">
+                      <div className="border rounded-md max-h-40 overflow-y-auto z-10 relative">
                         {filteredClients.slice(0, 10).map((client) => (
                           <div
                             key={client.id}
@@ -243,52 +286,103 @@ export default function ReminderDialog({
               </div>
             </div>
           )}
+
           <div className="space-y-2">
-            <Label>Tipo de recordatorio</Label>
-            <Select value={reminderType} onValueChange={(value: any) => setReminderType(value)}>
+            <Label htmlFor="reminder-kind">Motivo</Label>
+            <Select
+              value={reminderKind}
+              onValueChange={(v) => setReminderKind(v as ReminderKind)}
+              disabled={loading}
+            >
+              <SelectTrigger id="reminder-kind">
+                <SelectValue placeholder="Tipo de recordatorio" />
+              </SelectTrigger>
+              <SelectContent className="z-[220] max-h-[min(300px,60vh)]">
+                {REMINDER_KIND_VALUES.filter((k) => k !== 'custom').map((k) => (
+                  <SelectItem key={k} value={k}>
+                    {reminderKindLabel(k)}
+                  </SelectItem>
+                ))}
+                <SelectItem value="custom">Otro (describir)</SelectItem>
+              </SelectContent>
+            </Select>
+            {reminderKind === 'custom' && (
+              <Input
+                placeholder="Ej. llamar por presupuesto, visita…"
+                value={customLabel}
+                onChange={(e) => setCustomLabel(e.target.value)}
+                maxLength={200}
+                disabled={loading}
+              />
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Cuándo</Label>
+            <Select
+              value={datePreset}
+              onValueChange={(v) => setDatePreset(v as DatePreset)}
+              disabled={loading}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent>
-                {Object.entries(typeLabels).map(([value, label]) => (
-                  <SelectItem key={value} value={value}>
-                    {label}
+              <SelectContent className="z-[220]">
+                {(Object.keys(DATE_PRESET_LABELS) as DatePreset[]).map((key) => (
+                  <SelectItem key={key} value={key}>
+                    {DATE_PRESET_LABELS[key]}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
+
+            {datePreset === 'specific' && (
+              <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={cn(
+                      'w-full justify-start text-left font-normal',
+                      !specificDate && 'text-muted-foreground',
+                    )}
+                    disabled={loading}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {specificDate
+                      ? format(specificDate, 'PPP', { locale: es })
+                      : 'Seleccionar fecha en el calendario'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="z-[220] w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={specificDate}
+                    onSelect={(d) => {
+                      setSpecificDate(d);
+                      setCalendarOpen(false);
+                    }}
+                    disabled={(date) => date < startOfDay(new Date())}
+                    initialFocus
+                    locale={es}
+                    className="p-3 pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
+            )}
           </div>
 
           <div className="space-y-2">
-            <Label>Fecha del recordatorio</Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className={cn(
-                    "w-full justify-start text-left font-normal",
-                    !specificDate && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {specificDate ? format(specificDate, 'PPP', { locale: es }) : 'Seleccionar fecha'}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  mode="single"
-                  selected={specificDate}
-                  onSelect={setSpecificDate}
-                  disabled={(date) => {
-                    const today = new Date();
-                    today.setHours(0, 0, 0, 0);
-                    return date < today;
-                  }}
-                  initialFocus
-                  className="p-3 pointer-events-auto"
-                />
-              </PopoverContent>
-            </Popover>
+            <Label htmlFor="reminder-time">Hora (opcional)</Label>
+            <Input
+              id="reminder-time"
+              type="time"
+              value={timeStr}
+              onChange={(e) => setTimeStr(e.target.value)}
+              disabled={loading}
+              className="w-full sm:w-40"
+            />
+            <p className="text-xs text-muted-foreground">Si la dejas vacía, se usa las 9:00.</p>
           </div>
 
           <div className="space-y-2">
@@ -297,20 +391,21 @@ export default function ReminderDialog({
               id="notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Agregar información adicional sobre el recordatorio..."
+              placeholder="Información adicional…"
               rows={3}
+              disabled={loading}
             />
           </div>
-        </form>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancelar
-          </Button>
-          <Button onClick={handleSubmit} disabled={loading}>
-            {loading ? 'Creando...' : 'Crear recordatorio'}
-          </Button>
-        </DialogFooter>
+          <DialogFooter className="flex-shrink-0 pt-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={loading || !specificDate}>
+              {loading ? 'Creando...' : 'Crear recordatorio'}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

@@ -1051,7 +1051,7 @@ export default function ClientManagement() {
                                    setSelectedClient({ id: client.id, name: client.nombre_apellidos });
                                    setReminderDialogOpen(true);
                                  }}
-                                 title="Crear recordatorio de renovación"
+                                 title="Crear recordatorio"
                                >
                                  <Bell className="h-4 w-4" />
                                </Button>

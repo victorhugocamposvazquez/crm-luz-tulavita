@@ -14,11 +14,14 @@ import { Bell, BellOff, Trash2, UserPlus, Calendar, Search, Filter, X, CheckSqua
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import ReminderDialog from './ReminderDialog';
+import { reminderKindDisplay } from '@/lib/reminders/reminderKinds';
 
 interface Reminder {
   id: string;
   client_id: string;
   reminder_date: string;
+  reminder_kind?: string;
+  custom_label?: string | null;
   notes?: string;
   status: 'pending' | 'completed' | 'cancelled';
   created_at: string;
@@ -461,14 +464,7 @@ export default function RemindersManagement() {
 
   const isPastDue = (reminderDate: string, status: string) => {
     if (status !== 'pending') return false;
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Start of today
-    
-    const reminderDateObj = new Date(reminderDate);
-    reminderDateObj.setHours(0, 0, 0, 0); // Start of reminder date
-    
-    return reminderDateObj < today; // Only past dates, not today
+    return new Date(reminderDate).getTime() < Date.now();
   };
 
   if (!isAdmin) {
@@ -484,7 +480,9 @@ export default function RemindersManagement() {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold">Gestión de recordatorios</h2>
-          <p className="text-muted-foreground">Administra los recordatorios de renovación de clientes</p>
+          <p className="text-muted-foreground">
+            Administra recordatorios de clientes (renovación, fin de contrato, recontacto u otros).
+          </p>
         </div>
         <Button 
           onClick={() => setReminderDialogOpen(true)} 
@@ -611,6 +609,7 @@ export default function RemindersManagement() {
                     </TableHead>
                     <TableHead>Cliente</TableHead>
                     <TableHead>DNI</TableHead>
+                    <TableHead>Motivo</TableHead>
                     <TableHead>Fecha recordatorio</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead>Notas</TableHead>
@@ -631,8 +630,11 @@ export default function RemindersManagement() {
                         {reminder.client?.nombre_apellidos || 'Cliente eliminado'}
                       </TableCell>
                       <TableCell>{reminder.client?.dni || 'N/A'}</TableCell>
+                      <TableCell className="max-w-[10rem] truncate" title={reminderKindDisplay(reminder.reminder_kind, reminder.custom_label)}>
+                        {reminderKindDisplay(reminder.reminder_kind, reminder.custom_label)}
+                      </TableCell>
                       <TableCell>
-                        {format(new Date(reminder.reminder_date), 'PPP', { locale: es })}
+                        {format(new Date(reminder.reminder_date), "PPP 'a las' HH:mm", { locale: es })}
                         {isPastDue(reminder.reminder_date, reminder.status) && (
                           <Badge variant="destructive" className="ml-2">Vencido</Badge>
                         )}
@@ -691,7 +693,7 @@ export default function RemindersManagement() {
                   ))}
                   {reminders.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
                         No hay recordatorios que coincidan con los filtros
                       </TableCell>
                     </TableRow>

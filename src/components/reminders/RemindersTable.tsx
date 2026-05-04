@@ -7,13 +7,16 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
-import { Bell, Trash2, UserPlus } from 'lucide-react';
+import { Trash2, UserPlus } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { reminderKindDisplay } from '@/lib/reminders/reminderKinds';
 
 interface Reminder {
   id: string;
   reminder_date: string;
+  reminder_kind?: string;
+  custom_label?: string | null;
   notes?: string;
   status: 'pending' | 'completed' | 'cancelled';
   created_at: string;
@@ -291,14 +294,7 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
 
   const isPastDue = (reminderDate: string, status: string) => {
     if (status !== 'pending') return false;
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Start of today
-    
-    const reminderDateObj = new Date(reminderDate);
-    reminderDateObj.setHours(0, 0, 0, 0); // Start of reminder date
-    
-    return reminderDateObj < today; // Only past dates, not today
+    return new Date(reminderDate).getTime() < Date.now();
   };
 
   if (loading) {
@@ -316,6 +312,7 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead>Motivo</TableHead>
               <TableHead>Fecha recordatorio</TableHead>
               <TableHead>Estado</TableHead>
               <TableHead>Notas</TableHead>
@@ -326,8 +323,11 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
           <TableBody>
             {reminders.map((reminder) => (
               <TableRow key={reminder.id} className={isPastDue(reminder.reminder_date, reminder.status) ? 'bg-red-50' : ''}>
+                <TableCell className="max-w-[10rem] truncate" title={reminderKindDisplay(reminder.reminder_kind, reminder.custom_label)}>
+                  {reminderKindDisplay(reminder.reminder_kind, reminder.custom_label)}
+                </TableCell>
                 <TableCell>
-                  {format(new Date(reminder.reminder_date), 'PPP', { locale: es })}
+                  {format(new Date(reminder.reminder_date), "PPP 'a las' HH:mm", { locale: es })}
                   {isPastDue(reminder.reminder_date, reminder.status) && (
                     <Badge variant="destructive" className="ml-2">Vencido</Badge>
                   )}
@@ -385,7 +385,7 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
             ))}
             {reminders.length === 0 && (
               <TableRow>
-                <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                   No hay recordatorios para este cliente
                 </TableCell>
               </TableRow>

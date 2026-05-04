@@ -962,9 +962,11 @@ export type Database = {
           client_id: string
           created_at: string
           created_by: string
+          custom_label: string | null
           id: string
           notes: string | null
           reminder_date: string
+          reminder_kind: string
           status: string
           updated_at: string
         }
@@ -972,9 +974,11 @@ export type Database = {
           client_id: string
           created_at?: string
           created_by: string
+          custom_label?: string | null
           id?: string
           notes?: string | null
           reminder_date: string
+          reminder_kind?: string
           status?: string
           updated_at?: string
         }
@@ -982,9 +986,11 @@ export type Database = {
           client_id?: string
           created_at?: string
           created_by?: string
+          custom_label?: string | null
           id?: string
           notes?: string | null
           reminder_date?: string
+          reminder_kind?: string
           status?: string
           updated_at?: string
         }

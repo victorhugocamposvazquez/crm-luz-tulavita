@@ -505,14 +505,14 @@ const fetchVisits = async () => {
 
       {canManageClientDocs && <ClientDocumentsCard clientId={clientId} />}
 
-      {/* Recordatorios de renovación (solo admin) */}
+      {/* Recordatorios (solo admin) */}
       {isAdmin && (
         <Card className="mb-8">
           <CardHeader>
             <CardTitle className="flex items-center justify-between text-xl">
               <div className="flex items-center gap-3">
                 <Bell className="h-6 w-6" />
-                Recordatorios de renovación
+                Recordatorios
               </div>
               <Button
                 variant="outline"
