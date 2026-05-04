@@ -70,6 +70,7 @@ export function useReminderDesktopNotifications(isAdmin: boolean) {
           'id, reminder_date, notes, reminder_kind, custom_label, client:clients(nombre_apellidos)',
         )
         .eq('status', 'pending')
+        .is('web_push_sent_at', null)
         .lte('reminder_date', nowIso);
 
       if (cancelled) return;

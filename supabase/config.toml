@@ -1,1 +1,5 @@
 project_id = "kamfdjczamfgumkiwjpw"
+
+# Invocación desde cron (x-cron-secret); no usar JWT de usuario.
+[functions.send-reminder-web-push]
+verify_jwt = false

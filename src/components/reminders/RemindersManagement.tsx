@@ -12,7 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { toast } from '@/hooks/use-toast';
-import { Bell, BellOff, Trash2, UserPlus, Calendar, Search, Filter, X, CheckSquare } from 'lucide-react';
+import { Bell, Loader2, Trash2, UserPlus, Calendar, Search, Filter, X, CheckSquare, CheckCircle2, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import ReminderDialog from './ReminderDialog';
@@ -22,6 +22,12 @@ import {
   getReminderDesktopNotificationsEnabled,
   setReminderDesktopNotificationsEnabled,
 } from '@/lib/reminders/desktopNotificationPrefs';
+import {
+  subscribeReminderWebPush,
+  unsubscribeReminderWebPush,
+  webPushApiSupported,
+  webPushEnvConfigured,
+} from '@/lib/reminders/webPushRegistration';
 
 interface Reminder {
   id: string;
@@ -45,7 +51,7 @@ interface Reminder {
 }
 
 export default function RemindersManagement() {
-  const { userRole } = useAuth();
+  const { userRole, user } = useAuth();
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
@@ -59,6 +65,9 @@ export default function RemindersManagement() {
     getReminderDesktopNotificationsEnabled(),
   );
   const desktopNotifySupported = desktopNotificationsSupported();
+  const webPushSupported = webPushApiSupported();
+  const [webPushOn, setWebPushOn] = useState(false);
+  const [webPushBusy, setWebPushBusy] = useState(false);
 
   useEffect(() => {
     const sync = () => setDesktopNotifyOn(getReminderDesktopNotificationsEnabled());
@@ -108,6 +117,46 @@ export default function RemindersManagement() {
       description:
         'Te avisaremos cuando llegue la hora de un recordatorio pendiente (con el backoffice abierto).',
     });
+  };
+
+  useEffect(() => {
+    if (userRole?.role !== 'admin' || !user?.id) return;
+    void supabase
+      .from('admin_web_push_subscriptions')
+      .select('id')
+      .eq('user_id', user.id)
+      .limit(1)
+      .then(({ data }) => setWebPushOn(!!data?.length));
+  }, [userRole?.role, user?.id]);
+
+  const handleWebPushToggle = async (checked: boolean) => {
+    if (!user?.id) return;
+    setWebPushBusy(true);
+    try {
+      if (!checked) {
+        await unsubscribeReminderWebPush();
+        setWebPushOn(false);
+        toast({ title: 'Push desactivado' });
+        return;
+      }
+      const r = await subscribeReminderWebPush(user.id);
+      if (!r.ok) {
+        toast({
+          variant: 'destructive',
+          title: 'No se pudo activar el push',
+          description: r.error,
+        });
+        return;
+      }
+      setWebPushOn(true);
+      toast({
+        title: 'Push activado',
+        description:
+          'Recibirás avisos aunque cierres la pestaña. Debes programar la función send-reminder-web-push en Supabase.',
+      });
+    } finally {
+      setWebPushBusy(false);
+    }
   };
 
   const fetchReminders = useCallback(async () => {
@@ -312,7 +361,8 @@ export default function RemindersManagement() {
       const { error } = await supabase
         .from('renewal_reminders')
         .update({ status: newStatus })
-        .eq('id', reminderId);
+        .eq('id', reminderId)
+        .eq('status', 'pending');
 
       if (error) throw error;
 
@@ -328,6 +378,32 @@ export default function RemindersManagement() {
         title: "Error",
         description: "No se pudo actualizar el estado del recordatorio",
         variant: "destructive",
+      });
+    }
+  };
+
+  const handleReopenReminder = async (reminderId: string) => {
+    try {
+      const { error } = await supabase
+        .from('renewal_reminders')
+        .update({ status: 'pending', web_push_sent_at: null })
+        .eq('id', reminderId)
+        .in('status', ['completed', 'cancelled']);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Recordatorio reabierto',
+        description: 'Pendiente de nuevo. Si sigue vencido, volverá a las alertas.',
+      });
+
+      fetchReminders();
+    } catch (error: unknown) {
+      console.error('Error reopening reminder:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo reabrir el recordatorio',
+        variant: 'destructive',
       });
     }
   };
@@ -571,6 +647,41 @@ export default function RemindersManagement() {
               usar esta función.
             </p>
           )}
+
+          <div className="border-t pt-4 space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Avisos con pestaña cerrada (Web Push)
+            </p>
+            <p className="text-sm text-muted-foreground">
+              Misma permisos del navegador; además hace falta la migración, variables VAPID y un cron que llame a la
+              Edge Function <code className="text-xs bg-muted px-1 rounded">send-reminder-web-push</code>.
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              {webPushBusy ? (
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              ) : null}
+              <Switch
+                id="reminder-web-push"
+                checked={webPushOn}
+                onCheckedChange={handleWebPushToggle}
+                disabled={
+                  !webPushSupported || !webPushEnvConfigured() || webPushBusy || userRole?.role !== 'admin'
+                }
+              />
+              <Label htmlFor="reminder-web-push" className="cursor-pointer font-normal">
+                Registrar este navegador para recibir push
+              </Label>
+            </div>
+            {!webPushSupported && (
+              <p className="text-sm text-muted-foreground">Tu navegador no soporta Web Push en este contexto.</p>
+            )}
+            {webPushSupported && !webPushEnvConfigured() && (
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                Añade <code className="text-xs bg-muted px-1 rounded">VITE_VAPID_PUBLIC_KEY</code> al build del CRM
+                (misma clave pública que en la función).
+              </p>
+            )}
+          </div>
         </CardContent>
       </Card>
 
@@ -620,6 +731,8 @@ export default function RemindersManagement() {
                 <SelectContent>
                   <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="pending">Pendientes</SelectItem>
+                  <SelectItem value="completed">Completados</SelectItem>
+                  <SelectItem value="cancelled">Cancelados</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -741,7 +854,19 @@ export default function RemindersManagement() {
                         }
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {reminder.status === 'pending' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleStatusUpdate(reminder.id, 'completed')}
+                              className="text-green-700 border-green-600 hover:bg-green-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Marcar como hecho"
+                              disabled={selectedReminders.length > 1}
+                            >
+                              <CheckCircle2 className="h-4 w-4" />
+                            </Button>
+                          )}
                           {reminder.status === 'pending' && (
                             <Button
                               size="sm"
@@ -756,6 +881,18 @@ export default function RemindersManagement() {
                               disabled={selectedReminders.length > 1}
                             >
                               <UserPlus className="h-4 w-4" />
+                            </Button>
+                          )}
+                          {(reminder.status === 'completed' || reminder.status === 'cancelled') && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleReopenReminder(reminder.id)}
+                              className="text-amber-800 border-amber-600 hover:bg-amber-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                              title="Reabrir como pendiente"
+                              disabled={selectedReminders.length > 1}
+                            >
+                              <RotateCcw className="h-4 w-4" />
                             </Button>
                           )}
                           <Button

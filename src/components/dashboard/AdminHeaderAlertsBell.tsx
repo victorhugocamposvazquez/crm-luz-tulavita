@@ -1,13 +1,16 @@
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Bell, CalendarClock } from 'lucide-react';
+import { Bell, CalendarClock, CheckCircle2, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import AdminNotifications from '@/components/dashboard/AdminNotifications';
 import { useRealtimeNotifications } from '@/hooks/useRealtimeNotifications';
 import { useDueReminderAlerts } from '@/hooks/useDueReminderAlerts';
 import { reminderKindDisplay } from '@/lib/reminders/reminderKinds';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 
 interface AdminHeaderAlertsBellProps {
   onViewChange: (view: string) => void;
@@ -21,7 +24,8 @@ export default function AdminHeaderAlertsBell({
   className,
 }: AdminHeaderAlertsBellProps) {
   const { pendingTasks, pendingApprovals } = useRealtimeNotifications();
-  const { items: dueReminders, dueCount } = useDueReminderAlerts(true);
+  const { items: dueReminders, dueCount, refetch: refetchDueReminders } = useDueReminderAlerts(true);
+  const [completingId, setCompletingId] = useState<string | null>(null);
 
   const taskCount = pendingTasks.length + pendingApprovals.length;
   const totalAlerts = taskCount + dueCount;
@@ -30,6 +34,34 @@ export default function AdminHeaderAlertsBell({
   const goReminders = () => {
     onViewChange('reminders');
     onAfterNavigate?.();
+  };
+
+  const markReminderDone = async (id: string) => {
+    setCompletingId(id);
+    try {
+      const { error } = await supabase
+        .from('renewal_reminders')
+        .update({ status: 'completed' })
+        .eq('id', id)
+        .eq('status', 'pending');
+
+      if (error) throw error;
+
+      toast({
+        title: 'Recordatorio cerrado',
+        description: 'Marcado como completado. Puedes reabrirlo desde Gestión de recordatorios si hace falta.',
+      });
+      await refetchDueReminders();
+    } catch (e) {
+      console.error(e);
+      toast({
+        variant: 'destructive',
+        title: 'No se pudo actualizar',
+        description: 'Inténtalo de nuevo o usa la pantalla de Recordatorios.',
+      });
+    } finally {
+      setCompletingId(null);
+    }
   };
 
   return (
@@ -80,11 +112,33 @@ export default function AdminHeaderAlertsBell({
                   return (
                     <li
                       key={r.id}
-                      className="rounded-md border border-amber-200/80 dark:border-amber-800 bg-background/90 px-2.5 py-2 text-xs"
+                      className="rounded-md border border-amber-200/80 dark:border-amber-800 bg-background/90 px-2 py-2 text-xs flex gap-2 items-start"
                     >
-                      <p className="font-medium truncate">{name}</p>
-                      <p className="text-muted-foreground truncate">{motivo}</p>
-                      <p className="text-amber-800 dark:text-amber-200">{cuando}</p>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium truncate">{name}</p>
+                        <p className="text-muted-foreground truncate">{motivo}</p>
+                        <p className="text-amber-800 dark:text-amber-200">{cuando}</p>
+                      </div>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        className="h-8 w-8 shrink-0 text-green-700 hover:text-green-800 hover:bg-green-100 dark:hover:bg-green-900/40"
+                        title="Marcar como hecho"
+                        aria-label={`Marcar como hecho: ${name}`}
+                        disabled={completingId === r.id}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          void markReminderDone(r.id);
+                        }}
+                      >
+                        {completingId === r.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="h-4 w-4" />
+                        )}
+                      </Button>
                     </li>
                   );
                 })}

@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
-import { Trash2, UserPlus } from 'lucide-react';
+import { Trash2, UserPlus, CheckCircle2, RotateCcw } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { reminderKindDisplay } from '@/lib/reminders/reminderKinds';
@@ -169,7 +169,8 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
       const { error } = await supabase
         .from('renewal_reminders')
         .update({ status: newStatus })
-        .eq('id', reminderId);
+        .eq('id', reminderId)
+        .eq('status', 'pending');
 
       if (error) throw error;
 
@@ -186,6 +187,33 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
         title: "Error",
         description: "No se pudo actualizar el estado del recordatorio",
         variant: "destructive",
+      });
+    }
+  };
+
+  const handleReopenReminder = async (reminderId: string) => {
+    try {
+      const { error } = await supabase
+        .from('renewal_reminders')
+        .update({ status: 'pending', web_push_sent_at: null })
+        .eq('id', reminderId)
+        .in('status', ['completed', 'cancelled']);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Recordatorio reabierto',
+        description: 'Pendiente de nuevo.',
+      });
+
+      fetchReminders();
+      onReminderUpdate();
+    } catch (error: unknown) {
+      console.error('Error reopening reminder:', error);
+      toast({
+        title: 'Error',
+        description: 'No se pudo reabrir el recordatorio',
+        variant: 'destructive',
       });
     }
   };
@@ -354,7 +382,18 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
                 </TableCell>
                 <TableCell>
                   {isAdmin && (
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {reminder.status === 'pending' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleStatusUpdate(reminder.id, 'completed')}
+                          className="text-green-700 border-green-600 hover:bg-green-50"
+                          title="Marcar como hecho"
+                        >
+                          <CheckCircle2 className="h-4 w-4" />
+                        </Button>
+                      )}
                       {reminder.status === 'pending' && (
                         <Button
                           size="sm"
@@ -367,6 +406,17 @@ export default function RemindersTable({ clientId, onReminderUpdate }: Reminders
                           title="Crear visita"
                         >
                           <UserPlus className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {(reminder.status === 'completed' || reminder.status === 'cancelled') && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleReopenReminder(reminder.id)}
+                          className="text-amber-800 border-amber-600 hover:bg-amber-50"
+                          title="Reabrir como pendiente"
+                        >
+                          <RotateCcw className="h-4 w-4" />
                         </Button>
                       )}
                       <Button
