@@ -194,93 +194,79 @@ export default function ClientManagement() {
     };
   }, [dialogOpen, editingClient?.id, applySupplyDrafts]);
 
-  // Debounced fetch function
-  const debouncedFetchClients = useCallback(
-    debounce(() => {
-      fetchClients();
-    }, 300),
-    [currentPage, pageSize, filters]
-  );
-
-  useEffect(() => {
-    debouncedFetchClients();
-  }, [debouncedFetchClients]);
-
-  // Debounce utility function
-  function debounce(func: Function, wait: number) {
-    let timeout: NodeJS.Timeout;
-    return function executedFunction(...args: any[]) {
-      const later = () => {
-        clearTimeout(timeout);
-        func(...args);
-      };
-      clearTimeout(timeout);
-      timeout = setTimeout(later, wait);
-    };
-  }
-
-  const fetchClients = async () => {
+  const fetchClients = useCallback(async () => {
     try {
       setLoading(true);
-      
-      // Build query with filters
-      const clientSelect = isAdmin
-        ? '*, assigned_commercial:profiles!clients_assigned_commercial_id_fkey(first_name, last_name, email)'
-        : '*';
 
-      let query = supabase.from('clients').select(clientSelect, { count: 'exact' });
+      const adminEmbedSelect =
+        '*, assigned_commercial:profiles!clients_assigned_commercial_id_fkey(first_name, last_name, email)';
 
-      // Apply filters
-      if (filters.nombre.trim()) {
-        query = query.ilike('nombre_apellidos', `%${filters.nombre.trim()}%`);
-      }
-      if (filters.dni.trim()) {
-        const normalizedDniFilter = normalizeDNI(filters.dni.trim());
-        if (normalizedDniFilter) {
-          query = query.ilike('dni', `%${normalizedDniFilter}%`);
+      const buildQuery = (selectStr: string) => {
+        let q = supabase.from('clients').select(selectStr, { count: 'exact' });
+        if (filters.nombre.trim()) {
+          q = q.ilike('nombre_apellidos', `%${filters.nombre.trim()}%`);
         }
-      }
-      if (filters.localidad.trim()) {
-        query = query.ilike('localidad', `%${filters.localidad.trim()}%`);
-      }
-      if (filters.codigo_postal.trim()) {
-        query = query.ilike('codigo_postal', `%${filters.codigo_postal.trim()}%`);
-      }
-      if (filters.telefono.trim()) {
-        query = query.or(`telefono1.ilike.%${filters.telefono.trim()}%,telefono2.ilike.%${filters.telefono.trim()}%`);
-      }
-      if (filters.status.trim()) {
-        query = query.eq('status', filters.status.trim());
-      }
-      if (filters.prospect) {
-        query = query.eq('prospect', true);
+        if (filters.dni.trim()) {
+          const normalizedDniFilter = normalizeDNI(filters.dni.trim());
+          if (normalizedDniFilter) {
+            q = q.ilike('dni', `%${normalizedDniFilter}%`);
+          }
+        }
+        if (filters.localidad.trim()) {
+          q = q.ilike('localidad', `%${filters.localidad.trim()}%`);
+        }
+        if (filters.codigo_postal.trim()) {
+          q = q.ilike('codigo_postal', `%${filters.codigo_postal.trim()}%`);
+        }
+        if (filters.telefono.trim()) {
+          q = q.or(
+            `telefono1.ilike.%${filters.telefono.trim()}%,telefono2.ilike.%${filters.telefono.trim()}%`,
+          );
+        }
+        if (filters.status.trim()) {
+          q = q.eq('status', filters.status.trim());
+        }
+        if (filters.prospect) {
+          q = q.eq('prospect', true);
+        }
+        const from = (currentPage - 1) * pageSize;
+        const to = from + pageSize - 1;
+        return q.order('created_at', { ascending: false }).range(from, to);
+      };
+
+      let selectUsed = isAdmin ? adminEmbedSelect : '*';
+      let result = await buildQuery(selectUsed);
+
+      if (result.error && isAdmin && selectUsed !== '*') {
+        console.warn(
+          'Lista clientes: falló la relación assigned_commercial; reintentando sin incrustar perfil.',
+          result.error,
+        );
+        selectUsed = '*';
+        result = await buildQuery('*');
       }
 
-      // Apply pagination
-      const from = (currentPage - 1) * pageSize;
-      const to = from + pageSize - 1;
-      
-      query = query
-        .order('created_at', { ascending: false })
-        .range(from, to);
-
-      const { data, error, count } = await query;
-
-      if (error) throw error;
-      
-      setClients((data || []) as Client[]);
-      setTotalItems(count || 0);
+      if (result.error) throw result.error;
+      setClients((result.data || []) as Client[]);
+      setTotalItems(result.count ?? 0);
     } catch (error) {
       console.error('Error fetching clients:', error);
       toast({
-        title: "Error",
-        description: "No se pudieron cargar los clientes",
-        variant: "destructive",
+        title: 'Error',
+        description: 'No se pudieron cargar los clientes',
+        variant: 'destructive',
       });
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAdmin, currentPage, pageSize, filters]);
+
+  useEffect(() => {
+    const t = window.setTimeout(() => {
+      void fetchClients();
+    }, 300);
+    return () => window.clearTimeout(t);
+  }, [fetchClients]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
