@@ -284,11 +284,12 @@ export default function ClientManagement() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    const form = e.currentTarget;
     // Deja que React aplique el último onChange de los inputs antes de leer borradores (p. ej. Enter en un campo).
     await Promise.resolve();
     const supplySnapshot = supplyDraftsRef.current;
 
-    const formData = new FormData(e.currentTarget);
+    const formData = new FormData(form);
     
     // Parse coordinates from DMS format
     const latString = formData.get('latitude') as string;
@@ -760,7 +761,27 @@ export default function ClientManagement() {
                     Nuevo cliente
                   </Button>
                 </DialogTrigger>
-            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogContent
+              className="max-w-3xl max-h-[90vh] overflow-y-auto"
+              onPointerDownOutside={(e) => {
+                if (
+                  (e.target as HTMLElement).closest?.(
+                    '.client-form-commercial-select-content',
+                  )
+                ) {
+                  e.preventDefault();
+                }
+              }}
+              onInteractOutside={(e) => {
+                if (
+                  (e.target as HTMLElement).closest?.(
+                    '.client-form-commercial-select-content',
+                  )
+                ) {
+                  e.preventDefault();
+                }
+              }}
+            >
               <DialogHeader>
                 <DialogTitle>
                   {editingClient ? 'Editar cliente' : 'Crear nuevo cliente'}
@@ -856,7 +877,7 @@ export default function ClientManagement() {
                       <SelectTrigger id="assigned_commercial">
                         <SelectValue placeholder="Sin asignar" />
                       </SelectTrigger>
-                      <SelectContent className="z-[300]">
+                      <SelectContent className="z-[300] client-form-commercial-select-content">
                         <SelectItem value="__none__">Sin asignar</SelectItem>
                         {commercialSelectOptions.map((u) => (
                           <SelectItem key={u.id} value={u.id}>
