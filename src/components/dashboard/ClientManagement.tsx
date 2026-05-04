@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, useLayoutEffect, type SetStateAction } from 'react';
+import { useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo, type SetStateAction } from 'react';
 import Papa from 'papaparse';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
@@ -23,6 +23,9 @@ import ReminderDialog from '@/components/reminders/ReminderDialog';
 import ClientSupplyAddressesEditor from './ClientSupplyAddressesEditor';
 import type { SupplyAddressDraft } from '@/lib/clients/supplyAddresses';
 import { draftFromSupplyRow, syncClientSupplyAddresses } from '@/lib/clients/supplyAddresses';
+import type { Database } from '@/integrations/supabase/types';
+
+type ClientTableUpdate = Database['public']['Tables']['clients']['Update'];
 
 interface Client {
   id: string;
@@ -138,6 +141,20 @@ export default function ClientManagement() {
       setAssignedCommercialId('__none__');
     }
   }, [dialogOpen, isAdmin, editingClient?.id, editingClient?.assigned_commercial_id]);
+
+  const commercialSelectOptions = useMemo(() => {
+    const byId = new Map(commercialUsers.map((u) => [u.id, u]));
+    const aid = editingClient?.assigned_commercial_id;
+    const ac = editingClient?.assigned_commercial;
+    if (aid && !byId.has(aid)) {
+      const label =
+        [ac?.first_name, ac?.last_name].filter(Boolean).join(' ').trim() ||
+        ac?.email ||
+        'Comercial asignado';
+      byId.set(aid, { id: aid, label });
+    }
+    return [...byId.values()].sort((a, b) => a.label.localeCompare(b.label, 'es'));
+  }, [commercialUsers, editingClient?.assigned_commercial, editingClient?.assigned_commercial_id]);
 
   useEffect(() => {
     if (!dialogOpen) {
@@ -318,15 +335,18 @@ export default function ClientManagement() {
     console.log('Raw nombre before normalization:', rawClientData.nombre_apellidos);
     
     const clientData = normalizeClientData(rawClientData);
-    const payload: Record<string, unknown> = { ...clientData };
+    const payload: ClientTableUpdate = { ...clientData };
     if (isAdmin) {
-      payload.assigned_commercial_id =
-        assignedCommercialId === '__none__' ? null : assignedCommercialId;
+      const chosen =
+        assignedCommercialId && assignedCommercialId !== '__none__'
+          ? assignedCommercialId
+          : null;
+      payload.assigned_commercial_id = chosen;
     }
 
     // Add prospect field if editing and DNI is empty
     if (editingClient && (!clientData.dni || clientData.dni.trim() === '')) {
-      (payload as any).prospect = true;
+      payload.prospect = true;
     }
     
     console.log('Normalized DNI:', clientData.dni);
@@ -828,13 +848,17 @@ export default function ClientManagement() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="assigned_commercial">Comercial asignado</Label>
-                    <Select value={assignedCommercialId} onValueChange={setAssignedCommercialId}>
+                    <Select
+                      key={`commercial-${editingClient?.id ?? 'new'}`}
+                      value={assignedCommercialId}
+                      onValueChange={setAssignedCommercialId}
+                    >
                       <SelectTrigger id="assigned_commercial">
                         <SelectValue placeholder="Sin asignar" />
                       </SelectTrigger>
                       <SelectContent className="z-[300]">
                         <SelectItem value="__none__">Sin asignar</SelectItem>
-                        {commercialUsers.map((u) => (
+                        {commercialSelectOptions.map((u) => (
                           <SelectItem key={u.id} value={u.id}>
                             {u.label}
                           </SelectItem>
