@@ -93,8 +93,12 @@ export async function syncClientSupplyAddresses(
 }
 
 export function fullSupplyAddressLine(d: SupplyAddressDraft): string {
-  const parts = [d.direccion.trim(), d.localidad.trim(), d.codigo_postal.trim()].filter(Boolean);
+  const dir = (d.direccion ?? '').trim();
+  const loc = (d.localidad ?? '').trim();
+  const cp = (d.codigo_postal ?? '').trim();
+  const parts = [dir, loc, cp].filter(Boolean);
   if (parts.length) return parts.join(', ');
-  if (d.cups.trim()) return `CUPS ${d.cups.trim()}`;
+  const cups = (d.cups ?? '').trim();
+  if (cups) return `CUPS ${cups}`;
   return '';
 }

@@ -4,7 +4,7 @@
  * Requisitos:
  *   - Migración 20260509180000_csv_import_clients_supply_sales.sql aplicada.
  *   - .env.local (o .env): SUPABASE_URL o VITE_SUPABASE_URL, y SUPABASE_SERVICE_ROLE_KEY (clave service_role del proyecto)
- *   - Copiar scripts/config/ventas-tulavita.agentes.example.json → ventas-tulavita.agentes.json (UUIDs reales)
+ *   - Opcional: ventas-tulavita.agentes.json (UUID de profiles). Sin él: clientes + suministros; ventas omitidas.
  *
  * Uso: npm run import:ventas-tulavita
  *       VENTAS_IMPORT_YEAR=2025 npm run import:ventas-tulavita -- ./csvs/otro.csv
@@ -228,17 +228,15 @@ async function main(): Promise<void> {
 
   const agentPath = join(process.cwd(), 'scripts', 'config', 'ventas-tulavita.agentes.json');
   const agentExample = join(process.cwd(), 'scripts', 'config', 'ventas-tulavita.agentes.example.json');
+  let rawAgents: Record<string, string> = {};
   if (!existsSync(agentPath)) {
-    console.error(
-      'Crea scripts/config/ventas-tulavita.agentes.json (copia desde .example.json) con UUID de comerciales.',
+    console.warn(
+      'No existe ventas-tulavita.agentes.json — se crean clientes y suministros; las filas de venta se omiten (sin comercial UUID).\n' +
+        (existsSync(agentExample) ? `Plantilla: ${agentExample}\n` : ''),
     );
-    if (existsSync(agentExample)) {
-      console.error('Plantilla:', agentExample);
-    }
-    process.exit(1);
+  } else {
+    rawAgents = loadJson<Record<string, string>>(agentPath);
   }
-
-  const rawAgents = loadJson<Record<string, string>>(agentPath);
   const agentsMap: AgentMap = {};
   let defaultCommercial: string | null = null;
   for (const [k, vin] of Object.entries(rawAgents)) {

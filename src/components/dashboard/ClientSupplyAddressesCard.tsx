@@ -185,7 +185,20 @@ export default function ClientSupplyAddressesCard({ clientId }: ClientSupplyAddr
             <p className="text-sm text-muted-foreground py-2">No hay puntos de suministro registrados.</p>
           ) : (
             <ul className="space-y-3">
-              {rows.map((r) => (
+              {rows.map((r) => {
+                const lineDraft: SupplyAddressDraft = {
+                  localId: r.id,
+                  dbId: r.id,
+                  label: r.label ?? '',
+                  direccion: r.direccion ?? '',
+                  localidad: r.localidad ?? '',
+                  codigo_postal: r.codigo_postal ?? '',
+                  cups: r.cups ?? '',
+                  note: r.note ?? '',
+                };
+                const addressLine = fullSupplyAddressLine(lineDraft);
+
+                return (
                 <li
                   key={r.id}
                   className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 rounded-lg border bg-muted/15 px-3 py-3 text-sm"
@@ -195,32 +208,17 @@ export default function ClientSupplyAddressesCard({ clientId }: ClientSupplyAddr
                         <p className="font-medium text-foreground">{r.label.trim()}</p>
                       )}
                       <a
-                        href={mapsHref(
-                          fullSupplyAddressLine({
-                            localId: r.id,
-                            dbId: r.id,
-                            label: '',
-                            direccion: r.direccion,
-                            localidad: r.localidad ?? '',
-                            codigo_postal: r.codigo_postal ?? '',
-                            cups: '',
-                            note: '',
-                          }),
-                        )}
+                        href={mapsHref(addressLine || 'España')}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-primary hover:underline inline-flex items-center gap-1"
                       >
                         <MapPin className="h-3.5 w-3.5 shrink-0" />
-                        <span className="break-words">
-                          {r.direccion}
-                          {(r.localidad || r.codigo_postal) &&
-                            `, ${[r.localidad, r.codigo_postal].filter(Boolean).join(', ')}`}
-                        </span>
+                        <span className="break-words">{addressLine || '—'}</span>
                       </a>
-                      {r.cups?.trim() && (
+                      {r.direccion?.trim() && r.cups?.trim() ? (
                         <p className="font-mono text-xs text-muted-foreground">CUPS: {r.cups}</p>
-                      )}
+                      ) : null}
                       {r.note?.trim() && (
                         <p className="text-xs text-muted-foreground whitespace-pre-wrap">{r.note}</p>
                       )}
@@ -240,7 +238,8 @@ export default function ClientSupplyAddressesCard({ clientId }: ClientSupplyAddr
                       </Button>
                     </div>
                   </li>
-                ))}
+                );
+              })}
             </ul>
           )}
         </CardContent>
