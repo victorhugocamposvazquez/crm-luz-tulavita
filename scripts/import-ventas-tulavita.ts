@@ -3,7 +3,7 @@
  *
  * Requisitos:
  *   - Migración 20260509180000_csv_import_clients_supply_sales.sql aplicada.
- *   - .env.local: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+ *   - .env.local (o .env): SUPABASE_URL o VITE_SUPABASE_URL, y SUPABASE_SERVICE_ROLE_KEY (clave service_role del proyecto)
  *   - Copiar scripts/config/ventas-tulavita.agentes.example.json → ventas-tulavita.agentes.json (UUIDs reales)
  *
  * Uso: npm run import:ventas-tulavita
@@ -39,10 +39,9 @@ const MONTHS: Record<string, number> = {
   dic: 11,
 };
 
-function loadDotEnvLocal(): void {
-  const p = join(process.cwd(), '.env.local');
-  if (!existsSync(p)) return;
-  const raw = readFileSync(p, 'utf8');
+function loadDotEnvFile(absPath: string, overrideExisting: boolean): void {
+  if (!existsSync(absPath)) return;
+  const raw = readFileSync(absPath, 'utf8');
   for (const line of raw.split('\n')) {
     const t = line.trim();
     if (!t || t.startsWith('#')) continue;
@@ -52,7 +51,40 @@ function loadDotEnvLocal(): void {
     let v = t.slice(i + 1).trim();
     if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'")))
       v = v.slice(1, -1);
-    process.env[k] = v;
+    if (overrideExisting || process.env[k] === undefined) process.env[k] = v;
+  }
+}
+
+function loadDotEnvLocal(): void {
+  loadDotEnvFile(join(process.cwd(), '.env'), false);
+  loadDotEnvFile(join(process.cwd(), '.env.local'), true);
+}
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/** Evita enviar "" a columnas uuid (Postgres falla). */
+function nilUuid(v: string | null | undefined): string | null {
+  const s = (v ?? '').trim();
+  if (!s || !UUID_RE.test(s)) return null;
+  return s;
+}
+
+/** La anon key no bypass RLS; hace falta service_role. */
+function warnIfNotServiceRole(key: string): void {
+  try {
+    const parts = key.split('.');
+    if (parts.length < 2) return;
+    const json = Buffer.from(parts[1], 'base64url').toString('utf8');
+    const payload = JSON.parse(json) as { role?: string };
+    if (payload.role !== 'service_role') {
+      console.error(
+        '\n❌ El JWT no es service_role (rol:',
+        payload.role,
+        '). Con la clave anon los inserts en clients suelen fallar por RLS.\n   En Supabase: Project Settings → API → service_role (secreta), copia a SUPABASE_SERVICE_ROLE_KEY en .env.local\n',
+      );
+    }
+  } catch {
+    // ignore
   }
 }
 
@@ -174,12 +206,15 @@ async function ensureCompany(sb: ReturnType<typeof createClient<Database>>, name
 
 async function main(): Promise<void> {
   loadDotEnvLocal();
-  const url = process.env.SUPABASE_URL;
+  const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !serviceKey) {
-    console.error('Faltan SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY en .env.local');
+    console.error(
+      'Faltan variables en .env.local (o .env):\n  SUPABASE_URL (o VITE_SUPABASE_URL)\n  SUPABASE_SERVICE_ROLE_KEY  ← debe ser la clave service_role, no la anon',
+    );
     process.exit(1);
   }
+  warnIfNotServiceRole(serviceKey);
 
   const year = Number.parseInt(process.env.VENTAS_IMPORT_YEAR ?? '2025', 10);
   const csvPath =
@@ -205,13 +240,25 @@ async function main(): Promise<void> {
 
   const rawAgents = loadJson<Record<string, string>>(agentPath);
   const agentsMap: AgentMap = {};
+  let defaultCommercial: string | null = null;
   for (const [k, vin] of Object.entries(rawAgents)) {
     if (k.startsWith('_')) continue;
-    agentsMap[k.trim().toUpperCase()] = (vin ?? '').trim();
+    const ku = k.trim().toUpperCase();
+    if (ku === 'DEFAULT') {
+      defaultCommercial = nilUuid(vin);
+      if ((vin ?? '').trim() && !defaultCommercial) {
+        console.warn('⚠️  DEFAULT no es un UUID válido; las ventas sin agente mapeado se omitirán.');
+      }
+      continue;
+    }
+    const id = nilUuid(vin);
+    if ((vin ?? '').trim() && !id) {
+      console.warn(`⚠️  Agente "${k}" tiene valor que no es UUID válido, se ignorará.`);
+    }
+    if (id) agentsMap[ku] = id;
   }
-  const defaultCommercial = agentsMap.DEFAULT || null;
   if (!defaultCommercial) {
-    console.warn('⚠️  DEFAULT vacío en agentes: las ventas sin agente mapeado se omitirán.');
+    console.warn('⚠️  DEFAULT vacío o ausente: las ventas sin agente mapeado se omitirán.');
   }
 
   const companiesCfg = loadJson<CompaniesFile>(
@@ -277,7 +324,27 @@ async function main(): Promise<void> {
     lineIndex++;
   }
 
+  console.log('Resumen CSV:', {
+    archivo: csvPath,
+    filasConCliente: parsedRows.length,
+    empresaPorDefecto: fallbackCo,
+  });
+
   const sb = createClient<Database>(url, serviceKey);
+
+  try {
+    const u = new URL(url);
+    const { error: probeErr, count } = await sb
+      .from('clients')
+      .select('id', { count: 'exact', head: true });
+    if (probeErr) {
+      console.error('No se pudo consultar public.clients:', probeErr.message, '(¿migración aplicada?)');
+      process.exit(1);
+    }
+    console.log('Conexión Supabase OK:', u.host, '| clients (total aprox.):', count ?? '?');
+  } catch {
+    console.log('URL Supabase:', url.slice(0, 36) + '…');
+  }
 
   const canonicalNames = new Set<string>([fallbackCo]);
   for (const r of parsedRows) {
@@ -298,6 +365,8 @@ async function main(): Promise<void> {
     groups.get(key)!.push(r);
   }
 
+  console.log('Grupos cliente (hash nombre+tel):', groups.size);
+
   let clientsCreated = 0;
   let suppliesCreated = 0;
   let suppliesSkippedDup = 0;
@@ -311,8 +380,9 @@ async function main(): Promise<void> {
     const phone = gRows.map((r) => r.telefono).find(Boolean) ?? null;
     const topAgent = modeString(gRows.map((r) => r.agente)) ?? '';
 
-    const commercialId =
-      (topAgent && agentsMap[topAgent]) || defaultCommercial || null;
+    const commercialId = nilUuid(
+      (topAgent && agentsMap[topAgent]) || defaultCommercial || null,
+    );
 
     const { data: existing } = await sb
       .from('clients')
@@ -346,7 +416,7 @@ async function main(): Promise<void> {
       const { data: row, error } = await sb.from('clients').insert(ins).select('id').single();
       if (error) {
         report.push(`ERROR_CLIENT;${nombre};${error.message}`);
-        console.error(error);
+        console.error('Insert client falló:', nombre, error.message, error.code ?? '');
         continue;
       }
       clientId = row.id;
@@ -360,36 +430,41 @@ async function main(): Promise<void> {
       if (isDupSupply) {
         suppliesSkippedDup++;
       } else {
-        if (cupsKey) supplyKeysSeen.add(cupsKey);
-
-        const noteParts = [
-          r.fechaIso ? `Envío ${r.fechaIso}` : null,
-          r.compania ? `Compañía: ${r.compania}` : null,
-          r.euros != null ? `Importe CSV: ${r.euros} €` : null,
-          !r.cups && r.localityHint ? `Ubicación indicada: ${r.localityHint}` : null,
-          `Línea origen: ${r.lineIndex}`,
-        ].filter(Boolean);
-
-        const payload = {
-          client_id: clientId,
-          label: r.tipoEnergy ? `${r.tipoEnergy}` : null,
-          direccion: r.cups ? null : r.localityHint,
-          localidad: r.localityHint && !r.cups ? r.localityHint : null,
-          codigo_postal: null,
-          cups: r.cups,
-          note: noteParts.join(' · '),
-          sort_order: sortOrder++,
-        };
-
-        const { error: se } = await sb.from('client_supply_addresses').insert(payload);
-        if (se) {
-          if (se.code === '23505') {
-            suppliesSkippedDup++;
-          } else {
-            report.push(`ERROR_SUPPLY;L${r.lineIndex};${se.message}`);
-          }
+        const hasSupplyData = Boolean(r.cups || r.localityHint);
+        if (!hasSupplyData) {
+          report.push(`SKIP_SUPPLY;L${r.lineIndex};sin CUPS ni localidad`);
         } else {
-          suppliesCreated++;
+          if (cupsKey) supplyKeysSeen.add(cupsKey);
+
+          const noteParts = [
+            r.fechaIso ? `Envío ${r.fechaIso}` : null,
+            r.compania ? `Compañía: ${r.compania}` : null,
+            r.euros != null ? `Importe CSV: ${r.euros} €` : null,
+            !r.cups && r.localityHint ? `Ubicación indicada: ${r.localityHint}` : null,
+            `Línea origen: ${r.lineIndex}`,
+          ].filter(Boolean);
+
+          const payload = {
+            client_id: clientId,
+            label: r.tipoEnergy ? `${r.tipoEnergy}` : null,
+            direccion: r.cups ? null : r.localityHint,
+            localidad: r.localityHint && !r.cups ? r.localityHint : null,
+            codigo_postal: null,
+            cups: r.cups,
+            note: noteParts.join(' · '),
+            sort_order: sortOrder++,
+          };
+
+          const { error: se } = await sb.from('client_supply_addresses').insert(payload);
+          if (se) {
+            if (se.code === '23505') {
+              suppliesSkippedDup++;
+            } else {
+              report.push(`ERROR_SUPPLY;L${r.lineIndex};${se.message}`);
+            }
+          } else {
+            suppliesCreated++;
+          }
         }
       }
 
@@ -401,8 +476,9 @@ async function main(): Promise<void> {
         continue;
       }
 
-      const saleCommercial =
-        (r.agente && agentsMap[r.agente]) || defaultCommercial || commercialId || null;
+      const saleCommercial = nilUuid(
+        (r.agente && agentsMap[r.agente]) || defaultCommercial || commercialId || null,
+      );
       if (r.euros == null || r.euros <= 0) {
         salesSkipped++;
         continue;
@@ -489,6 +565,17 @@ async function main(): Promise<void> {
     salesCreated,
     salesSkipped,
   });
+  if (clientsCreated === 0 && suppliesCreated === 0 && salesCreated === 0) {
+    console.error(
+      '\nNada se insertó. Revisa el informe (líneas ERROR_*). En SQL Editor:\n  SELECT count(*) FROM public.clients WHERE import_source = \'ventas_tulavita_csv\';\n',
+    );
+  } else {
+    console.log(
+      '\nSolo este lote:\n  SELECT id, nombre_apellidos, import_batch_id FROM public.clients WHERE import_batch_id = \'' +
+        importBatchId +
+        '\';',
+    );
+  }
 }
 
 main().catch((e) => {
