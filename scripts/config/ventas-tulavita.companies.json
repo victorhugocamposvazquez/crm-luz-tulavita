@@ -1,0 +1,20 @@
+{
+  "fallbackCompanyName": "Importación CSV (sin compañía asignada)",
+  "aliases": {
+    "+ENERXIA": "Energía XXI",
+    "ENERXIA": "Energía XXI",
+    "ENERXIA GALEGA": "Energía Gallega",
+    "ENERXIA GALEGA 3,45": "Energía Gallega",
+    "ENERXIA GALEGA 4,6": "Energía Gallega",
+    "NATURGY": "Naturgy",
+    "IBERDROLA": "Iberdrola",
+    "IBERDROLA + STP": "Iberdrola",
+    "ENDESA": "Endesa",
+    "GANA": "Gana Energía",
+    "GANA ": "Gana Energía",
+    "NEXUS": "Nexus",
+    "OCTOPUS": "Octopus Energy",
+    "OCTOPUS ": "Octopus Energy",
+    "UNIELECTRIC": "Unielectric"
+  }
+}

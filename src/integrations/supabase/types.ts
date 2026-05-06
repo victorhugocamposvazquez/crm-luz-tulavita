@@ -186,7 +186,7 @@ export type Database = {
           id: string
           client_id: string
           label: string | null
-          direccion: string
+          direccion: string | null
           localidad: string | null
           codigo_postal: string | null
           cups: string | null
@@ -199,7 +199,7 @@ export type Database = {
           id?: string
           client_id: string
           label?: string | null
-          direccion: string
+          direccion?: string | null
           localidad?: string | null
           codigo_postal?: string | null
           cups?: string | null
@@ -212,7 +212,7 @@ export type Database = {
           id?: string
           client_id?: string
           label?: string | null
-          direccion?: string
+          direccion?: string | null
           localidad?: string | null
           codigo_postal?: string | null
           cups?: string | null
@@ -240,6 +240,9 @@ export type Database = {
           dni: string | null
           email: string | null
           id: string
+          import_batch_id: string | null
+          import_external_key: string | null
+          import_source: string | null
           latitude: number | null
           localidad: string | null
           longitude: number | null
@@ -259,6 +262,9 @@ export type Database = {
           dni?: string | null
           email?: string | null
           id?: string
+          import_batch_id?: string | null
+          import_external_key?: string | null
+          import_source?: string | null
           latitude?: number | null
           localidad?: string | null
           longitude?: number | null
@@ -278,6 +284,9 @@ export type Database = {
           dni?: string | null
           email?: string | null
           id?: string
+          import_batch_id?: string | null
+          import_external_key?: string | null
+          import_source?: string | null
           latitude?: number | null
           localidad?: string | null
           longitude?: number | null

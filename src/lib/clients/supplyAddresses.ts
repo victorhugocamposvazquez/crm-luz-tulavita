@@ -31,7 +31,7 @@ export function draftFromSupplyRow(row: SupplyAddressRow): SupplyAddressDraft {
     localId: row.id,
     dbId: row.id,
     label: row.label ?? '',
-    direccion: row.direccion,
+    direccion: row.direccion ?? '',
     localidad: row.localidad ?? '',
     codigo_postal: row.codigo_postal ?? '',
     cups: row.cups ?? '',
@@ -40,9 +40,10 @@ export function draftFromSupplyRow(row: SupplyAddressRow): SupplyAddressDraft {
 }
 
 function toPayload(d: SupplyAddressDraft, sortOrder: number) {
+  const dir = d.direccion.trim();
   return {
     label: d.label.trim() || null,
-    direccion: d.direccion.trim(),
+    direccion: dir || null,
     localidad: d.localidad.trim() || null,
     codigo_postal: d.codigo_postal.trim() || null,
     cups: d.cups.trim().replace(/\s+/g, '') || null,
@@ -51,13 +52,13 @@ function toPayload(d: SupplyAddressDraft, sortOrder: number) {
   };
 }
 
-/** Mantiene filas en BD alineadas con los borradores del formulario (solo filas con dirección no vacía). */
+/** Mantiene filas en BD alineadas con los borradores del formulario (dirección y/o CUPS). */
 export async function syncClientSupplyAddresses(
   supabase: SupabaseClient<Database>,
   clientId: string,
   drafts: SupplyAddressDraft[],
 ): Promise<{ error: Error | null }> {
-  const valid = drafts.filter((d) => d.direccion.trim().length > 0);
+  const valid = drafts.filter((d) => d.direccion.trim().length > 0 || d.cups.trim().length > 0);
   const { data: existing, error: fetchErr } = await supabase
     .from('client_supply_addresses')
     .select('id')
@@ -93,5 +94,7 @@ export async function syncClientSupplyAddresses(
 
 export function fullSupplyAddressLine(d: SupplyAddressDraft): string {
   const parts = [d.direccion.trim(), d.localidad.trim(), d.codigo_postal.trim()].filter(Boolean);
-  return parts.join(', ');
+  if (parts.length) return parts.join(', ');
+  if (d.cups.trim()) return `CUPS ${d.cups.trim()}`;
+  return '';
 }

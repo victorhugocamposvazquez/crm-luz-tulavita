@@ -1,0 +1,16 @@
+{
+  "_comment": "Copia este fichero como ventas-tulavita.agentes.json y rellena UUID de profiles (mismo id que auth.users). DEFAULT se usa si un agente del CSV no está listado.",
+  "DEFAULT": "",
+  "ROBER": "",
+  "JUAN": "",
+  "ELVIS": "",
+  "RAQUEL": "",
+  "OFICINA": "",
+  "MARCOS": "",
+  "PILLO": "",
+  "YANIRA": "",
+  "ANA": "",
+  "IRIS": "",
+  "REBECA": "",
+  "MANU": ""
+}

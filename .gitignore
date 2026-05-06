@@ -12,6 +12,8 @@ dist
 dist-ssr
 *.local
 supabase-backups
+scripts/config/ventas-tulavita.agentes.json
+csvs/import-report-*.txt
 
 
 # Editor directories and files
