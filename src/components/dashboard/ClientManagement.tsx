@@ -14,7 +14,14 @@ import { UserPlus, Edit, Trash2, Upload, Loader2, Eye, Bell, UserCheck, UserX, U
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { formatCoordinates, parseCoordinates } from '@/lib/coordinates';
-import { normalizeClientData, normalizeDNI, validateDNI } from '@/lib/clientUtils';
+import {
+  clientFiscalAddressLine,
+  clientFiscalAddressMapQuery,
+  direccionForFormInput,
+  normalizeClientData,
+  normalizeDNI,
+  validateDNI,
+} from '@/lib/clientUtils';
 import ClientDetailView from './ClientDetailView';
 import ClientFilters from './ClientFilters';
 import ClientPagination from './ClientPagination';
@@ -827,7 +834,7 @@ export default function ClientManagement() {
                     <Input 
                       id="direccion" 
                       name="direccion" 
-                      defaultValue={editingClient?.direccion || ''}
+                      defaultValue={editingClient ? direccionForFormInput(editingClient.direccion) : ''}
                       required 
                     />
                   </div>
@@ -1061,16 +1068,19 @@ export default function ClientManagement() {
                        </TableCell>
                        <TableCell>
                          {(() => {
-                           // Construir dirección completa
-                           const parts = [client.direccion];
-                           if (client.localidad) parts.push(client.localidad);
-                           if (client.codigo_postal) parts.push(client.codigo_postal);
-                           const fullAddress = parts.filter(part => part?.trim()).join(', ');
-                           
-                           // Usar siempre la dirección completa para Google Maps
+                           const fullAddress = clientFiscalAddressLine(
+                             client.direccion,
+                             client.localidad,
+                             client.codigo_postal,
+                           );
+                           const mapQuery = clientFiscalAddressMapQuery(
+                             client.direccion,
+                             client.localidad,
+                             client.codigo_postal,
+                           );
                            return (
                              <a
-                               href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(fullAddress)}`}
+                               href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(mapQuery)}`}
                                target="_blank"
                                rel="noopener noreferrer"
                                className="text-primary hover:underline cursor-pointer"

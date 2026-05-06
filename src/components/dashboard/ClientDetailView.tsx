@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { formatCoordinates } from '@/lib/coordinates';
+import { clientFiscalAddressLine, clientFiscalAddressMapQuery } from '@/lib/clientUtils';
 import VisitsTable from '@/components/visits/VisitsTable';
 import { calculateCommission, calculateTotalExcludingNulls, calculateSaleCommission, calculateEffectiveAmount } from '@/lib/commission';
 import RemindersTable from '@/components/reminders/RemindersTable';
@@ -454,13 +455,15 @@ const fetchVisits = async () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <div className="flex items-center gap-3 p-4 bg-muted/30 rounded-lg border">
               <MapPinIcon className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-              <a 
-                href={`https://maps.google.com/?q=${encodeURIComponent([client.direccion, client.localidad, client.codigo_postal].filter(Boolean).join(', '))}`}
+              <a
+                href={`https://maps.google.com/?q=${encodeURIComponent(
+                  clientFiscalAddressMapQuery(client.direccion, client.localidad, client.codigo_postal),
+                )}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer hover:underline flex items-center gap-1"
               >
-                {[client.direccion, client.localidad, client.codigo_postal].filter(Boolean).join(', ')}
+                {clientFiscalAddressLine(client.direccion, client.localidad, client.codigo_postal)}
                 <MapPinIcon className="h-3 w-3" />
               </a>
             </div>

@@ -395,7 +395,7 @@ async function main(): Promise<void> {
     } else {
       const ins = {
         nombre_apellidos: nombre.toUpperCase(),
-        direccion: 'Pendiente — importación CSV',
+        direccion: '-',
         localidad: gRows.find((r) => r.localityHint)?.localityHint ?? null,
         codigo_postal: null,
         telefono1: phone,
