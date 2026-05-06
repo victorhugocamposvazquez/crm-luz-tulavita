@@ -11,6 +11,7 @@ interface ClientFiltersProps {
     localidad: string;
     codigo_postal: string;
     telefono: string;
+    cups: string;
     status: string;
     prospect: boolean;
   };
@@ -77,6 +78,14 @@ export default function ClientFilters({ filters, onFilterChange, onClearFilters 
           value={filters.telefono}
           onChange={(e) => onFilterChange('telefono', e.target.value)}
           className="h-8 text-sm col-span-2"
+        />
+
+        <Input
+          placeholder="CUPS (todos los suministros)…"
+          value={filters.cups}
+          onChange={(e) => onFilterChange('cups', e.target.value)}
+          className="h-8 text-sm col-span-2 font-mono"
+          title="Busca en todos los puntos de suministro del cliente (varios CUPS por cliente). Coincidencia parcial; se ignoran espacios al buscar."
         />
 
         <Select value={filters.status || "all"} onValueChange={(value) => onFilterChange('status', value === 'all' ? '' : value)}>

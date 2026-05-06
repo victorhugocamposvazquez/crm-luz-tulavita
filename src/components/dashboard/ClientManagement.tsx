@@ -76,6 +76,7 @@ export default function ClientManagement() {
     localidad: '',
     codigo_postal: '',
     telefono: '',
+    cups: '',
     status: '',
     prospect: false
   });
@@ -198,6 +199,36 @@ export default function ClientManagement() {
     try {
       setLoading(true);
 
+      const cupsNorm = filters.cups.trim().replace(/\s+/g, '');
+      let cupsClientIds: string[] | null = null;
+      if (cupsNorm) {
+        // Todas las filas de suministro del cliente (varios CUPS); PostgREST pagina por defecto.
+        const CUPS_PAGE = 2000;
+        const idSet = new Set<string>();
+        let offset = 0;
+        for (;;) {
+          const { data: slice, error: supplyErr } = await supabase
+            .from('client_supply_addresses')
+            .select('client_id')
+            .not('cups', 'is', null)
+            .ilike('cups', `%${cupsNorm}%`)
+            .range(offset, offset + CUPS_PAGE - 1);
+          if (supplyErr) throw supplyErr;
+          const rows = slice ?? [];
+          for (const r of rows) {
+            idSet.add(r.client_id);
+          }
+          if (rows.length < CUPS_PAGE) break;
+          offset += CUPS_PAGE;
+        }
+        cupsClientIds = [...idSet];
+        if (cupsClientIds.length === 0) {
+          setClients([]);
+          setTotalItems(0);
+          return;
+        }
+      }
+
       const adminEmbedSelect =
         '*, assigned_commercial:profiles!clients_assigned_commercial_id_fkey(first_name, last_name, email)';
 
@@ -222,6 +253,9 @@ export default function ClientManagement() {
           q = q.or(
             `telefono1.ilike.%${filters.telefono.trim()}%,telefono2.ilike.%${filters.telefono.trim()}%`,
           );
+        }
+        if (cupsClientIds) {
+          q = q.in('id', cupsClientIds);
         }
         if (filters.status.trim()) {
           q = q.eq('status', filters.status.trim());
@@ -571,6 +605,7 @@ export default function ClientManagement() {
       localidad: '',
       codigo_postal: '',
       telefono: '',
+      cups: '',
       status: '',
       prospect: false
     });
