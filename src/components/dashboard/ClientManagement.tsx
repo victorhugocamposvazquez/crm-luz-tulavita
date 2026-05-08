@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { UserPlus, Edit, Trash2, Upload, Loader2, Eye, Bell, UserCheck, UserX, User } from 'lucide-react';
@@ -68,6 +68,7 @@ export default function ClientManagement() {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
+  const [detailRefreshNonce, setDetailRefreshNonce] = useState(0);
   const [reminderDialogOpen, setReminderDialogOpen] = useState(false);
   const [selectedClient, setSelectedClient] = useState<{ id: string; name: string } | null>(null);
   
@@ -404,6 +405,9 @@ export default function ClientManagement() {
           title: "Cliente actualizado",
           description: "El cliente ha sido actualizado exitosamente",
         });
+        if (selectedClientId === editingClient.id) {
+          setDetailRefreshNonce((n) => n + 1);
+        }
       } else {
         const { data: created, error } = await supabase
           .from('clients')
@@ -761,16 +765,23 @@ export default function ClientManagement() {
 
   // Remove the loading wrapper that hides everything
 
-  if (selectedClientId) {
-    return (
-      <ClientDetailView 
-        clientId={selectedClientId} 
-        onBack={() => setSelectedClientId(null)} 
-      />
-    );
-  }
-
   return (
+    <>
+      {selectedClientId ? (
+        <ClientDetailView
+          clientId={selectedClientId}
+          onBack={() => setSelectedClientId(null)}
+          refreshNonce={detailRefreshNonce}
+          onRequestEdit={
+            isAdmin
+              ? (c) => {
+                  setEditingClient(c as Client);
+                  setDialogOpen(true);
+                }
+              : undefined
+          }
+        />
+      ) : (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
@@ -780,213 +791,15 @@ export default function ClientManagement() {
         <div className="flex space-x-2">
           {/* Only show admin buttons for admins */}
           {isAdmin && (
-            <>
-              {/* Create client dialog */}
-              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button onClick={() => setEditingClient(null)}>
-                    <UserPlus className="mr-2 h-4 w-4" />
-                    Nuevo cliente
-                  </Button>
-                </DialogTrigger>
-            <DialogContent
-              className="max-w-3xl max-h-[90vh] overflow-y-auto"
-              onPointerDownOutside={(e) => {
-                if (
-                  (e.target as HTMLElement).closest?.(
-                    '.client-form-commercial-select-content',
-                  )
-                ) {
-                  e.preventDefault();
-                }
-              }}
-              onInteractOutside={(e) => {
-                if (
-                  (e.target as HTMLElement).closest?.(
-                    '.client-form-commercial-select-content',
-                  )
-                ) {
-                  e.preventDefault();
-                }
+            <Button
+              onClick={() => {
+                setEditingClient(null);
+                setDialogOpen(true);
               }}
             >
-              <DialogHeader>
-                <DialogTitle>
-                  {editingClient ? 'Editar cliente' : 'Crear nuevo cliente'}
-                </DialogTitle>
-                <DialogDescription>
-                  {editingClient ? 'Modifica los datos del cliente' : 'Añade un nuevo cliente al sistema'}
-                </DialogDescription>
-              </DialogHeader>
-              <form onSubmit={handleSubmit}>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="nombre_apellidos">Nombre y Apellidos *</Label>
-                    <Input 
-                      id="nombre_apellidos" 
-                      name="nombre_apellidos" 
-                      defaultValue={editingClient?.nombre_apellidos || ''}
-                      required 
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="direccion">Dirección *</Label>
-                    <Input 
-                      id="direccion" 
-                      name="direccion" 
-                      defaultValue={editingClient ? direccionForFormInput(editingClient.direccion) : ''}
-                      required 
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="localidad">Localidad *</Label>
-                      <Input 
-                        id="localidad" 
-                        name="localidad" 
-                        defaultValue={editingClient?.localidad || ''}
-                        required 
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="codigo_postal">Código Postal *</Label>
-                      <Input 
-                        id="codigo_postal" 
-                        name="codigo_postal" 
-                        defaultValue={editingClient?.codigo_postal || ''}
-                        required 
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                     <div className="space-y-2">
-                       <Label htmlFor="dni">DNI</Label>
-                       <Input 
-                         id="dni" 
-                         name="dni" 
-                         defaultValue={editingClient?.dni || ''}
-                       />
-                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input 
-                        id="email" 
-                        name="email" 
-                        type="email"
-                        defaultValue={editingClient?.email || ''}
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="telefono1">Teléfono 1</Label>
-                      <Input 
-                        id="telefono1" 
-                        name="telefono1" 
-                        defaultValue={editingClient?.telefono1 || ''}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="telefono2">Teléfono 2</Label>
-                      <Input 
-                        id="telefono2" 
-                        name="telefono2" 
-                        defaultValue={editingClient?.telefono2 || ''}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="assigned_commercial">Comercial asignado</Label>
-                    <Select
-                      key={`commercial-${editingClient?.id ?? 'new'}`}
-                      value={assignedCommercialId}
-                      onValueChange={setAssignedCommercialId}
-                    >
-                      <SelectTrigger id="assigned_commercial">
-                        <SelectValue placeholder="Sin asignar" />
-                      </SelectTrigger>
-                      <SelectContent className="z-[300] client-form-commercial-select-content">
-                        <SelectItem value="__none__">Sin asignar</SelectItem>
-                        {commercialSelectOptions.map((u) => (
-                          <SelectItem key={u.id} value={u.id}>
-                            {u.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="note">Nota</Label>
-                    <Textarea 
-                      id="note" 
-                      name="note" 
-                      placeholder="Add a note about this client..."
-                      defaultValue={editingClient?.note || ''}
-                    />
-                  </div>
-                  <ClientSupplyAddressesEditor
-                    value={supplyDrafts}
-                    onChange={applySupplyDrafts}
-                    disabled={supplyFormLoading}
-                  />
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="latitude">Latitud</Label>
-                        <Input 
-                          id="latitude" 
-                          name="latitude" 
-                          type="text"
-                          placeholder="43°16'59.7&quot;N"
-                          defaultValue={editingClient?.latitude && editingClient?.longitude ? formatCoordinates(editingClient.latitude, editingClient.longitude).split(' ')[0] : ''}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="longitude">Longitud</Label>
-                        <Input 
-                          id="longitude" 
-                          name="longitude" 
-                          type="text"
-                          placeholder="1°40'39.8&quot;W"
-                          defaultValue={editingClient?.latitude && editingClient?.longitude ? formatCoordinates(editingClient.latitude, editingClient.longitude).split(' ')[1] : ''}
-                        />
-                      </div>
-                    </div>
-                    <MapSelector
-                      latitude={editingClient?.latitude}
-                      longitude={editingClient?.longitude}
-                      onCoordinatesSelect={(lat, lng) => {
-                        const latInput = document.getElementById('latitude') as HTMLInputElement;
-                        const lngInput = document.getElementById('longitude') as HTMLInputElement;
-                        const coordinates = formatCoordinates(lat, lng);
-                        const [latDMS, lngDMS] = coordinates.split(' ');
-                        if (latInput) latInput.value = latDMS;
-                        if (lngInput) lngInput.value = lngDMS;
-                      }}
-                    />
-                  </div>
-                </div>
-                <DialogFooter className="mt-6">
-                  <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
-                    Cancelar
-                  </Button>
-                  <Button type="submit" disabled={!!editingClient && supplyFormLoading}>
-                    {editingClient && supplyFormLoading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Cargando suministros…
-                      </>
-                    ) : editingClient ? (
-                      'Actualizar'
-                    ) : (
-                      'Crear cliente'
-                    )}
-                  </Button>
-                </DialogFooter>
-              </form>
-            </DialogContent>
-          </Dialog>
-            </>
+              <UserPlus className="mr-2 h-4 w-4" />
+              Nuevo cliente
+            </Button>
           )}
         </div>
       </div>
@@ -1291,5 +1104,218 @@ export default function ClientManagement() {
         </DialogContent>
       </Dialog>
     </div>
+      )}
+
+      {isAdmin && (
+        <Dialog
+          open={dialogOpen}
+          onOpenChange={(open) => {
+            setDialogOpen(open);
+            if (!open) setEditingClient(null);
+          }}
+        >
+          <DialogContent
+            className="max-w-3xl max-h-[90vh] overflow-y-auto"
+            onPointerDownOutside={(e) => {
+              if (
+                (e.target as HTMLElement).closest?.(
+                  '.client-form-commercial-select-content',
+                )
+              ) {
+                e.preventDefault();
+              }
+            }}
+            onInteractOutside={(e) => {
+              if (
+                (e.target as HTMLElement).closest?.(
+                  '.client-form-commercial-select-content',
+                )
+              ) {
+                e.preventDefault();
+              }
+            }}
+          >
+            <DialogHeader>
+              <DialogTitle>
+                {editingClient ? 'Editar cliente' : 'Crear nuevo cliente'}
+              </DialogTitle>
+              <DialogDescription>
+                {editingClient ? 'Modifica los datos del cliente' : 'Añade un nuevo cliente al sistema'}
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleSubmit}>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="nombre_apellidos">Nombre y Apellidos *</Label>
+                  <Input
+                    id="nombre_apellidos"
+                    name="nombre_apellidos"
+                    defaultValue={editingClient?.nombre_apellidos || ''}
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="direccion">Dirección *</Label>
+                  <Input
+                    id="direccion"
+                    name="direccion"
+                    defaultValue={editingClient ? direccionForFormInput(editingClient.direccion) : ''}
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="localidad">Localidad *</Label>
+                    <Input
+                      id="localidad"
+                      name="localidad"
+                      defaultValue={editingClient?.localidad || ''}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="codigo_postal">Código Postal *</Label>
+                    <Input
+                      id="codigo_postal"
+                      name="codigo_postal"
+                      defaultValue={editingClient?.codigo_postal || ''}
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="dni">DNI</Label>
+                    <Input id="dni" name="dni" defaultValue={editingClient?.dni || ''} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      defaultValue={editingClient?.email || ''}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="telefono1">Teléfono 1</Label>
+                    <Input
+                      id="telefono1"
+                      name="telefono1"
+                      defaultValue={editingClient?.telefono1 || ''}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="telefono2">Teléfono 2</Label>
+                    <Input
+                      id="telefono2"
+                      name="telefono2"
+                      defaultValue={editingClient?.telefono2 || ''}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="assigned_commercial">Comercial asignado</Label>
+                  <Select
+                    key={`commercial-${editingClient?.id ?? 'new'}`}
+                    value={assignedCommercialId}
+                    onValueChange={setAssignedCommercialId}
+                  >
+                    <SelectTrigger id="assigned_commercial">
+                      <SelectValue placeholder="Sin asignar" />
+                    </SelectTrigger>
+                    <SelectContent className="z-[300] client-form-commercial-select-content">
+                      <SelectItem value="__none__">Sin asignar</SelectItem>
+                      {commercialSelectOptions.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="note">Nota</Label>
+                  <Textarea
+                    id="note"
+                    name="note"
+                    placeholder="Add a note about this client..."
+                    defaultValue={editingClient?.note || ''}
+                  />
+                </div>
+                <ClientSupplyAddressesEditor
+                  value={supplyDrafts}
+                  onChange={applySupplyDrafts}
+                  disabled={supplyFormLoading}
+                />
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="latitude">Latitud</Label>
+                      <Input
+                        id="latitude"
+                        name="latitude"
+                        type="text"
+                        placeholder="43°16'59.7&quot;N"
+                        defaultValue={
+                          editingClient?.latitude && editingClient?.longitude
+                            ? formatCoordinates(editingClient.latitude, editingClient.longitude).split(' ')[0]
+                            : ''
+                        }
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="longitude">Longitud</Label>
+                      <Input
+                        id="longitude"
+                        name="longitude"
+                        type="text"
+                        placeholder="1°40'39.8&quot;W"
+                        defaultValue={
+                          editingClient?.latitude && editingClient?.longitude
+                            ? formatCoordinates(editingClient.latitude, editingClient.longitude).split(' ')[1]
+                            : ''
+                        }
+                      />
+                    </div>
+                  </div>
+                  <MapSelector
+                    latitude={editingClient?.latitude}
+                    longitude={editingClient?.longitude}
+                    onCoordinatesSelect={(lat, lng) => {
+                      const latInput = document.getElementById('latitude') as HTMLInputElement;
+                      const lngInput = document.getElementById('longitude') as HTMLInputElement;
+                      const coordinates = formatCoordinates(lat, lng);
+                      const [latDMS, lngDMS] = coordinates.split(' ');
+                      if (latInput) latInput.value = latDMS;
+                      if (lngInput) lngInput.value = lngDMS;
+                    }}
+                  />
+                </div>
+              </div>
+              <DialogFooter className="mt-6">
+                <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={!!editingClient && supplyFormLoading}>
+                  {editingClient && supplyFormLoading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Cargando suministros…
+                    </>
+                  ) : editingClient ? (
+                    'Actualizar'
+                  ) : (
+                    'Crear cliente'
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
+    </>
   );
 }

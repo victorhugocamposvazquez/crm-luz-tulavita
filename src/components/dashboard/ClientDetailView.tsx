@@ -10,7 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { ArrowLeft, MapPin, Calendar, DollarSign, TrendingUp, Building2, Phone, Mail, MapPinIcon, Eye, Euro, Bell, User } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, DollarSign, TrendingUp, Building2, Phone, Mail, MapPinIcon, Euro, Bell, User, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
@@ -37,6 +37,8 @@ interface Client {
   longitude?: number;
   status?: 'active' | 'inactive';
   note?: string;
+  prospect?: boolean;
+  created_at?: string;
   assigned_commercial_id?: string | null;
   assigned_commercial?: {
     first_name: string | null;
@@ -115,9 +117,17 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 interface ClientDetailViewProps {
   clientId: string;
   onBack: () => void;
+  /** Incrementar desde el padre tras guardar el formulario de edición para refrescar la ficha. */
+  refreshNonce?: number;
+  onRequestEdit?: (client: Client) => void;
 }
 
-export default function ClientDetailView({ clientId, onBack }: ClientDetailViewProps) {
+export default function ClientDetailView({
+  clientId,
+  onBack,
+  refreshNonce = 0,
+  onRequestEdit,
+}: ClientDetailViewProps) {
   const { userRole } = useAuth();
   
   const [client, setClient] = useState<Client | null>(null);
@@ -137,7 +147,7 @@ export default function ClientDetailView({ clientId, onBack }: ClientDetailViewP
     if (clientId) {
       fetchClientData();
     }
-  }, [clientId]);
+  }, [clientId, refreshNonce]);
 
   const fetchClientData = async () => {
     setLoading(true);
@@ -441,6 +451,12 @@ const fetchVisits = async () => {
           <h1 className="text-3xl font-bold text-foreground">{client.nombre_apellidos}</h1>
           <p className="text-muted-foreground">Detalle completo del cliente</p>
         </div>
+        {onRequestEdit && (
+          <Button type="button" variant="outline" onClick={() => onRequestEdit(client)}>
+            <Pencil className="h-4 w-4 mr-2" />
+            Editar
+          </Button>
+        )}
       </div>
 
       {/* Información básica del cliente */}
@@ -516,9 +532,9 @@ const fetchVisits = async () => {
                     <>
                       {(() => {
                         const name = [client.assigned_commercial.first_name, client.assigned_commercial.last_name]
+                          .map((x) => (x == null ? '' : String(x)).trim())
                           .filter(Boolean)
-                          .join(' ')
-                          .trim();
+                          .join(' ');
                         const email = client.assigned_commercial.email;
                         return (
                           <>
