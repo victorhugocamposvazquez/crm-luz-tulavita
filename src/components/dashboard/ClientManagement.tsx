@@ -84,6 +84,7 @@ export default function ClientManagement() {
     localidad: '',
     codigo_postal: '',
     telefono: '',
+    email: '',
     cups: '',
     status: '',
     prospect: false
@@ -114,7 +115,7 @@ export default function ClientManagement() {
 
   const isAdmin = userRole?.role === 'admin';
   const totalPages = Math.ceil(totalItems / pageSize);
-  const tableColCount = isAdmin ? 8 : 7;
+  const tableColCount = isAdmin ? 9 : 8;
 
   const [assignedCommercialId, setAssignedCommercialId] = useState<string>('__none__');
   const [commercialUsers, setCommercialUsers] = useState<Array<{ id: string; label: string }>>([]);
@@ -261,6 +262,9 @@ export default function ClientManagement() {
           q = q.or(
             `telefono1.ilike.%${filters.telefono.trim()}%,telefono2.ilike.%${filters.telefono.trim()}%`,
           );
+        }
+        if (filters.email.trim()) {
+          q = q.ilike('email', `%${filters.email.trim()}%`);
         }
         if (cupsClientIds) {
           q = q.in('id', cupsClientIds);
@@ -616,6 +620,7 @@ export default function ClientManagement() {
       localidad: '',
       codigo_postal: '',
       telefono: '',
+      email: '',
       cups: '',
       status: '',
       prospect: false
@@ -828,6 +833,7 @@ export default function ClientManagement() {
                       <TableHead>Dirección</TableHead>
                       <TableHead>Coordenadas</TableHead>
                       <TableHead>Teléfono</TableHead>
+                      <TableHead>Correo</TableHead>
                       {isAdmin && <TableHead>Comercial</TableHead>}
                       <TableHead>Acciones</TableHead>
               </TableRow>
@@ -946,6 +952,20 @@ export default function ClientManagement() {
                          )}
                       </TableCell>
                       <TableCell>{client.telefono1 || '-'}</TableCell>
+                      <TableCell className="max-w-[200px]">
+                        {client.email?.trim() ? (
+                          <a
+                            href={`mailto:${client.email.trim()}`}
+                            className="text-primary hover:underline truncate block"
+                            title={client.email}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {client.email}
+                          </a>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
                       {isAdmin && (
                         <TableCell className="max-w-[200px] text-sm text-muted-foreground">
                           {client.assigned_commercial ? (
@@ -1189,7 +1209,7 @@ export default function ClientManagement() {
                     <Input id="dni" name="dni" defaultValue={editingClient?.dni || ''} />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
+                    <Label htmlFor="email">Correo electrónico</Label>
                     <Input
                       id="email"
                       name="email"

@@ -11,6 +11,7 @@ interface ClientFiltersProps {
     localidad: string;
     codigo_postal: string;
     telefono: string;
+    email: string;
     cups: string;
     status: string;
     prospect: boolean;
@@ -78,6 +79,16 @@ export default function ClientFilters({ filters, onFilterChange, onClearFilters 
           value={filters.telefono}
           onChange={(e) => onFilterChange('telefono', e.target.value)}
           className="h-8 text-sm col-span-2"
+        />
+
+        <Input
+          placeholder="Correo…"
+          type="search"
+          autoComplete="off"
+          value={filters.email}
+          onChange={(e) => onFilterChange('email', e.target.value)}
+          className="h-8 text-sm col-span-2"
+          title="Busca por correo del cliente (coincidencia parcial)"
         />
 
         <Input

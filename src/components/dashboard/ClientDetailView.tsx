@@ -509,12 +509,19 @@ const fetchVisits = async () => {
                 <span className="text-sm">{client.telefono2}</span>
               </div>
             )}
-            {client.email && (
-              <div className="flex items-center gap-3 p-4 bg-muted/30 rounded-lg border">
-                <Mail className="h-5 w-5 text-muted-foreground flex-shrink-0" />
-                <span className="text-sm">{client.email}</span>
-              </div>
-            )}
+            <div className="flex items-center gap-3 p-4 bg-muted/30 rounded-lg border">
+              <Mail className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+              {client.email?.trim() ? (
+                <a
+                  href={`mailto:${client.email.trim()}`}
+                  className="text-sm text-blue-600 hover:text-blue-800 hover:underline break-all"
+                >
+                  {client.email.trim()}
+                </a>
+              ) : (
+                <span className="text-sm text-muted-foreground">—</span>
+              )}
+            </div>
             {client.dni && (
               <div className="flex items-center gap-3 p-4 bg-muted/30 rounded-lg border">
                 <span className="text-sm font-medium flex-shrink-0">DNI:</span>
