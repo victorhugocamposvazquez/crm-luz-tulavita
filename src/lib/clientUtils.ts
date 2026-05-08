@@ -95,16 +95,45 @@ export function normalizeName(name: string): string {
 }
 
 /**
+ * Normalizes an IBAN: removes spaces and uppercases. Returns null if empty.
+ * Does not validate the checksum, just normalizes shape.
+ */
+export function normalizeIBAN(iban: string | null | undefined): string | null {
+  if (!iban) return null;
+  const t = iban.replace(/\s+/g, '').toUpperCase();
+  return t || null;
+}
+
+/**
+ * Lightweight IBAN validation: 15-34 chars, starts with 2 letters + 2 digits.
+ * Does NOT do full mod-97 (sufficient for legacy data; UI only blocks evidently broken values).
+ */
+export function validateIBAN(iban: string | null | undefined): boolean {
+  const t = normalizeIBAN(iban);
+  if (!t) return false;
+  if (t.length < 15 || t.length > 34) return false;
+  return /^[A-Z]{2}\d{2}[A-Z0-9]+$/.test(t);
+}
+
+/** Display IBAN with groups of 4 (ES12 3456 7890 1234 5678 9012). */
+export function formatIBAN(iban: string | null | undefined): string {
+  const t = normalizeIBAN(iban);
+  if (!t) return '';
+  return t.replace(/(.{4})/g, '$1 ').trim();
+}
+
+/**
  * Normalizes client data for creation or update
  * @param clientData - The client data object
  * @returns The normalized client data
  */
-export function normalizeClientData<T extends { nombre_apellidos: string; dni?: string | null }>(
-  clientData: T
-): T {
+export function normalizeClientData<
+  T extends { nombre_apellidos: string; dni?: string | null; iban?: string | null },
+>(clientData: T): T {
   return {
     ...clientData,
     nombre_apellidos: normalizeName(clientData.nombre_apellidos),
     dni: normalizeDNI(clientData.dni),
+    iban: normalizeIBAN(clientData.iban),
   };
 }

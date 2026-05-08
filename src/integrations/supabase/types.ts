@@ -239,6 +239,7 @@ export type Database = {
           direccion: string
           dni: string | null
           email: string | null
+          iban: string | null
           id: string
           import_batch_id: string | null
           import_external_key: string | null
@@ -261,6 +262,7 @@ export type Database = {
           direccion: string
           dni?: string | null
           email?: string | null
+          iban?: string | null
           id?: string
           import_batch_id?: string | null
           import_external_key?: string | null
@@ -283,6 +285,7 @@ export type Database = {
           direccion?: string
           dni?: string | null
           email?: string | null
+          iban?: string | null
           id?: string
           import_batch_id?: string | null
           import_external_key?: string | null

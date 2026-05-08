@@ -10,12 +10,12 @@ import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { ArrowLeft, MapPin, Calendar, DollarSign, TrendingUp, Building2, Phone, Mail, MapPinIcon, Euro, Bell, User, Pencil } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, DollarSign, TrendingUp, Building2, Phone, Mail, MapPinIcon, Euro, Bell, User, Pencil, Landmark } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { formatCoordinates } from '@/lib/coordinates';
-import { clientFiscalAddressLine, clientFiscalAddressMapQuery } from '@/lib/clientUtils';
+import { clientFiscalAddressLine, clientFiscalAddressMapQuery, formatIBAN } from '@/lib/clientUtils';
 import VisitsTable from '@/components/visits/VisitsTable';
 import { calculateCommission, calculateTotalExcludingNulls, calculateSaleCommission, calculateEffectiveAmount } from '@/lib/commission';
 import RemindersTable from '@/components/reminders/RemindersTable';
@@ -33,6 +33,7 @@ interface Client {
   telefono2?: string;
   email?: string;
   dni?: string;
+  iban?: string;
   latitude?: number;
   longitude?: number;
   status?: 'active' | 'inactive';
@@ -526,6 +527,15 @@ const fetchVisits = async () => {
               <div className="flex items-center gap-3 p-4 bg-muted/30 rounded-lg border">
                 <span className="text-sm font-medium flex-shrink-0">DNI:</span>
                 <span className="text-sm">{client.dni}</span>
+              </div>
+            )}
+            {client.iban && (
+              <div className="flex items-center gap-3 p-4 bg-muted/30 rounded-lg border">
+                <Landmark className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                <div className="text-sm min-w-0">
+                  <span className="font-medium text-muted-foreground block text-xs mb-0.5">IBAN</span>
+                  <span className="font-mono break-all">{formatIBAN(client.iban)}</span>
+                </div>
               </div>
             )}
             {isAdmin && (

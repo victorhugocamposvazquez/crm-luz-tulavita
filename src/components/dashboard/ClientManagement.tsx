@@ -21,6 +21,7 @@ import {
   normalizeClientData,
   normalizeDNI,
   validateDNI,
+  validateIBAN,
 } from '@/lib/clientUtils';
 import ClientDetailView from './ClientDetailView';
 import ClientFilters from './ClientFilters';
@@ -44,6 +45,7 @@ interface Client {
   telefono2?: string;
   email?: string;
   dni?: string;
+  iban?: string;
   latitude?: number;
   longitude?: number;
   created_at: string;
@@ -342,6 +344,7 @@ export default function ClientManagement() {
     const rawClientData = {
       nombre_apellidos: formData.get('nombre_apellidos') as string,
       dni: formData.get('dni') as string || null,
+      iban: formData.get('iban') as string || null,
       direccion: formData.get('direccion') as string,
       localidad: formData.get('localidad') as string,
       codigo_postal: formData.get('codigo_postal') as string,
@@ -359,6 +362,15 @@ export default function ClientManagement() {
         title: "Error",
         description: "El DNI debe tener al menos 8 caracteres y contener al menos una letra",
         variant: "destructive",
+      });
+      return;
+    }
+
+    if (rawClientData.iban && !validateIBAN(rawClientData.iban)) {
+      toast({
+        title: 'IBAN no válido',
+        description: 'Comprueba el formato (p. ej. ES12 3456 7890 1234 5678 9012).',
+        variant: 'destructive',
       });
       return;
     }
@@ -1235,6 +1247,17 @@ export default function ClientManagement() {
                       defaultValue={editingClient?.telefono2 || ''}
                     />
                   </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="iban">IBAN</Label>
+                  <Input
+                    id="iban"
+                    name="iban"
+                    placeholder="ES12 3456 7890 1234 5678 9012"
+                    defaultValue={editingClient?.iban || ''}
+                    className="font-mono uppercase"
+                    autoComplete="off"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="assigned_commercial">Comercial asignado</Label>
