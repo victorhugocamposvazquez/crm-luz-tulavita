@@ -38,9 +38,9 @@ import { randomUUID } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 import Papa from 'papaparse';
 import type { Database } from '../src/integrations/supabase/types';
-import { COMERCIALIZADORA_IBERDROLA_CLIENTES_SA_U } from '../src/constants/crm-comercializadoras';
+import { COMERCIALIZADORA_IBERDROLA_CLIENTES_SA_U, IMPORT_SOURCE_IBERDROLA_OPERACIONES_CSV } from '../src/constants/crm-comercializadoras';
 
-const IMPORT_SOURCE = 'iberdrola_operaciones_csv';
+const IMPORT_SOURCE = IMPORT_SOURCE_IBERDROLA_OPERACIONES_CSV;
 
 function loadDotEnvFile(absPath: string, overrideExisting: boolean): void {
   if (!existsSync(absPath)) return;

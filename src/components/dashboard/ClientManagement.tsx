@@ -33,6 +33,16 @@ import { ComercializadoraCombobox } from '@/components/dashboard/Comercializador
 import type { SupplyAddressDraft } from '@/lib/clients/supplyAddresses';
 import { draftFromSupplyRow, syncClientSupplyAddresses } from '@/lib/clients/supplyAddresses';
 import type { Database } from '@/integrations/supabase/types';
+import {
+  COMERCIALIZADORA_IBERDROLA_CLIENTES_SA_U,
+  IMPORT_SOURCE_IBERDROLA_OPERACIONES_CSV,
+} from '@/constants/crm-comercializadoras';
+
+function matchesIberdrolaComercializadoraFilter(value: string): boolean {
+  const v = value.trim().normalize('NFD').replace(/\p{M}/gu, '');
+  const ib = COMERCIALIZADORA_IBERDROLA_CLIENTES_SA_U.normalize('NFD').replace(/\p{M}/gu, '');
+  return v.localeCompare(ib, 'es', { sensitivity: 'base' }) === 0;
+}
 
 type ClientTableUpdate = Database['public']['Tables']['clients']['Update'];
 
@@ -288,7 +298,16 @@ export default function ClientManagement() {
           q = q.eq('prospect', true);
         }
         if (filters.comercializadora.trim()) {
-          q = q.eq('comercializadora', filters.comercializadora.trim());
+          const com = filters.comercializadora.trim();
+          // Iberdrola: incluir clientes del CSV aunque `comercializadora` siga NULL (datos previos al backfill).
+          if (matchesIberdrolaComercializadoraFilter(com)) {
+            const quoted = `"${COMERCIALIZADORA_IBERDROLA_CLIENTES_SA_U.replace(/"/g, '""')}"`;
+            q = q.or(
+              `comercializadora.eq.${quoted},import_source.eq.${IMPORT_SOURCE_IBERDROLA_OPERACIONES_CSV}`,
+            );
+          } else {
+            q = q.ilike('comercializadora', com);
+          }
         }
         const from = (currentPage - 1) * pageSize;
         const to = from + pageSize - 1;
