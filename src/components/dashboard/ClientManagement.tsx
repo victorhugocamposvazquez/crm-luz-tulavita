@@ -30,9 +30,33 @@ import { MapSelector } from '@/components/ui/map-selector';
 import ReminderDialog from '@/components/reminders/ReminderDialog';
 import ClientSupplyAddressesEditor from './ClientSupplyAddressesEditor';
 import { ComercializadoraCombobox } from '@/components/dashboard/ComercializadoraCombobox';
+import type { Database } from '@/integrations/supabase/types';
 import type { SupplyAddressDraft } from '@/lib/clients/supplyAddresses';
 import { draftFromSupplyRow, syncClientSupplyAddresses } from '@/lib/clients/supplyAddresses';
-import type { Database } from '@/integrations/supabase/types';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { COMERCIALIZADORA_IBERDROLA_CLIENTES_SA_U } from '@/constants/crm-comercializadoras';
+import {
+  type IberdrolaCsvRow,
+  mapPapaRowsToIberdrolaParsed,
+  runIberdrolaCsvImport,
+  validateIberdrolaCsvHeaders,
+} from '@/lib/clients/iberdrolaImportCore';
+
+function normalizeCsvHeader(h: string): string {
+  return h.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().trim();
+}
+
+function pickCsvCell(row: Record<string, string>, headers: string[], aliases: string[]): string {
+  for (const a of aliases) {
+    const na = normalizeCsvHeader(a);
+    const key = headers.find((hdr) => normalizeCsvHeader(hdr) === na);
+    if (key != null) {
+      const v = row[key];
+      if (v != null && String(v).trim()) return String(v).trim();
+    }
+  }
+  return '';
+}
 
 function intersectStringSets(a: string[], b: string[]): string[] {
   const bs = new Set(b);
@@ -75,6 +99,10 @@ export default function ClientManagement() {
   const [editingCoordinates, setEditingCoordinates] = useState<{id: string, coordinates: string} | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [csvImportMode, setCsvImportMode] = useState<'iberdrola' | 'simple'>('iberdrola');
+  const [csvImportComercializadora, setCsvImportComercializadora] = useState<string | null>(
+    COMERCIALIZADORA_IBERDROLA_CLIENTES_SA_U,
+  );
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const [detailRefreshNonce, setDetailRefreshNonce] = useState(0);
@@ -550,115 +578,154 @@ export default function ClientManagement() {
     }
   };
 
-  const handleFileUpload = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleCsvImport = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
     const file = formData.get('file') as File;
 
-    if (!file) {
+    if (!file?.size) {
       toast({
-        title: "Error",
-        description: "Por favor selecciona un archivo CSV o Excel",
-        variant: "destructive",
+        title: 'Error',
+        description: 'Selecciona un archivo CSV.',
+        variant: 'destructive',
       });
       return;
     }
 
+    const mode = csvImportMode;
+    const comercializadoraImport = csvImportComercializadora;
     setUploading(true);
 
-    try {
-      Papa.parse(file, {
-        header: false,
-        skipEmptyLines: true,
-        complete: async (results) => {
+    Papa.parse(file, {
+      header: true,
+      skipEmptyLines: true,
+      transformHeader: (h) => h.replace(/^\uFEFF/, '').trim(),
+      complete: (results) => {
+        void (async () => {
           try {
-            const rows = results.data as string[][];
-            
-            if (rows.length < 2) {
-              toast({
-                title: "Error en el archivo",
-                description: "El archivo debe contener al menos una fila de datos además del encabezado",
-                variant: "destructive",
+            const fh = results.meta.fields ?? [];
+
+            if (mode === 'iberdrola') {
+              const headerErr = validateIberdrolaCsvHeaders(fh);
+              if (headerErr) {
+                toast({
+                  title: 'CSV Iberdrola inválido',
+                  description: headerErr,
+                  variant: 'destructive',
+                });
+                return;
+              }
+              const rows = mapPapaRowsToIberdrolaParsed((results.data ?? []) as IberdrolaCsvRow[]);
+              if (rows.length === 0) {
+                toast({
+                  title: 'Sin filas',
+                  description: 'No hay operaciones con columna ID rellena.',
+                  variant: 'destructive',
+                });
+                return;
+              }
+              const batchId = crypto.randomUUID();
+              const stats = await runIberdrolaCsvImport(supabase, rows, batchId, {
+                comercializadora: comercializadoraImport,
               });
+              toast({
+                title: 'Importación Iberdrola completada',
+                description: `Nuevos: ${stats.clientsInserted} · Reutilizados (filas): ${stats.clientsReused} · Suministros: ${stats.suppliesInserted} · Sin CUPS: ${stats.skippedNoCups} · Errores: ${stats.errors}`,
+              });
+              setUploadDialogOpen(false);
+              fetchClients();
               return;
             }
 
-            // Expected order: nombre_apellidos, dni, direccion, telefono1, telefono2, email
-            const clients = [];
-            for (let i = 0; i < rows.length; i++) {
-              const row = rows[i];
-              
-              if (row.length >= 3) { // At least name and address
-                const client = {
-                  nombre_apellidos: row[0]?.trim() || '',
-                  dni: row[1]?.trim() || null,
-                  direccion: row[2]?.trim() || '',
-                  telefono1: row[3]?.trim() || null,
-                  telefono2: row[4]?.trim() || null,
-                  email: row[5]?.trim() || null,
-                };
+            const data = (results.data ?? []) as Record<string, string>[];
+            const clientsToInsert: ReturnType<typeof normalizeClientData<
+              {
+                nombre_apellidos: string;
+                dni: string | null;
+                direccion: string;
+                telefono1: string | null;
+                telefono2: string | null;
+                email: string | null;
+              }
+            >>[] = [];
 
-                // Only add if we have required fields
-                if (client.nombre_apellidos && client.direccion) {
-                  // Normalize client data before adding
-                  const normalizedClient = normalizeClientData(client);
-                  clients.push(normalizedClient);
-                }
+            for (const row of data) {
+              const nombre_apellidos = pickCsvCell(row, fh, [
+                'nombre_apellidos',
+                'nombre',
+                'name',
+                'cliente',
+              ]);
+              const dni = pickCsvCell(row, fh, ['dni', 'nif', 'cif']);
+              const direccion = pickCsvCell(row, fh, ['direccion', 'domicilio', 'address']);
+              const telefono1 = pickCsvCell(row, fh, ['telefono1', 'telefono', 'tlf', 'movil', 'tel']);
+              const telefono2 = pickCsvCell(row, fh, ['telefono2']);
+              const email = pickCsvCell(row, fh, ['email', 'correo']);
+
+              if (nombre_apellidos && direccion) {
+                clientsToInsert.push(
+                  normalizeClientData({
+                    nombre_apellidos,
+                    dni: dni || null,
+                    direccion,
+                    telefono1: telefono1 || null,
+                    telefono2: telefono2 || null,
+                    email: email || null,
+                  }),
+                );
               }
             }
 
-            if (clients.length === 0) {
+            if (clientsToInsert.length === 0) {
               toast({
-                title: "Error",
-                description: "No se encontraron clientes válidos en el archivo",
-                variant: "destructive",
+                title: 'Sin clientes válidos',
+                description:
+                  'Se necesitan al menos nombre y dirección (columnas reconocidas o nombre_apellidos / direccion).',
+                variant: 'destructive',
               });
               return;
             }
 
-            const { error } = await supabase
-              .from('clients')
-              .insert(clients);
-
-            if (error) throw error;
+            let inserted = 0;
+            let duplicates = 0;
+            let failed = 0;
+            for (const client of clientsToInsert) {
+              const { error } = await supabase
+                .from('clients')
+                .insert({ ...client, comercializadora: comercializadoraImport });
+              if (error) {
+                if (error.code === '23505') duplicates++;
+                else failed++;
+              } else inserted++;
+            }
 
             toast({
-              title: "Clientes importados",
-              description: `Se han importado ${clients.length} clientes exitosamente`,
+              title: 'Importación completada',
+              description: `Insertados: ${inserted}. Duplicados (DNI): ${duplicates}. Otros errores: ${failed}.`,
             });
-
             setUploadDialogOpen(false);
             fetchClients();
-          } catch (error: any) {
-            console.error('Error processing file:', error);
+          } catch (error: unknown) {
+            console.error('Error processing CSV:', error);
             toast({
-              title: "Error",
-              description: error.message || "Error al procesar el archivo",
-              variant: "destructive",
+              title: 'Error',
+              description: error instanceof Error ? error.message : 'Error al procesar el archivo',
+              variant: 'destructive',
             });
           } finally {
             setUploading(false);
           }
-        },
-        error: (error) => {
-          console.error('Error parsing file:', error);
-          toast({
-            title: "Error",
-            description: "Error al analizar el archivo",
-            variant: "destructive",
-          });
-          setUploading(false);
-        }
-      });
-    } catch (error: any) {
-      console.error('Error uploading file:', error);
-      toast({
-        title: "Error",
-        description: error.message || "Error al cargar el archivo",
-        variant: "destructive",
-      });
-      setUploading(false);
-    }
+        })();
+      },
+      error: () => {
+        toast({
+          title: 'Error',
+          description: 'No se pudo leer el CSV.',
+          variant: 'destructive',
+        });
+        setUploading(false);
+      },
+    });
   };
 
   const handleFilterChange = (key: string, value: string | boolean) => {
@@ -850,15 +917,21 @@ export default function ClientManagement() {
         <div className="flex space-x-2">
           {/* Only show admin buttons for admins */}
           {isAdmin && (
-            <Button
-              onClick={() => {
-                setEditingClient(null);
-                setDialogOpen(true);
-              }}
-            >
-              <UserPlus className="mr-2 h-4 w-4" />
-              Nuevo cliente
-            </Button>
+            <>
+              <Button variant="outline" onClick={() => setUploadDialogOpen(true)}>
+                <Upload className="mr-2 h-4 w-4" />
+                Importar CSV
+              </Button>
+              <Button
+                onClick={() => {
+                  setEditingClient(null);
+                  setDialogOpen(true);
+                }}
+              >
+                <UserPlus className="mr-2 h-4 w-4" />
+                Nuevo cliente
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -1191,6 +1264,7 @@ export default function ClientManagement() {
       )}
 
       {isAdmin && (
+        <>
         <Dialog
           open={dialogOpen}
           onOpenChange={(open) => {
@@ -1422,6 +1496,94 @@ export default function ClientManagement() {
             </form>
           </DialogContent>
         </Dialog>
+
+        <Dialog
+          open={uploadDialogOpen}
+          onOpenChange={(open) => {
+            setUploadDialogOpen(open);
+            if (open) {
+              setCsvImportComercializadora(COMERCIALIZADORA_IBERDROLA_CLIENTES_SA_U);
+            }
+          }}
+        >
+          <DialogContent
+            className="max-w-lg"
+            onPointerDownOutside={(e) => {
+              const el = e.target as HTMLElement;
+              if (el.closest?.('.comercializadora-combobox-popover')) e.preventDefault();
+            }}
+            onInteractOutside={(e) => {
+              const el = e.target as HTMLElement;
+              if (el.closest?.('.comercializadora-combobox-popover')) e.preventDefault();
+            }}
+          >
+            <DialogHeader>
+              <DialogTitle>Importar clientes desde CSV</DialogTitle>
+              <DialogDescription>
+                Para Iberdrola, usa el listado de operaciones exportado a CSV (cabeceras Fecha, ID, Cliente,
+                Suministro, etc.).
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleCsvImport} className="space-y-4">
+              <RadioGroup
+                value={csvImportMode}
+                onValueChange={(v) => setCsvImportMode(v as 'iberdrola' | 'simple')}
+                className="flex flex-col gap-3"
+              >
+                <div className="flex items-start space-x-3 rounded-md border p-3">
+                  <RadioGroupItem value="iberdrola" id="csv-mode-iberdrola" className="mt-1" />
+                  <Label htmlFor="csv-mode-iberdrola" className="cursor-pointer font-normal leading-snug">
+                    <span className="font-medium">Iberdrola (operaciones)</span>
+                    <span className="block text-xs text-muted-foreground">
+                      Columnas requeridas: Fecha, ID, Cliente, Suministro, Tipo, Estado, Teléfono.
+                    </span>
+                  </Label>
+                </div>
+                <div className="flex items-start space-x-3 rounded-md border p-3">
+                  <RadioGroupItem value="simple" id="csv-mode-simple" className="mt-1" />
+                  <Label htmlFor="csv-mode-simple" className="cursor-pointer font-normal leading-snug">
+                    <span className="font-medium">Tabla simple</span>
+                    <span className="block text-xs text-muted-foreground">
+                      Primera fila con nombres de columna (nombre, dirección, DNI, teléfonos, email…).
+                    </span>
+                  </Label>
+                </div>
+              </RadioGroup>
+              <div className="space-y-2">
+                <Label htmlFor="csv-comercializadora">Comercializadora</Label>
+                <ComercializadoraCombobox
+                  id="csv-comercializadora"
+                  value={csvImportComercializadora}
+                  onChange={setCsvImportComercializadora}
+                  disabled={uploading}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Se guardará en cada cliente de esta importación. Usa «Sin comercializadora» si no tienes el dato.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="csv-file">Archivo .csv</Label>
+                <Input id="csv-file" name="file" type="file" accept=".csv,text/csv" required />
+              </div>
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button type="button" variant="outline" onClick={() => setUploadDialogOpen(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={uploading}>
+                  {uploading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Importando…
+                    </>
+                  ) : (
+                    'Importar'
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+        </>
       )}
     </>
   );
