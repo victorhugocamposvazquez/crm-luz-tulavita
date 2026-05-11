@@ -1430,6 +1430,12 @@ export type Database = {
         Args: { sale_id_param: string }
         Returns: number
       }
+      clients_ids_matching_comercializadora: {
+        Args: { p_filter: string }
+        Returns: {
+          id: string
+        }[]
+      }
       get_user_company: {
         Args: { _user_id: string }
         Returns: string
