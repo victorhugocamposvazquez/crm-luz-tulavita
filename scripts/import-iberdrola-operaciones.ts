@@ -15,6 +15,8 @@
  * NO se tocan `sales`. Estado/Oferta/Fecha/Clave/Token/Enviado Iberdrola se concatenan en
  * `client_supply_addresses.note` para preservar trazabilidad de la operación de Iberdrola.
  *
+ * `clients.comercializadora` se asigna a IBERDROLA CLIENTES, S.A.U. (CNMC) en cada fila.
+ *
  * Requisitos:
  *   - Migración 20260509180000_csv_import_clients_supply_sales.sql aplicada
  *     (clients.import_*; client_supply_addresses.direccion permite NULL).
@@ -23,6 +25,11 @@
  * Uso:
  *   npm run import:iberdrola
  *   npm run import:iberdrola -- ./csvs/otroFichero.csv
+ *
+ * Cuando los datos ya están en el CRM y hay que llevar el mismo formato al portal Iberdrola:
+ *   npm run export:iberdrola -- [--solo-pendientes] [rutaSalida.csv]
+ * Tras confirmar el envío en Iberdrola:
+ *   npm run mark:iberdrola-enviado -- ./csvs/tu.csv [--valor SI]
  */
 
 import { readFileSync, writeFileSync, existsSync } from 'fs';
@@ -31,6 +38,7 @@ import { randomUUID } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 import Papa from 'papaparse';
 import type { Database } from '../src/integrations/supabase/types';
+import { COMERCIALIZADORA_IBERDROLA_CLIENTES_SA_U } from '../src/constants/crm-comercializadoras';
 
 const IMPORT_SOURCE = 'iberdrola_operaciones_csv';
 
@@ -422,6 +430,7 @@ async function main(): Promise<void> {
             ? `iberdrola_cli_tel:${phoneKey}`
             : `iberdrola_cli_op:${r.opId}`,
         assigned_commercial_id: comercialName ? profileByName.get(comercialName) ?? null : null,
+        comercializadora: COMERCIALIZADORA_IBERDROLA_CLIENTES_SA_U,
       };
       const { data: created, error: insErr } = await sb
         .from('clients')
@@ -439,6 +448,16 @@ async function main(): Promise<void> {
       clientsInserted++;
       if (dni) dniToClientId.set(dni, clientId);
       if (phoneKey) phoneToClientId.set(phoneKey, clientId);
+    }
+
+    {
+      const { error: comErr } = await sb
+        .from('clients')
+        .update({ comercializadora: COMERCIALIZADORA_IBERDROLA_CLIENTES_SA_U })
+        .eq('id', clientId);
+      if (comErr) {
+        report.push(`L${r.csvLine};WARN_COMERCIALIZADORA;${r.opId};${comErr.message}`);
+      }
     }
 
     // 2) Suministro (solo si hay CUPS).
