@@ -13,6 +13,7 @@
     "preview": "vite preview",
     "import:ventas-tulavita": "tsx scripts/import-ventas-tulavita.ts",
     "import:clientes-xlsx": "tsx scripts/import-clientes-xlsx.ts",
+    "import:iberdrola": "tsx scripts/import-iberdrola-operaciones.ts",
     "deploy:functions": "supabase functions deploy admin-actions --project-ref oslvdbmcwzfwekulqabk && supabase functions deploy get-mapbox-token --project-ref oslvdbmcwzfwekulqabk"
   },
   "dependencies": {

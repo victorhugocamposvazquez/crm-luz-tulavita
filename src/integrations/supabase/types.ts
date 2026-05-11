@@ -235,6 +235,7 @@ export type Database = {
         Row: {
           assigned_commercial_id: string | null
           codigo_postal: string | null
+          comercializadora: string | null
           created_at: string
           direccion: string
           dni: string | null
@@ -258,6 +259,7 @@ export type Database = {
         Insert: {
           assigned_commercial_id?: string | null
           codigo_postal?: string | null
+          comercializadora?: string | null
           created_at?: string
           direccion: string
           dni?: string | null
@@ -281,6 +283,7 @@ export type Database = {
         Update: {
           assigned_commercial_id?: string | null
           codigo_postal?: string | null
+          comercializadora?: string | null
           created_at?: string
           direccion?: string
           dni?: string | null

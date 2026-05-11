@@ -29,6 +29,7 @@ import ClientPagination from './ClientPagination';
 import { MapSelector } from '@/components/ui/map-selector';
 import ReminderDialog from '@/components/reminders/ReminderDialog';
 import ClientSupplyAddressesEditor from './ClientSupplyAddressesEditor';
+import { ComercializadoraCombobox } from '@/components/dashboard/ComercializadoraCombobox';
 import type { SupplyAddressDraft } from '@/lib/clients/supplyAddresses';
 import { draftFromSupplyRow, syncClientSupplyAddresses } from '@/lib/clients/supplyAddresses';
 import type { Database } from '@/integrations/supabase/types';
@@ -58,6 +59,7 @@ interface Client {
     last_name: string | null;
     email: string;
   } | null;
+  comercializadora?: string | null;
 }
 
 export default function ClientManagement() {
@@ -88,6 +90,7 @@ export default function ClientManagement() {
     telefono: '',
     email: '',
     cups: '',
+    comercializadora: '',
     status: '',
     prospect: false
   });
@@ -117,7 +120,9 @@ export default function ClientManagement() {
 
   const isAdmin = userRole?.role === 'admin';
   const totalPages = Math.ceil(totalItems / pageSize);
-  const tableColCount = isAdmin ? 9 : 8;
+  const tableColCount = isAdmin ? 10 : 9;
+
+  const [formComercializadora, setFormComercializadora] = useState<string | null>(null);
 
   const [assignedCommercialId, setAssignedCommercialId] = useState<string>('__none__');
   const [commercialUsers, setCommercialUsers] = useState<Array<{ id: string; label: string }>>([]);
@@ -153,6 +158,11 @@ export default function ClientManagement() {
       setAssignedCommercialId('__none__');
     }
   }, [dialogOpen, isAdmin, editingClient?.id, editingClient?.assigned_commercial_id]);
+
+  useEffect(() => {
+    if (!dialogOpen) return;
+    setFormComercializadora(editingClient?.comercializadora ?? null);
+  }, [dialogOpen, editingClient?.id, editingClient?.comercializadora]);
 
   const commercialSelectOptions = useMemo(() => {
     const byId = new Map(commercialUsers.map((u) => [u.id, u]));
@@ -277,6 +287,9 @@ export default function ClientManagement() {
         if (filters.prospect) {
           q = q.eq('prospect', true);
         }
+        if (filters.comercializadora.trim()) {
+          q = q.eq('comercializadora', filters.comercializadora.trim());
+        }
         const from = (currentPage - 1) * pageSize;
         const to = from + pageSize - 1;
         return q.order('created_at', { ascending: false }).range(from, to);
@@ -380,7 +393,10 @@ export default function ClientManagement() {
     console.log('Raw nombre before normalization:', rawClientData.nombre_apellidos);
     
     const clientData = normalizeClientData(rawClientData);
-    const payload: ClientTableUpdate = { ...clientData };
+    const payload: ClientTableUpdate = {
+      ...clientData,
+      comercializadora: formComercializadora,
+    };
     if (isAdmin) {
       const chosen =
         assignedCommercialId && assignedCommercialId !== '__none__'
@@ -634,6 +650,7 @@ export default function ClientManagement() {
       telefono: '',
       email: '',
       cups: '',
+      comercializadora: '',
       status: '',
       prospect: false
     });
@@ -842,6 +859,7 @@ export default function ClientManagement() {
                       <TableHead>Nombre</TableHead>
                       <TableHead>DNI</TableHead>
                       <TableHead>Tipo</TableHead>
+                      <TableHead className="min-w-[140px] max-w-[220px]">Comercializadora</TableHead>
                       <TableHead>Dirección</TableHead>
                       <TableHead>Coordenadas</TableHead>
                       <TableHead>Teléfono</TableHead>
@@ -896,6 +914,15 @@ export default function ClientManagement() {
                          }`}>
                            {client.prospect ? 'Prospecto' : 'Cliente'}
                          </span>
+                       </TableCell>
+                       <TableCell className="max-w-[220px] align-top text-sm text-muted-foreground">
+                         {client.comercializadora?.trim() ? (
+                           <span className="line-clamp-3" title={client.comercializadora}>
+                             {client.comercializadora}
+                           </span>
+                         ) : (
+                           <span className="text-muted-foreground/70">—</span>
+                         )}
                        </TableCell>
                        <TableCell>
                          {(() => {
@@ -1149,19 +1176,19 @@ export default function ClientManagement() {
           <DialogContent
             className="max-w-3xl max-h-[90vh] overflow-y-auto"
             onPointerDownOutside={(e) => {
+              const el = e.target as HTMLElement;
               if (
-                (e.target as HTMLElement).closest?.(
-                  '.client-form-commercial-select-content',
-                )
+                el.closest?.('.client-form-commercial-select-content') ||
+                el.closest?.('.comercializadora-combobox-popover')
               ) {
                 e.preventDefault();
               }
             }}
             onInteractOutside={(e) => {
+              const el = e.target as HTMLElement;
               if (
-                (e.target as HTMLElement).closest?.(
-                  '.client-form-commercial-select-content',
-                )
+                el.closest?.('.client-form-commercial-select-content') ||
+                el.closest?.('.comercializadora-combobox-popover')
               ) {
                 e.preventDefault();
               }
@@ -1278,6 +1305,18 @@ export default function ClientManagement() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="client-comercializadora">Comercializadora</Label>
+                  <ComercializadoraCombobox
+                    id="client-comercializadora"
+                    value={formComercializadora}
+                    onChange={setFormComercializadora}
+                    disabled={!!editingClient && supplyFormLoading}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Listado basado en el censo de comercializadoras de electricidad (CNMC). Busca por nombre.
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="note">Nota</Label>

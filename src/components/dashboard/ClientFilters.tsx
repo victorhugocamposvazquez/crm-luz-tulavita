@@ -3,6 +3,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Search, X } from 'lucide-react';
+import { ComercializadoraCombobox } from '@/components/dashboard/ComercializadoraCombobox';
 
 interface ClientFiltersProps {
   filters: {
@@ -13,6 +14,7 @@ interface ClientFiltersProps {
     telefono: string;
     email: string;
     cups: string;
+    comercializadora: string;
     status: string;
     prospect: boolean;
   };
@@ -119,6 +121,18 @@ export default function ClientFilters({ filters, onFilterChange, onClearFilters 
             className="h-4 w-4"
           />
           <Label htmlFor="prospect-filter" className="text-sm">Solo prospectos</Label>
+        </div>
+
+        <div className="col-span-12 flex flex-col gap-1.5 sm:flex-row sm:items-end sm:gap-3">
+          <div className="flex-1 space-y-1">
+            <Label className="text-xs text-muted-foreground">Comercializadora</Label>
+            <ComercializadoraCombobox
+              value={filters.comercializadora.trim() ? filters.comercializadora : null}
+              onChange={(v) => onFilterChange('comercializadora', v ?? '')}
+              placeholder="Todas las comercializadoras"
+              popoverContentClassName="min-w-[min(100vw-2rem,28rem)]"
+            />
+          </div>
         </div>
       </div>
     </div>

@@ -10,7 +10,7 @@ import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
-import { ArrowLeft, MapPin, Calendar, DollarSign, TrendingUp, Building2, Phone, Mail, MapPinIcon, Euro, Bell, User, Pencil, Landmark } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, DollarSign, TrendingUp, Building2, Phone, Mail, MapPinIcon, Euro, Bell, User, Pencil, Landmark, Zap } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
@@ -46,6 +46,7 @@ interface Client {
     last_name: string | null;
     email: string;
   } | null;
+  comercializadora?: string | null;
 }
 
 interface Visit {
@@ -522,6 +523,19 @@ const fetchVisits = async () => {
               ) : (
                 <span className="text-sm text-muted-foreground">—</span>
               )}
+            </div>
+            <div className="flex items-start gap-3 p-4 bg-muted/30 rounded-lg border md:col-span-2 lg:col-span-1">
+              <Zap className="h-5 w-5 text-muted-foreground flex-shrink-0 mt-0.5" />
+              <div className="text-sm min-w-0">
+                <span className="font-medium text-muted-foreground block text-xs mb-0.5">
+                  Comercializadora
+                </span>
+                {client.comercializadora?.trim() ? (
+                  <span className="break-words">{client.comercializadora.trim()}</span>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </div>
             </div>
             {client.dni && (
               <div className="flex items-center gap-3 p-4 bg-muted/30 rounded-lg border">
