@@ -1,6 +1,6 @@
 /**
- * Importa csvs/Iberdrola.csv (o ruta por argv) en public.clients y public.client_supply_addresses.
- * La lógica compartida está en `src/lib/clients/iberdrolaImportCore.ts` (misma que la importación desde la UI).
+ * Importa un CSV «tipo operaciones» (p. ej. csvs/Iberdrola.csv o ruta por argv) en public.clients y public.client_supply_addresses.
+ * La lógica está en `src/lib/clients/iberdrolaImportCore.ts` (la misma que la importación CSV desde la UI).
  *
  * Requiere .env.local: SUPABASE_URL (o VITE_SUPABASE_URL) y SUPABASE_SERVICE_ROLE_KEY.
  *

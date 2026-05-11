@@ -1,18 +1,21 @@
 /**
- * Lógica compartida: CSV operaciones Iberdrola → clients + client_supply_addresses.
- * Usada por el script `import:iberdrola` y por la importación desde la UI (admin).
+ * CSV tipo «operaciones» (columnas Fecha, ID, Cliente, Suministro…) → clients + client_supply_addresses.
+ * El formato suele coincidir con exportaciones de varias comercializadoras; la marca en CRM es la elegida al importar.
+ *
+ * Usado por `import:iberdrola` (CLI) y por la importación CSV desde la UI (admin).
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/integrations/supabase/types';
 import {
   COMERCIALIZADORA_IBERDROLA_CLIENTES_SA_U,
-  IMPORT_SOURCE_IBERDROLA_OPERACIONES_CSV,
+  IMPORT_SOURCE_OPERACIONES_COMERCIALIZADORA_CSV,
 } from '@/constants/crm-comercializadoras';
 
-export const IBERDROLA_IMPORT_SOURCE = IMPORT_SOURCE_IBERDROLA_OPERACIONES_CSV;
+/** Valor guardado en `clients.import_source` y en líneas «Importado …» de notas para este tipo de CSV. */
+export const OPERACIONES_CSV_IMPORT_SOURCE = IMPORT_SOURCE_OPERACIONES_COMERCIALIZADORA_CSV;
 
-export const IBERDROLA_CSV_REQUIRED_HEADERS = [
+export const OPERACIONES_CSV_REQUIRED_HEADERS = [
   'Fecha',
   'ID',
   'Cliente',
@@ -160,13 +163,13 @@ export function buildIberdrolaSupplyNote(p: IberdrolaParsedRow, batchId: string)
   if (p.token) parts.push(`Token: ${p.token}`);
   if (p.enviadoIberdrola) parts.push(`Enviado Iberdrola: ${p.enviadoIberdrola}`);
   if (p.notas) parts.push(`Notas: ${p.notas}`);
-  parts.push(`Importado ${IBERDROLA_IMPORT_SOURCE} · ID origen ${p.opId} · lote ${batchId}`);
+  parts.push(`Importado ${OPERACIONES_CSV_IMPORT_SOURCE} · ID origen ${p.opId} · lote ${batchId}`);
   return parts.join('\n');
 }
 
 export function validateIberdrolaCsvHeaders(fields: string[] | undefined): string | null {
   const present = (fields ?? []).map((h) => h.trim());
-  const missing = IBERDROLA_CSV_REQUIRED_HEADERS.filter((h) => !present.includes(h));
+  const missing = OPERACIONES_CSV_REQUIRED_HEADERS.filter((h) => !present.includes(h));
   if (missing.length) {
     return `Faltan columnas: ${missing.join(', ')}. Detectadas: ${present.join(' | ')}`;
   }
@@ -332,14 +335,14 @@ export async function runIberdrolaCsvImport(
         dni,
         prospect: !dni,
         status: 'active',
-        note: `Importado ${IBERDROLA_IMPORT_SOURCE} · primera op ID ${r.opId} · lote ${importBatchId}`,
+        note: `Importado ${OPERACIONES_CSV_IMPORT_SOURCE} · primera op ID ${r.opId} · lote ${importBatchId}`,
         import_batch_id: importBatchId,
-        import_source: IBERDROLA_IMPORT_SOURCE,
+        import_source: OPERACIONES_CSV_IMPORT_SOURCE,
         import_external_key: dni
-          ? `iberdrola_cli_dni:${dni}`
+          ? `operaciones_csv_cli_dni:${dni}`
           : phoneKey
-            ? `iberdrola_cli_tel:${phoneKey}`
-            : `iberdrola_cli_op:${r.opId}`,
+            ? `operaciones_csv_cli_tel:${phoneKey}`
+            : `operaciones_csv_cli_op:${r.opId}`,
         assigned_commercial_id: comercialName ? profileByName.get(comercialName) ?? null : null,
         comercializadora: comercializadoraValue,
       };
@@ -389,7 +392,7 @@ export async function runIberdrolaCsvImport(
 
     const supplyIns: Database['public']['Tables']['client_supply_addresses']['Insert'] = {
       client_id: clientId,
-      label: r.tipo ? `Iberdrola — ${r.tipo}` : 'Iberdrola',
+      label: r.tipo ? `Operaciones — ${r.tipo}` : 'Operaciones',
       direccion: null,
       localidad: r.provincia,
       codigo_postal: null,

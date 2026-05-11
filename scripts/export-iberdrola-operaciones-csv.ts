@@ -1,8 +1,9 @@
 /**
- * Exporta operaciones Iberdrola guardadas en el CRM al mismo formato CSV que el import
- * (`scripts/import-iberdrola-operaciones.ts`), para usarlas en el portal Iberdrola.
+ * Exporta operaciones importadas vía CSV «tipo operaciones» al mismo formato que el import
+ * (`scripts/import-iberdrola-operaciones.ts`), típicamente para volcarlas en el portal de la comercializadora.
  *
- * Fuente: filas de `client_supply_addresses` con nota que contiene `iberdrola_operaciones_csv`
+ * Fuente: filas de `client_supply_addresses` cuya nota indica import desde CSV operaciones
+ * (`iberdrola_operaciones_csv` legado o `operaciones_comercializadora_csv`)
  * y la línea `ID origen <número>` (generada por el import).
  *
  * Uso:
@@ -145,7 +146,9 @@ async function main(): Promise<void> {
     sb
       .from('client_supply_addresses')
       .select('id, client_id, cups, note, localidad')
-      .ilike('note', '%iberdrola_operaciones_csv%')
+      .or(
+        'note.ilike.%iberdrola_operaciones_csv%,note.ilike.%operaciones_comercializadora_csv%',
+      )
       .order('id', { ascending: true })
       .range(from, to),
   );

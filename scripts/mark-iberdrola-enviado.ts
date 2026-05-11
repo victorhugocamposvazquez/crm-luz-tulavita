@@ -51,7 +51,9 @@ function applyEnviadoNote(note: string, valor: string): string {
   if (/Enviado Iberdrola:\s*/im.test(n)) {
     return n.replace(/^Enviado Iberdrola:\s*.*$/im, line);
   }
-  const idx = n.search(/\nImportado\s+iberdrola_operaciones_csv/i);
+  const idx = n.search(
+    /\nImportado\s+(iberdrola_operaciones_csv|operaciones_comercializadora_csv)/i,
+  );
   if (idx !== -1) {
     return n.slice(0, idx) + `\n${line}` + n.slice(idx);
   }
@@ -68,7 +70,9 @@ async function fetchAllIberdrolaSupplies(sb: ReturnType<typeof createClient<Data
     const { data, error } = await sb
       .from('client_supply_addresses')
       .select('id, note')
-      .ilike('note', '%iberdrola_operaciones_csv%')
+      .or(
+        'note.ilike.%iberdrola_operaciones_csv%,note.ilike.%operaciones_comercializadora_csv%',
+      )
       .order('id', { ascending: true })
       .range(offset, offset + PAGE - 1);
     if (error) throw new Error(error.message);
