@@ -969,6 +969,12 @@ export default function ClientManagement() {
                  </TableRow>
               ) : (
                  clients.map((client) => {
+                   const tipoBadge = client.prospect
+                     ? { label: 'Prospecto', className: 'bg-blue-100 text-blue-800' }
+                     : client.status === 'inactive'
+                       ? { label: 'Cliente inactivo', className: 'bg-red-100 text-red-800' }
+                       : { label: 'Cliente activo', className: 'bg-green-100 text-green-800' };
+
                    const getRowClasses = () => {
                      let classes = "";
                      if (client.prospect) {
@@ -984,12 +990,8 @@ export default function ClientManagement() {
                        <TableCell className="font-medium">{client.nombre_apellidos}</TableCell>
                        <TableCell>{client.dni || '-'}</TableCell>
                        <TableCell>
-                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                           client.prospect 
-                             ? 'bg-blue-100 text-blue-800' 
-                             : 'bg-green-100 text-green-800'
-                         }`}>
-                           {client.prospect ? 'Prospecto' : 'Cliente'}
+                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${tipoBadge.className}`}>
+                           {tipoBadge.label}
                          </span>
                        </TableCell>
                        <TableCell className="max-w-[220px] align-top text-sm text-muted-foreground">
