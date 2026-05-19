@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import {
   TvContact,
   TvFoot,
@@ -7,9 +7,11 @@ import {
   TvPartners,
   TvSimulator,
   TvTestiCarousel,
+  TvTicker,
   waLink,
 } from './colaboradores-shared';
-import { TvBot } from './TvBot';
+
+const TvBot = lazy(() => import('./TvBot').then((m) => ({ default: m.TvBot })));
 
 export function LandingHibrida() {
   const [open, setOpen] = useState(0);
@@ -55,16 +57,7 @@ export function LandingHibrida() {
         </div>
       </div>
 
-      {/* TICKER */}
-      <div className="tv-ticker" style={{ marginBottom: 6 }}>
-        <div className="row">
-          {Array.from({ length: 2 }).map((_, k) =>
-            ['Aroa cobró 540€ este mes', 'Pablo cobró 320€ este mes', 'Sandra cobró 890€ este mes',
-             'Marcos cobró 215€ este mes', 'Lucía cobró 1.140€ este mes', 'Iván cobró 470€ este mes']
-              .map((t, i) => <div key={k + '-' + i}><span className="star">●</span>{t}</div>)
-          )}
-        </div>
-      </div>
+      <TvTicker />
 
       {/* FORM */}
       <div style={{ padding: '14px 24px 18px' }}>
@@ -268,7 +261,9 @@ export function LandingHibrida() {
         <p className="tv-lead" style={{ marginBottom: 18 }}>
           Cuéntaselas a Lara. Te responde al momento y, si quieres, te apunta para que un compañero te llame.
         </p>
-        <TvBot />
+        <Suspense fallback={<div className="tv-card" style={{ padding: 24, textAlign: 'center', color: 'var(--muted)' }}>Cargando asistente…</div>}>
+          <TvBot />
+        </Suspense>
       </div>
 
       <TvFoot />

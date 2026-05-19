@@ -5,6 +5,7 @@ import {
   TvNav,
   TvPartners,
   TvSimulator,
+  TvTicker,
   waLink,
 } from './colaboradores-shared';
 
@@ -31,16 +32,7 @@ export function LandingCompacta() {
         </div>
       </div>
 
-      {/* TICKER de cobros */}
-      <div className="tv-ticker" style={{ marginBottom: 6 }}>
-        <div className="row">
-          {Array.from({ length: 2 }).map((_, k) =>
-            ['Aroa cobró 540€ este mes', 'Pablo cobró 320€ este mes', 'Sandra cobró 890€ este mes',
-             'Marcos cobró 215€ este mes', 'Lucía cobró 1.140€ este mes', 'Iván cobró 470€ este mes']
-              .map((t, i) => <div key={k + '-' + i}><span className="star">●</span>{t}</div>)
-          )}
-        </div>
-      </div>
+      <TvTicker />
 
       {/* FORM */}
       <div style={{ padding: '14px 24px 18px' }}>

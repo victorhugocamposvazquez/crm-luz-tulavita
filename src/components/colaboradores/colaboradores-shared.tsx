@@ -1,21 +1,20 @@
-import { useEffect, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import type { ColaboradoresLandingVariant } from './colaboradores-config';
 import { TV_BRAND, TEL_NUMBER, waLink } from './colaboradores-config';
 import { useColaboradoresLeadSubmit } from '@/hooks/useColaboradoresLeadSubmit';
 
-// ───────── logo ─────────
-function TvLogo({ size = 30, dark = false }) {
+// ───────── logo (misma marca que /ahorra-factura-luz) ─────────
+function TvLogo({ size = 40, dark = false }: { size?: number; dark?: boolean }) {
   return (
     <div className="tv-logo">
-      <div className="leaf" style={{
-        width: size, height: size,
-        background: dark ? '#161613' : '#fff',
-        borderColor: dark ? 'rgba(255,255,255,.12)' : 'var(--line)'
-      }}>
-        <svg width={size * 0.55} height={size * 0.55} viewBox="0 0 24 24" fill="none">
-          <path d="M4 20c8 0 16-6 16-16-8 0-16 6-16 16zM4 20c2-4 6-7 11-9" stroke="#8bc414" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="#c4ed4f"/>
-        </svg>
-      </div>
+      <img
+        src="/logo-tulavita.png"
+        alt=""
+        className="tv-logo-mark"
+        width={size}
+        height={size}
+        style={{ width: size, height: size }}
+      />
       <span style={{ color: dark ? '#fff' : 'var(--fg)' }}>{TV_BRAND}</span>
     </div>
   );
@@ -224,70 +223,154 @@ function TvPartners({ dark = false, warm = false, label = "Colaboradores oficial
   );
 }
 
-// ───────── carrusel arrastrable de testimonios ─────────
-function TvTestiCarousel({ items }) {
-  const data = items || [
-    { quote: "Tengo peluquería en Lugo. Pego el QR en el espejo y mientras espero al siguiente cliente le pregunto si paga mucho de luz. Saco unos 280€ extra al mes.",
-      name: "Marta Vilas", role: "Peluquería · Lugo", init: "M" },
-    { quote: "Como agente, lo uso al cerrar pisos. 'Os ayudo a contratar la luz, sin coste'. La gente alucina. 4-5 firmas al mes fácil.",
-      name: "Pablo Reigosa", role: "Inmobiliaria · Vigo", init: "P" },
-    { quote: "Llevo gestoría con 80 PYMES. En tres meses pasé media cartera. Lo cobro recurrente sin tocar nada nunca más.",
-      name: "Sandra Castro", role: "Gestoría · Santiago", init: "S" },
-    { quote: "Mi madre tiene 64 años y se aburría en casa. En dos meses le ha sacado más que con su pensión solo enseñando el QR a vecinas.",
-      name: "Iván Pereira", role: "Estudiante · Ourense", init: "I" },
-    { quote: "Soy profe. Lo comparto en el grupo del cole y entre padres. Cero esfuerzo, 180€ al mes que antes no tenía.",
-      name: "Lucía Antelo", role: "Profesora · Pontevedra", init: "L" },
-  ];
+const TICKER_LINES = [
+  'Aroa cobró 540€ este mes',
+  'Pablo cobró 320€ este mes',
+  'Sandra cobró 890€ este mes',
+  'Marcos cobró 215€ este mes',
+  'Lucía cobró 1.140€ este mes',
+  'Iván cobró 470€ este mes',
+] as const;
 
-  const scrollRef = useRef(null);
+export function TvTicker() {
+  return (
+    <div className="tv-ticker" style={{ marginBottom: 6 }}>
+      <div className="row">
+        {TICKER_LINES.map((t) => (
+          <div key={t}>
+            <span className="star">●</span>
+            {t}
+          </div>
+        ))}
+        {TICKER_LINES.map((t) => (
+          <div key={`${t}-b`} aria-hidden>
+            <span className="star">●</span>
+            {t}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type TestiItem = { quote: string; name: string; role: string; init: string };
+
+const DEFAULT_TESTI: TestiItem[] = [
+  {
+    quote:
+      'Tengo peluquería en Lugo. Pego el QR en el espejo y mientras espero al siguiente cliente le pregunto si paga mucho de luz. Saco unos 280€ extra al mes.',
+    name: 'Marta Vilas',
+    role: 'Peluquería · Lugo',
+    init: 'M',
+  },
+  {
+    quote:
+      "Como agente, lo uso al cerrar pisos. 'Os ayudo a contratar la luz, sin coste'. La gente alucina. 4-5 firmas al mes fácil.",
+    name: 'Pablo Reigosa',
+    role: 'Inmobiliaria · Vigo',
+    init: 'P',
+  },
+  {
+    quote:
+      'Llevo gestoría con 80 PYMES. En tres meses pasé media cartera. Lo cobro recurrente sin tocar nada nunca más.',
+    name: 'Sandra Castro',
+    role: 'Gestoría · Santiago',
+    init: 'S',
+  },
+  {
+    quote:
+      'Mi madre tiene 64 años y se aburría en casa. En dos meses le ha sacado más que con su pensión solo enseñando el QR a vecinas.',
+    name: 'Iván Pereira',
+    role: 'Estudiante · Ourense',
+    init: 'I',
+  },
+  {
+    quote:
+      'Soy profe. Lo comparto en el grupo del cole y entre padres. Cero esfuerzo, 180€ al mes que antes no tenía.',
+    name: 'Lucía Antelo',
+    role: 'Profesora · Pontevedra',
+    init: 'L',
+  },
+];
+
+function TvTestiCarousel({ items }: { items?: TestiItem[] }) {
+  const data = items ?? DEFAULT_TESTI;
+  const scrollRef = useRef<HTMLDivElement>(null);
   const [active, setActive] = useState(0);
+  const scrollRaf = useRef(0);
+  const activeRef = useRef(0);
 
-  // mouse drag to scroll (desktop pasa de scroll-touch)
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    let down = false, startX = 0, startLeft = 0;
-    const md = (e) => {
-      down = true;
+
+    let dragging = false;
+    let startX = 0;
+    let startLeft = 0;
+
+    const onMouseMove = (e: MouseEvent) => {
+      if (!dragging) return;
+      e.preventDefault();
+      el.scrollLeft = startLeft - (e.pageX - startX);
+    };
+
+    const endDrag = () => {
+      if (!dragging) return;
+      dragging = false;
+      el.style.cursor = 'grab';
+      el.style.scrollSnapType = '';
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', endDrag);
+    };
+
+    const onMouseDown = (e: MouseEvent) => {
+      dragging = true;
       startX = e.pageX;
       startLeft = el.scrollLeft;
       el.style.cursor = 'grabbing';
       el.style.scrollSnapType = 'none';
+      window.addEventListener('mousemove', onMouseMove);
+      window.addEventListener('mouseup', endDrag);
     };
-    const mm = (e) => {
-      if (!down) return;
-      e.preventDefault();
-      el.scrollLeft = startLeft - (e.pageX - startX);
-    };
-    const mu = () => {
-      if (!down) return;
-      down = false;
-      el.style.cursor = 'grab';
-      el.style.scrollSnapType = '';
-    };
-    el.addEventListener('mousedown', md);
-    window.addEventListener('mousemove', mm);
-    window.addEventListener('mouseup', mu);
+
+    el.addEventListener('mousedown', onMouseDown);
     return () => {
-      el.removeEventListener('mousedown', md);
-      window.removeEventListener('mousemove', mm);
-      window.removeEventListener('mouseup', mu);
+      el.removeEventListener('mousedown', onMouseDown);
+      endDrag();
     };
   }, []);
 
-  const onScroll = () => {
+  const updateActiveFromScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    const card = el.firstElementChild;
+    const card = el.firstElementChild as HTMLElement | null;
     if (!card) return;
-    const w = card.offsetWidth + 12; // card width + gap
-    setActive(Math.round(el.scrollLeft / w));
-  };
+    const w = card.offsetWidth + 12;
+    const next = Math.round(el.scrollLeft / w);
+    if (next !== activeRef.current) {
+      activeRef.current = next;
+      setActive(next);
+    }
+  }, []);
 
-  const goTo = (i) => {
+  const onScroll = useCallback(() => {
+    if (scrollRaf.current) return;
+    scrollRaf.current = requestAnimationFrame(() => {
+      scrollRaf.current = 0;
+      updateActiveFromScroll();
+    });
+  }, [updateActiveFromScroll]);
+
+  useEffect(() => {
+    return () => {
+      if (scrollRaf.current) cancelAnimationFrame(scrollRaf.current);
+    };
+  }, []);
+
+  const goTo = (i: number) => {
     const el = scrollRef.current;
     if (!el) return;
-    const card = el.firstElementChild;
+    const card = el.firstElementChild as HTMLElement | null;
     if (!card) return;
     const w = card.offsetWidth + 12;
     el.scrollTo({ left: i * w, behavior: 'smooth' });
@@ -310,42 +393,65 @@ function TvTestiCarousel({ items }) {
           msOverflowStyle: 'none',
           scrollbarWidth: 'none',
           userSelect: 'none',
-        }}>
+        }}
+      >
         {data.map((t, i) => (
-          <div key={i} className="tv-testi-slide" style={{
-            flex: '0 0 86%',
-            scrollSnapAlign: 'start',
-            scrollSnapStop: 'always',
-          }}>
+          <div
+            key={i}
+            className="tv-testi-slide"
+            style={{
+              flex: '0 0 86%',
+              scrollSnapAlign: 'start',
+              scrollSnapStop: 'always',
+            }}
+          >
             <TvTesti {...t} />
           </div>
         ))}
       </div>
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: '0 24px',
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '0 24px',
+        }}
+      >
         <div style={{ display: 'flex', gap: 6 }}>
           {data.map((_, i) => (
-            <button key={i} onClick={() => goTo(i)} aria-label={"Testimonio " + (i+1)} style={{
-              width: i === active ? 22 : 6, height: 6, borderRadius: 3,
-              background: i === active ? 'var(--fg)' : 'var(--line)',
-              border: 'none', padding: 0, cursor: 'pointer',
-              transition: 'width .2s, background .2s'
-            }}/>
+            <button
+              key={i}
+              type="button"
+              onClick={() => goTo(i)}
+              aria-label={`Testimonio ${i + 1}`}
+              style={{
+                width: i === active ? 22 : 6,
+                height: 6,
+                borderRadius: 3,
+                background: i === active ? 'var(--fg)' : 'var(--line)',
+                border: 'none',
+                padding: 0,
+                cursor: 'pointer',
+                transition: 'width .2s, background .2s',
+              }}
+            />
           ))}
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={() => goTo(Math.max(0, active - 1))} className="tv-btn sm" style={{
-            width: 32, height: 32, padding: 0, borderRadius: '50%'
-          }}>
+          <button
+            type="button"
+            onClick={() => goTo(Math.max(0, active - 1))}
+            className="tv-btn sm"
+            style={{ width: 32, height: 32, padding: 0, borderRadius: '50%' }}
+          >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M7.5 2L3.5 6l4 4"/></svg>
           </button>
-          <button onClick={() => goTo(Math.min(data.length - 1, active + 1))} className="tv-btn sm" style={{
-            width: 32, height: 32, padding: 0, borderRadius: '50%'
-          }}>
+          <button
+            type="button"
+            onClick={() => goTo(Math.min(data.length - 1, active + 1))}
+            className="tv-btn sm"
+            style={{ width: 32, height: 32, padding: 0, borderRadius: '50%' }}
+          >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M4.5 2l4 4-4 4"/></svg>
           </button>
         </div>
@@ -353,6 +459,7 @@ function TvTestiCarousel({ items }) {
     </div>
   );
 }
+
 
 // ───────── footer ─────────
 function TvFoot({ dark = false }) {

@@ -1,5 +1,7 @@
 import { useEffect, type ReactNode } from 'react';
+import { useColaboradoresScrollPerf } from '@/hooks/useColaboradoresScrollPerf';
 import './colaboradores-landing.css';
+import './colaboradores-perf.css';
 
 type ColaboradoresLandingLayoutProps = {
   title: string;
@@ -12,6 +14,8 @@ export function ColaboradoresLandingLayout({
   description,
   children,
 }: ColaboradoresLandingLayoutProps) {
+  useColaboradoresScrollPerf();
+
   useEffect(() => {
     document.title = title;
     const meta = document.querySelector('meta[name="description"]');

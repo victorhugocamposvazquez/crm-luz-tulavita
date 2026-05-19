@@ -1,0 +1,48 @@
+/* Optimizaciones de scroll para las landings (sin alterar el diseño visual). */
+
+.colaboradores-landing-page {
+  overflow-x: clip;
+}
+
+/* Forzamos scroll único del documento (anula el overflow-y:auto del .tv-root original). */
+.colaboradores-landing-root .tv-root {
+  height: auto !important;
+  overflow: visible !important;
+  overflow-y: visible !important;
+  scroll-behavior: auto !important;
+}
+
+.colaboradores-landing-root .tv-nav {
+  contain: layout style paint;
+}
+
+/* Capas de animación aisladas (solo transform / opacity). */
+.tv-partners .track,
+.tv-ticker .row {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* Mientras el usuario hace scroll, pausamos las animaciones infinitas. */
+.colaboradores-landing-root.is-scrolling .tv-partners .track,
+.colaboradores-landing-root.is-scrolling .tv-ticker .row,
+.colaboradores-landing-root.is-scrolling .tv-wafloat::after,
+.colaboradores-landing-root.is-scrolling .tv-live .ring {
+  animation-play-state: paused !important;
+}
+
+/* Secciones below-the-fold: menos trabajo de layout al hacer scroll. */
+.colaboradores-landing-root .tv-partners,
+.colaboradores-landing-root .tv-bot-section {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 320px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .colaboradores-landing-root .tv-partners .track,
+  .colaboradores-landing-root .tv-ticker .row,
+  .colaboradores-landing-root .tv-wafloat::after,
+  .colaboradores-landing-root .tv-live .ring {
+    animation: none !important;
+  }
+}

@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -9,9 +10,10 @@ import Dashboard from "./pages/Dashboard";
 import AuthPage from "@/components/AuthPage";
 import LeadLanding from "./pages/LeadLanding";
 import AhorroLuz from "./pages/AhorroLuz";
-import ColaboradoresCompacta from "./pages/ColaboradoresCompacta";
-import ColaboradoresHibrida from "./pages/ColaboradoresHibrida";
 import NotFound from "./pages/NotFound";
+
+const ColaboradoresCompacta = lazy(() => import("./pages/ColaboradoresCompacta"));
+const ColaboradoresHibrida = lazy(() => import("./pages/ColaboradoresHibrida"));
 
 const queryClient = new QueryClient();
 
@@ -28,8 +30,22 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/lead" element={<LeadLanding />} />
             <Route path="/ahorra-factura-luz" element={<AhorroLuz />} />
-            <Route path="/colaboradores" element={<ColaboradoresCompacta />} />
-            <Route path="/colaboradores/hibrida" element={<ColaboradoresHibrida />} />
+            <Route
+              path="/colaboradores"
+              element={
+                <Suspense fallback={null}>
+                  <ColaboradoresCompacta />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/colaboradores/hibrida"
+              element={
+                <Suspense fallback={null}>
+                  <ColaboradoresHibrida />
+                </Suspense>
+              }
+            />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
