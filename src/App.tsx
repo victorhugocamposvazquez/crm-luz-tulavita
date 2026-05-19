@@ -9,6 +9,8 @@ import Dashboard from "./pages/Dashboard";
 import AuthPage from "@/components/AuthPage";
 import LeadLanding from "./pages/LeadLanding";
 import AhorroLuz from "./pages/AhorroLuz";
+import ColaboradoresCompacta from "./pages/ColaboradoresCompacta";
+import ColaboradoresHibrida from "./pages/ColaboradoresHibrida";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -26,6 +28,8 @@ const App = () => (
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/lead" element={<LeadLanding />} />
             <Route path="/ahorra-factura-luz" element={<AhorroLuz />} />
+            <Route path="/colaboradores" element={<ColaboradoresCompacta />} />
+            <Route path="/colaboradores/hibrida" element={<ColaboradoresHibrida />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

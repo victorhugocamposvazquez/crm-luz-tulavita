@@ -4,10 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "predev": "npm run build:landings",
     "dev": "vite",
-    "build:landings": "node scripts/build-colaboradores-landings.mjs",
-    "build": "npm run build:landings && vite build",
+    "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
     "test": "vitest run",
