@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
-import { Plus, RefreshCw, Users, Link2, Wallet, CheckCircle2 } from 'lucide-react';
+import { Plus, RefreshCw, Users, Link2, Wallet, CheckCircle2, ExternalLink } from 'lucide-react';
 
 type CollaboratorRow = {
   id: string;
@@ -93,6 +93,14 @@ export default function CollaboratorsManagement() {
     if (typeof window === 'undefined') return '';
     return window.location.origin;
   }, []);
+
+  const colaboradoresLandings = useMemo(
+    () => [
+      { id: 'compacta', label: 'Captación compacta', path: '/colaboradores/' },
+      { id: 'hibrida', label: 'Captación híbrida', path: '/colaboradores/hibrida/' },
+    ],
+    [],
+  );
 
   const fetchCollaborators = useCallback(async () => {
     setLoading(true);
@@ -488,9 +496,47 @@ export default function CollaboratorsManagement() {
 
       <Card>
         <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Link2 className="h-5 w-5" />
+            Landings de captación (colaboradores)
+          </CardTitle>
+          <CardDescription>
+            Páginas públicas para reclutar nuevos colaboradores. Los formularios crean leads en el CRM con campaña
+            identificada.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+          {colaboradoresLandings.map((landing) => {
+            const url = `${baseUrl}${landing.path}`;
+            return (
+              <div
+                key={landing.id}
+                className="flex min-w-[240px] flex-1 flex-col gap-2 rounded-lg border p-3"
+              >
+                <p className="text-sm font-medium">{landing.label}</p>
+                <p className="break-all text-xs text-muted-foreground">{url}</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => void copyToClipboard(url)}>
+                    Copiar enlace
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" asChild>
+                    <a href={landing.path} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="mr-1 h-4 w-4" />
+                      Abrir
+                    </a>
+                  </Button>
+                </div>
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
           <CardTitle>Colaboradores</CardTitle>
           <CardDescription>
-            Activa/desactiva colaboradores y copia el enlace público o de subida directa.
+            Activa/desactiva colaboradores y copia el enlace de captación de clientes (ahorro luz).
           </CardDescription>
         </CardHeader>
         <CardContent>

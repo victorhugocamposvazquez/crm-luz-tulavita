@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useLayoutEffect, useMemo, typ
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,6 +29,7 @@ import ClientPagination from './ClientPagination';
 import { MapSelector } from '@/components/ui/map-selector';
 import ReminderDialog from '@/components/reminders/ReminderDialog';
 import ClientSupplyAddressesEditor from './ClientSupplyAddressesEditor';
+import { cn } from '@/lib/utils';
 import { ComercializadoraCombobox } from '@/components/dashboard/ComercializadoraCombobox';
 import type { Database } from '@/integrations/supabase/types';
 import type { SupplyAddressDraft } from '@/lib/clients/supplyAddresses';
@@ -935,7 +937,7 @@ export default function ClientManagement() {
               <TableRow>
                       <TableHead>Nombre</TableHead>
                       <TableHead>DNI</TableHead>
-                      <TableHead>Tipo</TableHead>
+                      <TableHead className="min-w-[12rem] w-[1%] whitespace-nowrap">Tipo</TableHead>
                       <TableHead className="min-w-[140px] max-w-[220px]">Comercializadora</TableHead>
                       <TableHead>Dirección</TableHead>
                       <TableHead>Coordenadas</TableHead>
@@ -970,10 +972,22 @@ export default function ClientManagement() {
               ) : (
                  clients.map((client) => {
                    const tipoBadge = client.prospect
-                     ? { label: 'Prospecto', className: 'bg-blue-100 text-blue-800' }
+                     ? {
+                         label: 'Prospecto',
+                         className:
+                           'border-0 bg-sky-100 text-sky-900 shadow-none ring-1 ring-inset ring-sky-700/15 hover:bg-sky-100',
+                       }
                      : client.status === 'inactive'
-                       ? { label: 'Cliente inactivo', className: 'bg-red-100 text-red-800' }
-                       : { label: 'Cliente activo', className: 'bg-green-100 text-green-800' };
+                       ? {
+                           label: 'Cliente inactivo',
+                           className:
+                             'border-0 bg-rose-100 text-rose-900 shadow-none ring-1 ring-inset ring-rose-700/20 hover:bg-rose-100',
+                         }
+                       : {
+                           label: 'Cliente activo',
+                           className:
+                             'border-0 bg-emerald-100 text-emerald-900 shadow-none ring-1 ring-inset ring-emerald-700/15 hover:bg-emerald-100',
+                         };
 
                    const getRowClasses = () => {
                      let classes = "";
@@ -989,10 +1003,10 @@ export default function ClientManagement() {
                     <TableRow key={client.id} className={getRowClasses()}>
                        <TableCell className="font-medium">{client.nombre_apellidos}</TableCell>
                        <TableCell>{client.dni || '-'}</TableCell>
-                       <TableCell>
-                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${tipoBadge.className}`}>
+                       <TableCell className="whitespace-nowrap align-middle">
+                         <Badge className={cn('px-3 py-1 text-xs font-semibold leading-none', tipoBadge.className)}>
                            {tipoBadge.label}
-                         </span>
+                         </Badge>
                        </TableCell>
                        <TableCell className="max-w-[220px] align-top text-sm text-muted-foreground">
                          {client.comercializadora?.trim() ? (

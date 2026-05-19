@@ -1,5 +1,7 @@
 {
   "rewrites": [
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    { "source": "/colaboradores/hibrida", "destination": "/colaboradores/hibrida/index.html" },
+    { "source": "/colaboradores", "destination": "/colaboradores/index.html" },
+    { "source": "/((?!api/|colaboradores).*)", "destination": "/index.html" }
   ]
 }
