@@ -31,7 +31,13 @@ function TvNav({ cta = "Únete", onCta, dark = false, sticky = true }) {
     }}>
       <TvLogo dark={dark} />
       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-        <button type="button" className="tv-btn sm primary" onClick={onCta}>{cta}</button>
+        <button
+          type="button"
+          className={'tv-btn sm ' + (dark ? 'accent' : 'primary')}
+          onClick={onCta}
+        >
+          {cta}
+        </button>
       </div>
     </div>
   );
@@ -86,7 +92,11 @@ function TvForm({ compact = false, dark = false, variant }: { compact?: boolean;
       {error ? (
         <div style={{ fontSize: 12, color: '#b91c1c', textAlign: 'center' }}>{error}</div>
       ) : null}
-      <button type="submit" disabled={sending} className="tv-btn block lg primary">
+      <button
+        type="submit"
+        disabled={sending}
+        className={'tv-btn block lg ' + (dark ? 'accent' : 'primary')}
+      >
         {sending ? 'Enviando...' : 'Quiero colaborar'}
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
       </button>

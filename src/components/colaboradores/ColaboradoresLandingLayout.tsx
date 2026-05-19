@@ -19,13 +19,8 @@ export function ColaboradoresLandingLayout({
   }, [title, description]);
 
   return (
-    <div className="colaboradores-landing-page min-h-screen bg-[#ece9df]">
-      <div
-        id="colaboradores-root"
-        className="colaboradores-landing-root mx-auto min-h-screen max-w-[1180px] bg-[var(--bg,#fafaf8)] shadow-[0_0_60px_rgba(0,0,0,0.08)]"
-      >
-        {children}
-      </div>
+    <div className="colaboradores-landing-page">
+      <div className="colaboradores-landing-root">{children}</div>
     </div>
   );
 }
