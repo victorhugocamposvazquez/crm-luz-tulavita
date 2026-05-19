@@ -903,8 +903,8 @@
 @container (min-width: 1080px) {
   .tv-nav { padding: 26px 60px; }
   .tv-hero {
-    grid-template-columns: 1.15fr 1fr;
-    gap: 80px;
+    grid-template-columns: 1fr 1.1fr;
+    gap: 72px;
     padding: 96px 60px 64px !important;
   }
   .tv-hero h1.tv-display.sm { font-size: 60px !important; line-height: 0.96 !important; }

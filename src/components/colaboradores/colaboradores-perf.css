@@ -23,9 +23,8 @@
   transform: translateZ(0);
 }
 
-/* Mientras el usuario hace scroll, pausamos las animaciones infinitas. */
-.colaboradores-landing-root.is-scrolling .tv-partners .track,
-.colaboradores-landing-root.is-scrolling .tv-ticker .row,
+/* Pausamos solo animaciones decorativas pequeñas durante el scroll.
+   Los carruseles continuos (cobros, colaboradores) NO se frenan. */
 .colaboradores-landing-root.is-scrolling .tv-wafloat::after,
 .colaboradores-landing-root.is-scrolling .tv-live .ring {
   animation-play-state: paused !important;
