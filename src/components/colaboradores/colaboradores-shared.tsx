@@ -158,20 +158,12 @@ function TvSimulator({ compact = false }) {
         className="tv-range"
         style={{ ['--tv-range-progress' as string]: `${((clientes - 1) / 39) * 100}%` }}
       />
-      <div style={{
-        marginTop: 14,
-        padding: '16px 18px',
-        background: 'var(--accent)',
-        borderRadius: 12,
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'baseline'
-      }}>
+      <div className="tv-simulator-result">
         <div>
-          <div style={{ fontSize: 12, fontWeight: 500 }}>Tus ingresos estimados</div>
-          <div style={{ fontSize: 11, opacity: .7 }}>{clientes}/mes × 12 meses</div>
+          <div className="tv-simulator-result__label">Tus ingresos estimados</div>
+          <div className="tv-simulator-result__sub">{clientes}/mes × 12 meses</div>
         </div>
-        <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em' }}>
+        <div className="tv-simulator-result__total">
           {total.toLocaleString('es-ES')}€
         </div>
       </div>

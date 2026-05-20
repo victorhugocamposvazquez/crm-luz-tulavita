@@ -452,6 +452,11 @@
   --accent: #c4ed4f;        /* verde lima Tulavita */
   --accent-deep: #8bc414;
   --accent-soft: rgba(196,237,79,.18);
+  --tv-brand: #045c6c;
+  --tv-brand-light: #065c6c;
+  --tv-section-soft: #efefef;
+  --tv-surface-form: #f8f8f8;
+  --tv-surface-result: #f7f7f7;
   --shadow-sm: 0 1px 2px rgba(0,0,0,.04);
   --shadow-md: 0 4px 16px rgba(0,0,0,.06);
   --radius-sm: 10px;
@@ -521,8 +526,8 @@
   letter-spacing: -0.01em;
 }
 .tv-btn:hover { transform: translateY(-1px); }
-.tv-btn.primary { background: var(--fg); color: #fff; border-color: var(--fg); }
-.tv-btn.accent  { background: var(--accent); color: var(--fg); border-color: var(--accent); font-weight: 600; }
+.tv-btn.primary { background: var(--tv-brand); color: #fff; border-color: var(--tv-brand); font-weight: 600; }
+.tv-btn.accent  { background: var(--tv-brand); color: #fff; border-color: var(--tv-brand); font-weight: 600; }
 .tv-btn.ghost   { background: transparent; }
 .tv-btn.wa      { background: #25D366; color: #fff; border-color: #25D366; font-weight: 600; }
 .tv-btn.block   { width: 100%; }
@@ -547,7 +552,7 @@
   height: 8px;
   border-radius: 999px;
   background:
-    linear-gradient(to right, var(--accent-deep) 0%, var(--accent-deep) var(--tv-range-progress, 0%), var(--line) var(--tv-range-progress, 0%), var(--line) 100%);
+    linear-gradient(to right, var(--tv-brand) 0%, var(--tv-brand) var(--tv-range-progress, 0%), var(--line) var(--tv-range-progress, 0%), var(--line) 100%);
 }
 .tv-range::-moz-range-track {
   height: 8px;
@@ -557,7 +562,7 @@
 .tv-range::-moz-range-progress {
   height: 8px;
   border-radius: 999px;
-  background: var(--accent-deep);
+  background: var(--tv-brand);
 }
 .tv-range::-webkit-slider-thumb {
   -webkit-appearance: none;
@@ -565,7 +570,7 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: var(--fg);
+  background: var(--tv-brand);
   border: 3px solid var(--card);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
   margin-top: -10px;
@@ -576,7 +581,7 @@
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  background: var(--fg);
+  background: var(--tv-brand);
   border: 3px solid var(--card);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
   cursor: grab;
@@ -1024,13 +1029,52 @@
   100% { transform: scale(1.6); opacity: 0; }
 }
 
+/* ---- simulador · pastilla ingresos ---- */
+.tv-simulator-result {
+  margin-top: 14px;
+  padding: 16px 18px;
+  background: var(--tv-surface-result);
+  border-radius: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+}
+.tv-simulator-result__label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--tv-brand-light);
+}
+.tv-simulator-result__sub {
+  font-size: 11px;
+  color: #000000;
+  margin-top: 2px;
+}
+.tv-simulator-result__total {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--tv-brand-light);
+}
+
+/* ---- formulario destacado ---- */
+.tv-form-card {
+  background: var(--tv-surface-form) !important;
+  border-style: dashed !important;
+  border-color: rgb(6, 92, 108) !important;
+}
+
+/* ---- secciones fondo gris ---- */
+.tv-section-soft {
+  background: var(--tv-section-soft);
+}
+
 /* ---- ticker ---- */
 .tv-ticker {
   overflow: hidden;
-  border-top: 1px solid #e1ead0;
-  border-bottom: 1px solid #e1ead0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
   padding: 14px 0;
-  background: #f6faec;
+  background: #ffffff;
 }
 .tv-ticker .row {
   display: flex; gap: 48px;
@@ -1038,9 +1082,9 @@
   width: max-content;
   white-space: nowrap;
   font-size: 14px;
-  color: var(--fg-soft);
+  color: var(--tv-brand-light);
 }
-.tv-ticker .row .star { color: var(--accent-deep); margin-right: 8px; }
+.tv-ticker .row .star { color: var(--tv-brand); margin-right: 8px; }
 @keyframes tv-ticker {
   from { transform: translateX(0); }
   to   { transform: translateX(-50%); }

@@ -61,7 +61,7 @@ export function LandingHibrida() {
 
       {/* FORM */}
       <div style={{ padding: '14px 24px 18px' }}>
-        <div className="tv-card" style={{ background: '#f6faec', borderStyle: 'dashed', borderColor: '#e1ead0' }}>
+        <div className="tv-card tv-form-card">
           <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Empieza hoy</div>
           <div className="tv-lead" style={{ fontSize: 13, marginBottom: 14 }}>
             Contactaremos pronto contigo para empezar.
@@ -136,7 +136,7 @@ export function LandingHibrida() {
       </div>
 
       {/* CUALQUIERA PUEDE */}
-      <div style={{ padding: '8px 24px 32px', background: 'var(--bg-warm)' }}>
+      <div className="tv-section-soft" style={{ padding: '8px 24px 32px' }}>
         <div style={{ padding: '28px 0 10px' }}>
           <span className="tv-eyebrow">¿Es para ti?</span>
           <h2 className="tv-display sm" style={{ fontSize: 30, marginTop: 8, marginBottom: 14 }}>
@@ -253,7 +253,7 @@ export function LandingHibrida() {
       </div>
 
       {/* CIERRE · habla con Lara */}
-      <div style={{ padding: '32px 24px 28px', background: 'var(--bg-warm)', marginTop: 14 }}>
+      <div className="tv-section-soft" style={{ padding: '32px 24px 28px', marginTop: 14 }}>
         <span className="tv-chip"><span className="dot"></span>Habla con alguien</span>
         <h2 className="tv-display sm" style={{ fontSize: 30, marginTop: 14, marginBottom: 8 }}>
           ¿Sigues con dudas?

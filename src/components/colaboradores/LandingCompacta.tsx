@@ -36,7 +36,7 @@ export function LandingCompacta() {
 
       {/* FORM */}
       <div style={{ padding: '14px 24px 18px' }}>
-        <div className="tv-card" style={{ background: '#f6faec', borderStyle: 'dashed', borderColor: '#e1ead0' }}>
+        <div className="tv-card tv-form-card">
           <div style={{ fontWeight: 700, fontSize: 16, marginBottom: 4 }}>Empieza hoy</div>
           <div className="tv-lead" style={{ fontSize: 13, marginBottom: 14 }}>
             Contactaremos pronto contigo para empezar.
