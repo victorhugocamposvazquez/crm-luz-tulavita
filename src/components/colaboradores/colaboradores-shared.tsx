@@ -141,12 +141,16 @@ function TvSimulator({ compact = false }) {
         <div style={{ fontSize: 13, color: 'var(--muted)' }}>Clientes captados al mes</div>
         <div style={{ fontWeight: 700, fontSize: 18, fontFamily: 'Geist Mono' }}>{clientes}</div>
       </div>
-      <input type="range" min="1" max="40" value={clientes}
+      <input
+        type="range"
+        min="1"
+        max="40"
+        value={clientes}
         onChange={(e) => setClientes(parseInt(e.target.value))}
-        style={{
-          width: '100%',
-          accentColor: 'var(--accent-deep)',
-        }} />
+        aria-label="Clientes captados al mes"
+        className="tv-range"
+        style={{ ['--tv-range-progress' as string]: `${((clientes - 1) / 39) * 100}%` }}
+      />
       <div style={{
         marginTop: 14,
         padding: '16px 18px',
