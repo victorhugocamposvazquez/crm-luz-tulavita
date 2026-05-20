@@ -454,6 +454,7 @@
   --accent-soft: rgba(196,237,79,.18);
   --tv-brand: #045c6c;
   --tv-brand-light: #065c6c;
+  --tv-highlight: #d8ff6b;
   --tv-section-soft: #efefef;
   --tv-surface-form: #f8f8f8;
   --tv-surface-result: #f7f7f7;
@@ -650,7 +651,7 @@
 
 /* ---- highlight underline ---- */
 .tv-mark {
-  background: linear-gradient(transparent 70%, var(--accent) 70%);
+  background: linear-gradient(transparent 70%, var(--tv-highlight) 70%);
   padding: 0 0.06em;
 }
 .tv-underline {
@@ -1082,9 +1083,9 @@
   width: max-content;
   white-space: nowrap;
   font-size: 14px;
-  color: var(--tv-brand-light);
+  color: #000000;
 }
-.tv-ticker .row .star { color: var(--tv-brand); margin-right: 8px; }
+.tv-ticker .row .star { color: var(--tv-highlight); margin-right: 8px; }
 @keyframes tv-ticker {
   from { transform: translateX(0); }
   to   { transform: translateX(-50%); }
