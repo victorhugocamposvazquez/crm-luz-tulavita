@@ -1,6 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import type { ColaboradoresLandingVariant } from './colaboradores-config';
 import { TV_BRAND, TEL_NUMBER, waLink } from './colaboradores-config';
+import { COLABORADORES_AVISO_LEGAL_TEXT } from './colaboradores-legal';
 import { useColaboradoresLeadSubmit } from '@/hooks/useColaboradoresLeadSubmit';
 
 // ───────── logo (misma marca que /ahorra-factura-luz) ─────────
@@ -467,14 +474,46 @@ function TvTestiCarousel({ items }: { items?: TestiItem[] }) {
 
 // ───────── footer ─────────
 function TvFoot({ dark = false }) {
+  const [legalOpen, setLegalOpen] = useState(false);
+  const year = new Date().getFullYear();
+
   return (
-    <div className="tv-foot" style={{ borderColor: dark ? 'rgba(255,255,255,.1)' : 'var(--line)' }}>
-      <div>Tulavita S.L · 2026</div>
-      <div style={{ display: 'flex', gap: 18 }}>
-        <span>Aviso legal</span>
-        <span>Política de colaborador</span>
+    <>
+      <div className="tv-foot" style={{ borderColor: dark ? 'rgba(255,255,255,.1)' : 'var(--line)' }}>
+        <div>
+          Tulavita S.L · {year}
+          {dark ? null : <span style={{ opacity: 0.65 }}>, derechos reservados</span>}
+        </div>
+        <button
+          type="button"
+          onClick={() => setLegalOpen(true)}
+          className="tv-foot-link"
+          style={{ color: dark ? 'rgba(255,255,255,.75)' : undefined }}
+        >
+          Aviso legal
+        </button>
       </div>
-    </div>
+
+      <Dialog open={legalOpen} onOpenChange={setLegalOpen}>
+        <DialogContent className="colaboradores-legal-dialog max-h-[85dvh] max-w-lg overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-left">Aviso legal</DialogTitle>
+          </DialogHeader>
+          <div className="colaboradores-legal-dialog__body whitespace-pre-line">
+            {COLABORADORES_AVISO_LEGAL_TEXT}
+          </div>
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => setLegalOpen(false)}
+              className="tv-btn block lg accent"
+            >
+              Cerrar
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 

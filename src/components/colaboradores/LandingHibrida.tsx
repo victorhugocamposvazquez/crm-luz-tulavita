@@ -279,5 +279,3 @@ export function LandingHibrida() {
     </div>
   );
 }
-
-Object.assign(window, { LandingHibrida });

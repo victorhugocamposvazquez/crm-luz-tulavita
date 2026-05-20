@@ -1,5 +1,6 @@
 import { useEffect, type ReactNode } from 'react';
 import { useColaboradoresScrollPerf } from '@/hooks/useColaboradoresScrollPerf';
+import { ColaboradoresCookieConsent } from './ColaboradoresCookieConsent';
 import './colaboradores-landing.css';
 import './colaboradores-perf.css';
 
@@ -25,6 +26,7 @@ export function ColaboradoresLandingLayout({
   return (
     <div className="colaboradores-landing-page">
       <div className="colaboradores-landing-root">{children}</div>
+      <ColaboradoresCookieConsent />
     </div>
   );
 }
