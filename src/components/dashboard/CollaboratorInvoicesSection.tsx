@@ -17,7 +17,7 @@ type InvoiceRow = {
   file_name: string | null;
   invoice_number: string | null;
   amount_eur: number | null;
-  status: 'submitted' | 'approved' | 'paid' | 'rejected';
+  status: 'submitted' | 'approved' | 'paid' | 'rejected' | 'cancelled';
   rejection_reason: string | null;
   submitted_at: string;
   collaborators?: { name: string; code: string } | null;
@@ -39,6 +39,7 @@ const STATUS_LABELS: Record<InvoiceRow['status'], string> = {
   approved: 'Aprobada',
   paid: 'Pagada',
   rejected: 'Rechazada',
+  cancelled: 'Anulada',
 };
 
 export function CollaboratorInvoicesSection({
@@ -190,6 +191,9 @@ export function CollaboratorInvoicesSection({
                 <Badge variant={row.status === 'paid' ? 'default' : 'secondary'}>
                   {STATUS_LABELS[row.status]}
                 </Badge>
+                {row.rejection_reason && (row.status === 'rejected' || row.status === 'cancelled') && (
+                  <p className="text-xs text-muted-foreground mt-1 max-w-[220px]">{row.rejection_reason}</p>
+                )}
               </TableCell>
               <TableCell>
                 <div className="flex flex-wrap gap-1">

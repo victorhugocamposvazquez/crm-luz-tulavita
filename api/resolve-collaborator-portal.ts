@@ -76,6 +76,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       .eq('status', 'pending')
       .order('created_at', { ascending: false });
 
+    const { data: commissionInvoices } = await supabase
+      .from('collaborator_invoices')
+      .select('id, payout_id, file_name, invoice_number, amount_eur, status, rejection_reason, submitted_at')
+      .eq('collaborator_id', collaborator.id)
+      .order('submitted_at', { ascending: false })
+      .limit(50);
+
     const { data: referralLinks } = await supabase
       .from('collaborator_referral_links')
       .select('id, token, entry_mode, is_active, expires_at, label, created_at')
@@ -109,6 +116,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         leads_converted: convertedCount ?? 0,
       },
       pending_payouts: pendingPayouts ?? [],
+      commission_invoices: commissionInvoices ?? [],
       referral_links: (referralLinks ?? []).map((l) => ({
         ...l,
         entry_mode: (l.entry_mode ?? 'auto') as EntryMode,

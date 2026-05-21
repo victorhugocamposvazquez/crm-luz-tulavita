@@ -102,6 +102,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return;
   }
 
+  const { data: activeInvoice } = await supabase
+    .from('collaborator_invoices')
+    .select('id')
+    .eq('payout_id', payoutId)
+    .in('status', ['submitted', 'approved'])
+    .maybeSingle();
+
+  if (activeInvoice) {
+    cors(res);
+    res.status(400).json({
+      success: false,
+      error: 'Ya hay una factura activa para esta liquidación. Anúlala antes de subir otra.',
+    });
+    return;
+  }
+
   const parsed = parseBase64(fileBase64);
   if (!parsed) {
     cors(res);
