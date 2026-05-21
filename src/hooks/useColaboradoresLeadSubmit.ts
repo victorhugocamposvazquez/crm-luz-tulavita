@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import type { ColaboradoresLandingVariant } from '@/components/colaboradores/colaboradores-config';
-import { COLABORADORES_CAMPAIGNS } from '@/components/colaboradores/colaboradores-config';
+import { useCallback, useMemo, useState } from 'react';
+import {
+  COLABORADORES_RECRUITMENT_CAMPAIGN,
+} from '@/components/colaboradores/colaboradores-config';
 import { useMetaAttribution } from '@/hooks/useMetaAttribution';
 
 export type ColaboradoresLeadFormState = {
@@ -32,7 +33,7 @@ function readRecruitRefFromUrl(): string | null {
   return ref?.trim() || null;
 }
 
-export function useColaboradoresLeadSubmit(variant: ColaboradoresLandingVariant) {
+export function useColaboradoresLeadSubmit() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
@@ -52,7 +53,6 @@ export function useColaboradoresLeadSubmit(variant: ColaboradoresLandingVariant)
 
         const customFields: Record<string, unknown> = {
           landing_type: 'colaboradores',
-          landing_variant: variant,
           ...(attribution.campaign ? { utm_campaign: attribution.campaign } : {}),
           ...(attribution.adset ? { utm_term: attribution.adset } : {}),
           ...(attribution.ad ? { utm_content: attribution.ad } : {}),
@@ -65,7 +65,7 @@ export function useColaboradoresLeadSubmit(variant: ColaboradoresLandingVariant)
           phone: state.tel.trim(),
           email: state.email.trim() || undefined,
           source: 'web_form',
-          campaign: COLABORADORES_CAMPAIGNS[variant],
+          campaign: COLABORADORES_RECRUITMENT_CAMPAIGN,
           custom_fields: customFields,
         };
 
@@ -95,7 +95,7 @@ export function useColaboradoresLeadSubmit(variant: ColaboradoresLandingVariant)
             body: JSON.stringify({
               lead_id: data.lead.id,
               source: 'web_form',
-              campaign: COLABORADORES_CAMPAIGNS[variant],
+              campaign: COLABORADORES_RECRUITMENT_CAMPAIGN,
               adset: attribution.adset ?? null,
               ad: attribution.ad ?? null,
               custom_fields: customFields,
@@ -110,7 +110,7 @@ export function useColaboradoresLeadSubmit(variant: ColaboradoresLandingVariant)
         setSending(false);
       }
     },
-    [sending, variant, attribution, recruitRef],
+    [sending, attribution, recruitRef],
   );
 
   return { submit, sending, error, sent, setSent };

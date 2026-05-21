@@ -12,7 +12,6 @@ import LeadLanding from "./pages/LeadLanding";
 import AhorroLuz from "./pages/AhorroLuz";
 import NotFound from "./pages/NotFound";
 
-const ColaboradoresCompacta = lazy(() => import("./pages/ColaboradoresCompacta"));
 const ColaboradoresHibrida = lazy(() => import("./pages/ColaboradoresHibrida"));
 const ColaboradorPortal = lazy(() => import("./pages/ColaboradorPortal"));
 
@@ -32,14 +31,6 @@ const App = () => (
             <Route path="/lead" element={<LeadLanding />} />
             <Route path="/ahorra-factura-luz" element={<AhorroLuz />} />
             <Route
-              path="/colaboradores"
-              element={
-                <Suspense fallback={null}>
-                  <ColaboradoresCompacta />
-                </Suspense>
-              }
-            />
-            <Route
               path="/hazte-colaborador"
               element={
                 <Suspense fallback={null}>
@@ -47,6 +38,7 @@ const App = () => (
                 </Suspense>
               }
             />
+            <Route path="/colaboradores" element={<Navigate to="/hazte-colaborador" replace />} />
             <Route path="/colaboradores/hibrida" element={<Navigate to="/hazte-colaborador" replace />} />
             <Route
               path="/colaborador/acceso"

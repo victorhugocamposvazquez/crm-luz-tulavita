@@ -5,7 +5,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import type { ColaboradoresLandingVariant } from './colaboradores-config';
 import { TV_BRAND, TEL_NUMBER, waLink } from './colaboradores-config';
 import { COLABORADORES_AVISO_LEGAL_TEXT } from './colaboradores-legal';
 import { useColaboradoresLeadSubmit } from '@/hooks/useColaboradoresLeadSubmit';
@@ -60,9 +59,9 @@ function TvStat({ n, l, accent }) {
 }
 
 // ───────── formulario rápido ─────────
-function TvForm({ compact = false, dark = false, variant }: { compact?: boolean; dark?: boolean; variant: ColaboradoresLandingVariant }) {
+function TvForm({ compact = false, dark = false }: { compact?: boolean; dark?: boolean }) {
   const [state, setState] = useState({ nombre: '', tel: '', email: '' });
-  const { submit: submitLead, sending, error, sent } = useColaboradoresLeadSubmit(variant);
+  const { submit: submitLead, sending, error, sent } = useColaboradoresLeadSubmit();
   const submit = (e: FormEvent) => {
     void submitLead(e, state);
   };

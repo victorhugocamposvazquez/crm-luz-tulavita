@@ -67,7 +67,7 @@ export function RecruitmentLeadsSection({ onConvertLead }: RecruitmentLeadsSecti
             <div>
               <CardTitle>Leads de reclutamiento</CardTitle>
               <CardDescription>
-                Prospectos desde /colaboradores o /hazte-colaborador (campañas colaboradores_compacta o hazte_colaborador).
+                Prospectos desde /hazte-colaborador (campaña hazte_colaborador).
               </CardDescription>
             </div>
             <Button variant="outline" size="sm" onClick={() => void fetchLeads()} disabled={loading}>

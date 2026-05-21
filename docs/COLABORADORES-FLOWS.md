@@ -4,17 +4,16 @@ Documentación de los dos funnels principales y las APIs involucradas.
 
 ## Funnel 1 — Reclutamiento de colaboradores
 
-**Rutas:** `/colaboradores`, `/hazte-colaborador` (antes `/colaboradores/hibrida`, redirige)
+**Ruta:** `/hazte-colaborador` (redirecciones legacy: `/colaboradores`, `/colaboradores/hibrida`)
 
 **Objetivo:** Captar prospectos que quieren unirse al programa de colaboradores.
 
 | Campo lead | Valor |
 |------------|-------|
 | `source` | `web_form` |
-| `campaign` | `colaboradores_compacta` o `hazte_colaborador` |
+| `campaign` | `hazte_colaborador` |
 | `status` | `contacted` (por defecto en API) |
 | `custom_fields.landing_type` | `colaboradores` |
-| `custom_fields.landing_variant` | `compacta` \| `hibrida` |
 
 **Flujo:**
 
@@ -87,11 +86,10 @@ Documentación de los dos funnels principales y las APIs involucradas.
   "phone": "612345678",
   "email": "maria@example.com",
   "source": "web_form",
-  "campaign": "colaboradores_compacta",
+  "campaign": "hazte_colaborador",
   "collaborator_id": "uuid-opcional",
   "custom_fields": {
-    "landing_type": "colaboradores",
-    "landing_variant": "compacta"
+    "landing_type": "colaboradores"
   }
 }
 ```
@@ -104,12 +102,11 @@ Respuesta: `{ "success": true, "lead": { "id": "..." }, "isNew": true }`
 {
   "lead_id": "uuid",
   "source": "web_form",
-  "campaign": "colaboradores_compacta",
+  "campaign": "hazte_colaborador",
   "adset": "utm_term",
   "ad": "utm_content",
   "collaborator_id": null,
   "custom_fields": {
-    "landing_variant": "compacta",
     "utm_source": "facebook",
     "fbclid": "..."
   }

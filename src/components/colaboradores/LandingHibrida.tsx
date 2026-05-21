@@ -66,7 +66,7 @@ export function LandingHibrida() {
           <div className="tv-lead" style={{ fontSize: 13, marginBottom: 14 }}>
             Contactaremos pronto contigo para empezar.
           </div>
-          <TvForm compact variant="hibrida" />
+          <TvForm compact />
         </div>
       </div>
 
