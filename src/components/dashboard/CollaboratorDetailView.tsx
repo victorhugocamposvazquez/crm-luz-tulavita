@@ -11,8 +11,7 @@ import { toast } from '@/hooks/use-toast';
 import { ArrowLeft, RefreshCw, Shield, Link2 } from 'lucide-react';
 import { CollaboratorKitMenu } from './CollaboratorKitMenu';
 import { CollaboratorCapturedClientsSection } from './CollaboratorCapturedClientsSection';
-import { CollaboratorPayoutsSection } from './CollaboratorPayoutsSection';
-import { CollaboratorInvoicesSection } from './CollaboratorInvoicesSection';
+import { CollaboratorPaymentsSection } from './CollaboratorPaymentsSection';
 import { CollaboratorTokenManager } from './CollaboratorTokenManager';
 import { buildClientCaptureUrl, getAppBaseUrl } from '@/lib/collaborators/links';
 
@@ -51,7 +50,7 @@ export function CollaboratorDetailView({ collaborator, onBack, onUpdated }: Coll
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [creatingPayout, setCreatingPayout] = useState(false);
-  const [payoutRefreshKey, setPayoutRefreshKey] = useState(0);
+  const [paymentsRefreshKey, setPaymentsRefreshKey] = useState(0);
 
   const campaign = `collaborator:${collaborator.code}`;
   const clientCaptureUrl = useMemo(
@@ -189,10 +188,10 @@ export function CollaboratorDetailView({ collaborator, onBack, onUpdated }: Coll
       }
 
       toast({
-        title: 'Liquidación creada',
-        description: `${pendingLeadIds.length} convertidos · ${totalAmount.toFixed(2)} €`,
+        title: 'Liquidación generada',
+        description: `${pendingLeadIds.length} convertidos · ${totalAmount.toFixed(2)} €. El colaborador puede subir su factura desde el portal.`,
       });
-      setPayoutRefreshKey((k) => k + 1);
+      setPaymentsRefreshKey((k) => k + 1);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'No se pudo crear la liquidación';
       toast({ title: 'Error', description: message, variant: 'destructive' });
@@ -233,8 +232,7 @@ export function CollaboratorDetailView({ collaborator, onBack, onUpdated }: Coll
         <TabsList className="flex h-auto flex-wrap justify-start gap-1">
           <TabsTrigger value="resumen">Resumen</TabsTrigger>
           <TabsTrigger value="clientes">Clientes captados</TabsTrigger>
-          <TabsTrigger value="liquidaciones">Liquidaciones</TabsTrigger>
-          <TabsTrigger value="facturas">Facturas</TabsTrigger>
+          <TabsTrigger value="pagos">Pagos y facturas</TabsTrigger>
           <TabsTrigger value="accesos">Accesos y kit</TabsTrigger>
         </TabsList>
 
@@ -365,19 +363,15 @@ export function CollaboratorDetailView({ collaborator, onBack, onUpdated }: Coll
           <CollaboratorCapturedClientsSection collaboratorId={collaborator.id} embedded={false} />
         </TabsContent>
 
-        <TabsContent value="liquidaciones">
-          <CollaboratorPayoutsSection
-            key={payoutRefreshKey}
+        <TabsContent value="pagos">
+          <CollaboratorPaymentsSection
+            key={paymentsRefreshKey}
             collaboratorId={collaborator.id}
             dateFrom={dateFrom}
             dateTo={dateTo}
             onCreatePayout={() => void createPendingPayout()}
             creatingPayout={creatingPayout}
           />
-        </TabsContent>
-
-        <TabsContent value="facturas">
-          <CollaboratorInvoicesSection collaboratorId={collaborator.id} />
         </TabsContent>
 
         <TabsContent value="accesos" className="space-y-4">

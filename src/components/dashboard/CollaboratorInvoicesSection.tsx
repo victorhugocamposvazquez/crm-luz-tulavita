@@ -21,6 +21,17 @@ type InvoiceRow = {
   rejection_reason: string | null;
   submitted_at: string;
   collaborators?: { name: string; code: string } | null;
+  collaborator_payouts?: {
+    amount_total_eur: number;
+    status: string;
+    leads_count: number;
+  } | null;
+};
+
+const PAYOUT_STATUS_LABELS: Record<string, string> = {
+  pending: 'Pendiente',
+  paid: 'Pagada',
+  cancelled: 'Cancelada',
 };
 
 const STATUS_LABELS: Record<InvoiceRow['status'], string> = {
@@ -30,7 +41,15 @@ const STATUS_LABELS: Record<InvoiceRow['status'], string> = {
   rejected: 'Rechazada',
 };
 
-export function CollaboratorInvoicesSection({ collaboratorId, embedded = false }: { collaboratorId?: string; embedded?: boolean }) {
+export function CollaboratorInvoicesSection({
+  collaboratorId,
+  embedded = false,
+  onPaymentRegistered,
+}: {
+  collaboratorId?: string;
+  embedded?: boolean;
+  onPaymentRegistered?: () => void;
+}) {
   const [rows, setRows] = useState<InvoiceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -41,7 +60,7 @@ export function CollaboratorInvoicesSection({ collaboratorId, embedded = false }
       let query = supabase
         .from('collaborator_invoices')
         .select(
-          'id, collaborator_id, payout_id, file_path, file_name, invoice_number, amount_eur, status, rejection_reason, submitted_at, collaborators(name, code)',
+          'id, collaborator_id, payout_id, file_path, file_name, invoice_number, amount_eur, status, rejection_reason, submitted_at, collaborators(name, code), collaborator_payouts(amount_total_eur, status, leads_count)',
         )
         .order('submitted_at', { ascending: false })
         .limit(collaboratorId ? 100 : 50);
@@ -84,8 +103,15 @@ export function CollaboratorInvoicesSection({ collaboratorId, embedded = false }
           .eq('id', payoutId);
       }
 
-      toast({ title: `Factura marcada como ${STATUS_LABELS[status].toLowerCase()}` });
+      toast({
+        title: status === 'paid' ? 'Pago registrado en el CRM' : `Factura ${STATUS_LABELS[status].toLowerCase()}`,
+        description:
+          status === 'paid'
+            ? 'Tras el abono manual fuera del CRM, la liquidación vinculada queda marcada como pagada.'
+            : undefined,
+      });
       void fetchInvoices();
+      if (status === 'paid') onPaymentRegistered?.();
     } catch (e) {
       toast({
         title: 'Error',
@@ -107,7 +133,7 @@ export function CollaboratorInvoicesSection({ collaboratorId, embedded = false }
   };
 
   const showCollaboratorColumn = !collaboratorId;
-  const colSpan = showCollaboratorColumn ? 6 : 5;
+  const colSpan = showCollaboratorColumn ? 7 : 6;
 
   const table = (
     <Table>
@@ -115,6 +141,7 @@ export function CollaboratorInvoicesSection({ collaboratorId, embedded = false }
         <TableRow>
           <TableHead>Fecha</TableHead>
           {showCollaboratorColumn && <TableHead>Colaborador</TableHead>}
+          <TableHead>Liquidación</TableHead>
           <TableHead>Nº factura</TableHead>
           <TableHead className="text-right">Importe</TableHead>
           <TableHead>Estado</TableHead>
@@ -125,7 +152,7 @@ export function CollaboratorInvoicesSection({ collaboratorId, embedded = false }
         {rows.length === 0 ? (
           <TableRow>
             <TableCell colSpan={colSpan} className="text-muted-foreground">
-              {loading ? 'Cargando...' : 'Sin facturas de comisión'}
+              {loading ? 'Cargando...' : 'Sin facturas recibidas del colaborador'}
             </TableCell>
           </TableRow>
         ) : (
@@ -142,6 +169,19 @@ export function CollaboratorInvoicesSection({ collaboratorId, embedded = false }
                   )}
                 </TableCell>
               )}
+              <TableCell className="text-xs">
+                {row.collaborator_payouts ? (
+                  <>
+                    <p className="font-medium">{Number(row.collaborator_payouts.amount_total_eur).toFixed(2)} €</p>
+                    <p className="text-muted-foreground">
+                      {row.collaborator_payouts.leads_count} conv. ·{' '}
+                      {PAYOUT_STATUS_LABELS[row.collaborator_payouts.status] ?? row.collaborator_payouts.status}
+                    </p>
+                  </>
+                ) : (
+                  '—'
+                )}
+              </TableCell>
               <TableCell>{row.invoice_number ?? '—'}</TableCell>
               <TableCell className="text-right">
                 {row.amount_eur != null ? `${Number(row.amount_eur).toFixed(2)} €` : '—'}
@@ -185,7 +225,7 @@ export function CollaboratorInvoicesSection({ collaboratorId, embedded = false }
                       disabled={updatingId === row.id}
                       onClick={() => void updateStatus(row.id, 'paid', row.payout_id)}
                     >
-                      Marcar pagada
+                      Registrar pago manual
                     </Button>
                   )}
                 </div>
@@ -208,9 +248,12 @@ export function CollaboratorInvoicesSection({ collaboratorId, embedded = false }
           <div>
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Facturas de comisión
+              Facturas del colaborador
             </CardTitle>
-            <CardDescription>Facturas enviadas por el colaborador desde el portal.</CardDescription>
+            <CardDescription>
+              PDFs de comisión enviados desde el portal, vinculados a una liquidación. Aprueba la factura y, cuando hayas
+              pagado fuera del CRM, registra el pago aquí.
+            </CardDescription>
           </div>
           <Button variant="outline" size="sm" onClick={() => void fetchInvoices()} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />

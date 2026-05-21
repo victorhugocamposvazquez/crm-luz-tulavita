@@ -449,6 +449,9 @@ export default function ColaboradorPortal() {
                   <Wallet className="h-5 w-5" />
                   Liquidaciones pendientes
                 </CardTitle>
+                <CardDescription>
+                  Comisiones calculadas por Tulavita. El pago se realiza manualmente; aquí solo ves lo pendiente de cobro.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {pending_payouts.length === 0 ? (
@@ -473,7 +476,10 @@ export default function ColaboradorPortal() {
               <Card>
                 <CardHeader>
                   <CardTitle>Subir factura de comisión</CardTitle>
-                  <CardDescription>PDF de tu factura hacia Tulavita para cobrar la liquidación.</CardDescription>
+                  <CardDescription>
+                    Sube el PDF de tu factura hacia Tulavita. Tras revisarla, te pagaremos por transferencia y lo
+                    registraremos en el CRM.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
                   <form className="space-y-4" onSubmit={(e) => void submitCommissionInvoice(e)}>

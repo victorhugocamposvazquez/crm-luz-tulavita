@@ -97,7 +97,7 @@ export function CollaboratorPayoutsSection({
         .update({ status: 'paid', paid_at: new Date().toISOString() })
         .eq('id', payoutId);
       if (error) throw error;
-      toast({ title: 'Liquidación marcada como pagada' });
+      toast({ title: 'Pago registrado en el CRM', description: 'La liquidación queda marcada como pagada.' });
       await fetchPayouts();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'No se pudo actualizar la liquidación';
@@ -169,7 +169,7 @@ export function CollaboratorPayoutsSection({
                     disabled={markingPayoutId === payout.id}
                   >
                     <CheckCircle2 className="h-3.5 w-3.5 mr-2" />
-                    {markingPayoutId === payout.id ? 'Guardando...' : 'Marcar pagada'}
+                    {markingPayoutId === payout.id ? 'Guardando...' : 'Registrar pago manual'}
                   </Button>
                 ) : (
                   <span className="text-muted-foreground text-sm">—</span>
@@ -196,7 +196,8 @@ export function CollaboratorPayoutsSection({
               Liquidaciones
             </CardTitle>
             <CardDescription>
-              Historial de liquidaciones generadas. Cada lead convertido se liquida una sola vez.
+              Comisiones calculadas a mano en el CRM. Cada lead convertido solo puede incluirse en una liquidación.
+              Los abonos reales se hacen fuera del sistema; aquí solo se registra el estado.
               {(dateFrom || dateTo) && (
                 <span className="block mt-1 text-xs">
                   Filtro activo: {dateFrom || '…'} → {dateTo || '…'}
@@ -208,7 +209,7 @@ export function CollaboratorPayoutsSection({
             {onCreatePayout && (
               <Button variant="default" size="sm" onClick={onCreatePayout} disabled={creatingPayout}>
                 <Wallet className="h-4 w-4 mr-2" />
-                {creatingPayout ? 'Creando...' : 'Liquidar pendientes'}
+                {creatingPayout ? 'Generando...' : 'Generar liquidación'}
               </Button>
             )}
             <Button variant="outline" size="sm" onClick={() => void fetchPayouts()} disabled={loading}>
