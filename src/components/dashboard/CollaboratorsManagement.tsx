@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/hooks/use-toast';
-import { Plus, RefreshCw, Users, Link2, ExternalLink, ChevronRight } from 'lucide-react';
+import { Plus, RefreshCw, Users, Link2, ExternalLink, ChevronRight, Megaphone } from 'lucide-react';
 import { RecruitmentLeadsSection } from './RecruitmentLeadsSection';
 import { ConvertLeadDialog } from './ConvertLeadDialog';
 import { CollaboratorDetailView, type CollaboratorRow } from './CollaboratorDetailView';
@@ -217,187 +218,214 @@ export default function CollaboratorsManagement() {
           Colaboradores
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Gestiona colaboradores activos. Entra en cada ficha para ver clientes, liquidaciones y facturas.
+          Gestiona colaboradores activos o captación y reclutamiento desde las pestañas inferiores.
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Nuevo colaborador</CardTitle>
-          <CardDescription>Crea un colaborador con código propio para atribuir leads y compartir enlaces.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form className="grid gap-3 md:grid-cols-2" onSubmit={handleCreate}>
-            <div className="space-y-2">
-              <Label htmlFor="collab-name">Nombre</Label>
-              <Input
-                id="collab-name"
-                placeholder="Ej. Marta Pérez"
-                value={name}
-                onChange={(e) => {
-                  const nextName = e.target.value;
-                  setName(nextName);
-                  if (!code.trim()) setCode(slugifyCode(nextName));
-                }}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="collab-code">Código (URL)</Label>
-              <Input
-                id="collab-code"
-                placeholder="ej. marta-zona-sur"
-                value={code}
-                onChange={(e) => setCode(slugifyCode(e.target.value))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="collab-email">Email (opcional)</Label>
-              <Input id="collab-email" value={email} onChange={(e) => setEmail(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="collab-phone">Teléfono (opcional)</Label>
-              <Input id="collab-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="collab-notes">Notas (opcional)</Label>
-              <Input id="collab-notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="collab-commission">Comisión por convertido (€)</Label>
-              <Input
-                id="collab-commission"
-                value={commissionPerConverted}
-                onChange={(e) => setCommissionPerConverted(e.target.value)}
-                inputMode="decimal"
-                placeholder="30"
-              />
-            </div>
-            <div className="md:col-span-2 flex items-center gap-2">
-              <Button type="submit" disabled={saving}>
-                <Plus className="h-4 w-4 mr-2" />
-                {saving ? 'Guardando...' : 'Crear colaborador'}
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+      <Tabs defaultValue="listado" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="listado" className="gap-2">
+            <Users className="h-4 w-4" />
+            Listado
+          </TabsTrigger>
+          <TabsTrigger value="marketing" className="gap-2">
+            <Megaphone className="h-4 w-4" />
+            Marketing
+          </TabsTrigger>
+        </TabsList>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <CardTitle>Listado de colaboradores</CardTitle>
-              <CardDescription>
-                {rows.length} colaborador{rows.length === 1 ? '' : 'es'} registrado{rows.length === 1 ? '' : 's'}.
-              </CardDescription>
-            </div>
-            <Button type="button" variant="outline" size="sm" onClick={() => void fetchCollaborators()} disabled={loading}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Recargar
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Código</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Clientes</TableHead>
-                <TableHead className="text-right">Convertidos</TableHead>
-                <TableHead className="text-right">Comisión/conv.</TableHead>
-                <TableHead></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={7}>Cargando...</TableCell>
-                </TableRow>
-              ) : rows.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-muted-foreground">
-                    Aún no hay colaboradores. Crea el primero arriba.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                rows.map((row) => {
-                  const stats = statsByCollaborator[row.id] ?? { total: 0, converted: 0 };
-                  return (
-                    <TableRow
-                      key={row.id}
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() => setSelectedCollaborator(row)}
-                    >
-                      <TableCell>
-                        <div className="font-medium">{row.name}</div>
-                        {(row.email || row.phone) && (
-                          <p className="text-xs text-muted-foreground">
-                            {[row.email, row.phone].filter(Boolean).join(' · ')}
-                          </p>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{row.code}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={row.is_active ? 'default' : 'secondary'}>
-                          {row.is_active ? 'Activo' : 'Inactivo'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">{statsLoading ? '…' : stats.total}</TableCell>
-                      <TableCell className="text-right font-medium">
-                        {statsLoading ? '…' : stats.converted}
-                      </TableCell>
-                      <TableCell className="text-right">{row.commission_per_converted_eur.toFixed(2)} €</TableCell>
-                      <TableCell>
-                        <Button variant="ghost" size="sm" onClick={() => setSelectedCollaborator(row)}>
-                          Ver ficha
-                          <ChevronRight className="h-4 w-4 ml-1" />
-                        </Button>
+        <TabsContent value="listado">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <CardTitle>Colaboradores activos</CardTitle>
+                  <CardDescription>
+                    {rows.length} colaborador{rows.length === 1 ? '' : 'es'} registrado{rows.length === 1 ? '' : 's'}.
+                    Entra en cada ficha para ver clientes, liquidaciones y facturas.
+                  </CardDescription>
+                </div>
+                <Button type="button" variant="outline" size="sm" onClick={() => void fetchCollaborators()} disabled={loading}>
+                  <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                  Recargar
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nombre</TableHead>
+                    <TableHead>Código</TableHead>
+                    <TableHead>Estado</TableHead>
+                    <TableHead className="text-right">Clientes</TableHead>
+                    <TableHead className="text-right">Convertidos</TableHead>
+                    <TableHead className="text-right">Comisión/conv.</TableHead>
+                    <TableHead></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={7}>Cargando...</TableCell>
+                    </TableRow>
+                  ) : rows.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-muted-foreground">
+                        Aún no hay colaboradores. Créalos desde la pestaña Marketing.
                       </TableCell>
                     </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                  ) : (
+                    rows.map((row) => {
+                      const stats = statsByCollaborator[row.id] ?? { total: 0, converted: 0 };
+                      return (
+                        <TableRow
+                          key={row.id}
+                          className="cursor-pointer hover:bg-muted/50"
+                          onClick={() => setSelectedCollaborator(row)}
+                        >
+                          <TableCell>
+                            <div className="font-medium">{row.name}</div>
+                            {(row.email || row.phone) && (
+                              <p className="text-xs text-muted-foreground">
+                                {[row.email, row.phone].filter(Boolean).join(' · ')}
+                              </p>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{row.code}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={row.is_active ? 'default' : 'secondary'}>
+                              {row.is_active ? 'Activo' : 'Inactivo'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right">{statsLoading ? '…' : stats.total}</TableCell>
+                          <TableCell className="text-right font-medium">
+                            {statsLoading ? '…' : stats.converted}
+                          </TableCell>
+                          <TableCell className="text-right">{row.commission_per_converted_eur.toFixed(2)} €</TableCell>
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedCollaborator(row);
+                              }}
+                            >
+                              Ver ficha
+                              <ChevronRight className="h-4 w-4 ml-1" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Link2 className="h-5 w-5" />
-            Reclutamiento de colaboradores
-          </CardTitle>
-          <CardDescription>
-            Prospectos desde la landing pública /hazte-colaborador. Es independiente de los colaboradores ya activos.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-medium">Landing «Hazte colaborador»</p>
-              <p className="break-all text-xs text-muted-foreground">{recruitmentUrl}</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => void copyToClipboard(recruitmentUrl)}>
-                Copiar enlace
-              </Button>
-              <Button type="button" variant="ghost" size="sm" asChild>
-                <a href={`${COLABORADORES_RECRUITMENT_ROUTE}/`} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="mr-1 h-4 w-4" />
-                  Abrir
-                </a>
-              </Button>
-            </div>
-          </div>
+        <TabsContent value="marketing" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Nuevo colaborador</CardTitle>
+              <CardDescription>
+                Alta manual de un colaborador con código propio para atribuir leads y compartir enlaces.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form className="grid gap-3 md:grid-cols-2" onSubmit={handleCreate}>
+                <div className="space-y-2">
+                  <Label htmlFor="collab-name">Nombre</Label>
+                  <Input
+                    id="collab-name"
+                    placeholder="Ej. Marta Pérez"
+                    value={name}
+                    onChange={(e) => {
+                      const nextName = e.target.value;
+                      setName(nextName);
+                      if (!code.trim()) setCode(slugifyCode(nextName));
+                    }}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="collab-code">Código (URL)</Label>
+                  <Input
+                    id="collab-code"
+                    placeholder="ej. marta-zona-sur"
+                    value={code}
+                    onChange={(e) => setCode(slugifyCode(e.target.value))}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="collab-email">Email (opcional)</Label>
+                  <Input id="collab-email" value={email} onChange={(e) => setEmail(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="collab-phone">Teléfono (opcional)</Label>
+                  <Input id="collab-phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                </div>
+                <div className="space-y-2 md:col-span-2">
+                  <Label htmlFor="collab-notes">Notas (opcional)</Label>
+                  <Input id="collab-notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="collab-commission">Comisión por convertido (€)</Label>
+                  <Input
+                    id="collab-commission"
+                    value={commissionPerConverted}
+                    onChange={(e) => setCommissionPerConverted(e.target.value)}
+                    inputMode="decimal"
+                    placeholder="30"
+                  />
+                </div>
+                <div className="md:col-span-2 flex items-center gap-2">
+                  <Button type="submit" disabled={saving}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    {saving ? 'Guardando...' : 'Crear colaborador'}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
 
-          <RecruitmentLeadsSection onConvertLead={openConvertLead} embedded />
-        </CardContent>
-      </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Link2 className="h-5 w-5" />
+                Reclutamiento de colaboradores
+              </CardTitle>
+              <CardDescription>
+                Prospectos desde la landing pública /hazte-colaborador. Convierte un lead en colaborador activo cuando proceda.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm font-medium">Landing «Hazte colaborador»</p>
+                  <p className="break-all text-xs text-muted-foreground">{recruitmentUrl}</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => void copyToClipboard(recruitmentUrl)}>
+                    Copiar enlace
+                  </Button>
+                  <Button type="button" variant="ghost" size="sm" asChild>
+                    <a href={`${COLABORADORES_RECRUITMENT_ROUTE}/`} target="_blank" rel="noopener noreferrer">
+                      <ExternalLink className="mr-1 h-4 w-4" />
+                      Abrir
+                    </a>
+                  </Button>
+                </div>
+              </div>
+
+              <RecruitmentLeadsSection onConvertLead={openConvertLead} embedded />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <ConvertLeadDialog
         lead={convertLead}
