@@ -13,6 +13,7 @@ import { ArrowLeft, RefreshCw, Shield, Link2, Save } from 'lucide-react';
 import { CollaboratorKitMenu } from './CollaboratorKitMenu';
 import { CollaboratorCapturedClientsSection } from './CollaboratorCapturedClientsSection';
 import { CollaboratorPaymentsSection } from './CollaboratorPaymentsSection';
+import { CollaboratorPortalAccessCard } from './CollaboratorPortalAccessCard';
 import { CollaboratorTokenManager } from './CollaboratorTokenManager';
 import { buildClientCaptureUrl, getAppBaseUrl } from '@/lib/collaborators/links';
 
@@ -325,6 +326,8 @@ export function CollaboratorDetailView({ collaborator, onBack, onUpdated }: Coll
           <span className="text-sm">{collaborator.is_active ? 'Activo' : 'Inactivo'}</span>
         </div>
       </div>
+
+      <CollaboratorPortalAccessCard collaboratorId={collaborator.id} collaboratorName={collaborator.name} />
 
       <Tabs defaultValue="resumen" className="space-y-4">
         <TabsList className="flex h-auto flex-wrap justify-start gap-1">
