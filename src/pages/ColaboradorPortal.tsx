@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, QrCode, UserPlus, Wallet, Copy, Upload, Users, FileText, Trash2, Eye } from 'lucide-react';
+import { Loader2, QrCode, UserPlus, Wallet, Copy, Upload, Users, FileText, Trash2, Eye, LogOut } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatSavingsPercent } from '@/lib/leads/invoice-utils';
@@ -36,6 +36,13 @@ import {
 } from '@/lib/collaborators/types';
 import { buildClientCaptureUrl, getAppBaseUrl } from '@/lib/collaborators/links';
 import { downloadQrPng, generateQrDataUrl } from '@/lib/collaborators/qr';
+import {
+  clearPortalSession,
+  getPortalSessionToken,
+  setPortalSessionToken,
+} from '@/lib/collaborators/portal-session';
+import { ColaboradorPortalLogin } from '@/components/colaboradores/ColaboradorPortalLogin';
+import { ColaboradorPortalBrandHeader } from '@/components/colaboradores/ColaboradorPortalBrandHeader';
 
 type PortalData = {
   collaborator: {
@@ -112,9 +119,12 @@ function fileToBase64(file: File): Promise<string> {
 
 export default function ColaboradorPortal() {
   const [searchParams] = useSearchParams();
-  const token = searchParams.get('token')?.trim() ?? '';
+  const navigate = useNavigate();
+  const urlToken = searchParams.get('token')?.trim() ?? '';
+  const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [authReady, setAuthReady] = useState(false);
   const [data, setData] = useState<PortalData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const baseUrl = getAppBaseUrl();
 
@@ -136,10 +146,10 @@ export default function ColaboradorPortal() {
   const [deletingInvoice, setDeletingInvoice] = useState(false);
   const [uploadConfirmOpen, setUploadConfirmOpen] = useState(false);
 
-  const loadPortal = useCallback(async () => {
+  const loadPortal = useCallback(async (token: string) => {
     if (!token) {
-      setError('Falta el token de acceso en la URL.');
-      setLoading(false);
+      setError(null);
+      setData(null);
       return;
     }
     setLoading(true);
@@ -155,16 +165,46 @@ export default function ColaboradorPortal() {
       setData({ ...json, captured_clients: json.captured_clients ?? [], commission_invoices: json.commission_invoices ?? [] });
       if (json.pending_payouts?.[0]) setInvoicePayoutId(json.pending_payouts[0].id);
     } catch (e) {
+      clearPortalSession();
+      setSessionToken(null);
       setError(e instanceof Error ? e.message : 'No se pudo cargar el portal');
       setData(null);
     } finally {
       setLoading(false);
     }
-  }, [token]);
+  }, []);
 
   useEffect(() => {
-    void loadPortal();
-  }, [loadPortal]);
+    if (urlToken) {
+      setPortalSessionToken(urlToken);
+      setSessionToken(urlToken);
+      navigate('/colaborador/acceso', { replace: true });
+      setAuthReady(true);
+      return;
+    }
+
+    const stored = getPortalSessionToken();
+    setSessionToken(stored);
+    setAuthReady(true);
+  }, [urlToken, navigate]);
+
+  useEffect(() => {
+    if (!authReady || !sessionToken) return;
+    void loadPortal(sessionToken);
+  }, [authReady, sessionToken, loadPortal]);
+
+  const handleAuthenticated = (token: string) => {
+    setPortalSessionToken(token);
+    setSessionToken(token);
+    setError(null);
+  };
+
+  const handleLogout = () => {
+    clearPortalSession();
+    setSessionToken(null);
+    setData(null);
+    setError(null);
+  };
 
   useEffect(() => {
     if (!data) return;
@@ -199,11 +239,11 @@ export default function ColaboradorPortal() {
 
   const submitClient = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!token || !clientName.trim() || !clientPhone.trim()) return;
+    if (!sessionToken || !clientName.trim() || !clientPhone.trim()) return;
     setSubmittingClient(true);
     try {
       const body: Record<string, unknown> = {
-        access_token: token,
+        access_token: sessionToken,
         name: clientName.trim(),
         phone: clientPhone.trim(),
         email: clientEmail.trim() || undefined,
@@ -233,7 +273,7 @@ export default function ColaboradorPortal() {
       setClientFile(null);
       setManualKwh('');
       setManualTotal('');
-      void loadPortal();
+      void loadPortal(sessionToken);
     } catch (e) {
       toast({
         title: 'Error',
@@ -246,14 +286,14 @@ export default function ColaboradorPortal() {
   };
 
   const submitCommissionInvoice = async () => {
-    if (!token || !invoicePayoutId || !invoiceFile) return;
+    if (!sessionToken || !invoicePayoutId || !invoiceFile) return;
     setSubmittingInvoice(true);
     try {
       const res = await fetch('/api/collaborator-invoice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          access_token: token,
+          access_token: sessionToken,
           payout_id: invoicePayoutId,
           invoice_number: invoiceNumber.trim() || undefined,
           file_name: invoiceFile.name,
@@ -266,7 +306,7 @@ export default function ColaboradorPortal() {
       setInvoiceFile(null);
       setInvoiceNumber('');
       setUploadConfirmOpen(false);
-      void loadPortal();
+      void loadPortal(sessionToken);
     } catch (e) {
       toast({
         title: 'Error',
@@ -279,12 +319,12 @@ export default function ColaboradorPortal() {
   };
 
   const openInvoiceFile = async (invoiceId: string) => {
-    if (!token) return;
+    if (!sessionToken) return;
     try {
       const res = await fetch('/api/collaborator-invoice-file', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ access_token: token, invoice_id: invoiceId }),
+        body: JSON.stringify({ access_token: sessionToken, invoice_id: invoiceId }),
       });
       const json = (await res.json()) as { success?: boolean; signed_url?: string; error?: string };
       if (!res.ok || !json.success || !json.signed_url) throw new Error(json.error ?? 'No se pudo abrir');
@@ -299,14 +339,14 @@ export default function ColaboradorPortal() {
   };
 
   const deleteCommissionInvoice = async () => {
-    if (!token || !deleteInvoiceId || deleteReason.trim().length < 5) return;
+    if (!sessionToken || !deleteInvoiceId || deleteReason.trim().length < 5) return;
     setDeletingInvoice(true);
     try {
       const res = await fetch('/api/collaborator-invoice-delete', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          access_token: token,
+          access_token: sessionToken,
           invoice_id: deleteInvoiceId,
           reason: deleteReason.trim(),
         }),
@@ -316,7 +356,7 @@ export default function ColaboradorPortal() {
       toast({ title: 'Factura anulada', description: 'Puedes subir una nueva factura para esa liquidación.' });
       setDeleteInvoiceId(null);
       setDeleteReason('');
-      void loadPortal();
+      void loadPortal(sessionToken);
     } catch (e) {
       toast({
         title: 'Error',
@@ -328,7 +368,19 @@ export default function ColaboradorPortal() {
     }
   };
 
-  if (loading) {
+  if (!authReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-muted/30">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!sessionToken) {
+    return <ColaboradorPortalLogin onAuthenticated={handleAuthenticated} initialError={error} />;
+  }
+
+  if (loading && !data) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted/30">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -337,16 +389,7 @@ export default function ColaboradorPortal() {
   }
 
   if (error || !data) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
-        <Card className="max-w-md w-full">
-          <CardHeader>
-            <CardTitle>Portal no disponible</CardTitle>
-            <CardDescription>{error ?? 'Token inválido'}</CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-    );
+    return <ColaboradorPortalLogin onAuthenticated={handleAuthenticated} initialError={error} />;
   }
 
   const { collaborator, stats, pending_payouts, captured_clients, commission_invoices } = data;
@@ -369,10 +412,17 @@ export default function ColaboradorPortal() {
   return (
     <div className="min-h-screen bg-muted/30 py-8 px-4">
       <div className="max-w-3xl mx-auto space-y-6">
-        <div>
-          <p className="text-sm text-muted-foreground">Portal colaborador Tulavita</p>
-          <h1 className="text-2xl font-bold">{collaborator.name}</h1>
-          <Badge variant="secondary" className="mt-1">{collaborator.code}</Badge>
+        <ColaboradorPortalBrandHeader subtitle="Portal colaborador" />
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-lg border bg-background p-4">
+          <div>
+            <h1 className="text-xl font-bold">{collaborator.name}</h1>
+            <Badge variant="secondary" className="mt-1">{collaborator.code}</Badge>
+          </div>
+          <Button variant="outline" size="sm" className="w-fit" onClick={handleLogout}>
+            <LogOut className="h-4 w-4 mr-2" />
+            Cerrar sesión
+          </Button>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">

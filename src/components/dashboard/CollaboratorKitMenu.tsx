@@ -164,10 +164,12 @@ export function CollaboratorKitMenu({ collaboratorId, code, name, compact }: Col
           QR captación completa
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Portal autoservicio</DropdownMenuLabel>
+        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+          Portal autoservicio (magic link)
+        </DropdownMenuLabel>
         <DropdownMenuItem onClick={() => void handlePortalLink()}>
           <KeyRound className="h-3.5 w-3.5 mr-2" />
-          Copiar enlace portal
+          Copiar enlace de acceso
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => void handlePortalLink(24)}>
           <KeyRound className="h-3.5 w-3.5 mr-2" />
