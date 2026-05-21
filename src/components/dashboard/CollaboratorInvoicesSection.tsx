@@ -30,7 +30,7 @@ const STATUS_LABELS: Record<InvoiceRow['status'], string> = {
   rejected: 'Rechazada',
 };
 
-export function CollaboratorInvoicesSection() {
+export function CollaboratorInvoicesSection({ collaboratorId, embedded = false }: { collaboratorId?: string; embedded?: boolean }) {
   const [rows, setRows] = useState<InvoiceRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
@@ -38,13 +38,19 @@ export function CollaboratorInvoicesSection() {
   const fetchInvoices = useCallback(async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('collaborator_invoices')
         .select(
           'id, collaborator_id, payout_id, file_path, file_name, invoice_number, amount_eur, status, rejection_reason, submitted_at, collaborators(name, code)',
         )
         .order('submitted_at', { ascending: false })
-        .limit(50);
+        .limit(collaboratorId ? 100 : 50);
+
+      if (collaboratorId) {
+        query = query.eq('collaborator_id', collaboratorId);
+      }
+
+      const { data, error } = await query;
       if (error) throw error;
       setRows((data as InvoiceRow[]) ?? []);
     } catch (e) {
@@ -56,7 +62,7 @@ export function CollaboratorInvoicesSection() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [collaboratorId]);
 
   useEffect(() => {
     void fetchInvoices();
@@ -100,6 +106,101 @@ export function CollaboratorInvoicesSection() {
     window.open(data.signedUrl, '_blank', 'noopener,noreferrer');
   };
 
+  const showCollaboratorColumn = !collaboratorId;
+  const colSpan = showCollaboratorColumn ? 6 : 5;
+
+  const table = (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Fecha</TableHead>
+          {showCollaboratorColumn && <TableHead>Colaborador</TableHead>}
+          <TableHead>Nº factura</TableHead>
+          <TableHead className="text-right">Importe</TableHead>
+          <TableHead>Estado</TableHead>
+          <TableHead>Acciones</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {rows.length === 0 ? (
+          <TableRow>
+            <TableCell colSpan={colSpan} className="text-muted-foreground">
+              {loading ? 'Cargando...' : 'Sin facturas de comisión'}
+            </TableCell>
+          </TableRow>
+        ) : (
+          rows.map((row) => (
+            <TableRow key={row.id}>
+              <TableCell className="text-xs">
+                {format(new Date(row.submitted_at), 'd MMM yyyy HH:mm', { locale: es })}
+              </TableCell>
+              {showCollaboratorColumn && (
+                <TableCell>
+                  <div className="font-medium">{row.collaborators?.name ?? row.collaborator_id}</div>
+                  {row.collaborators?.code && (
+                    <p className="text-xs text-muted-foreground">{row.collaborators.code}</p>
+                  )}
+                </TableCell>
+              )}
+              <TableCell>{row.invoice_number ?? '—'}</TableCell>
+              <TableCell className="text-right">
+                {row.amount_eur != null ? `${Number(row.amount_eur).toFixed(2)} €` : '—'}
+              </TableCell>
+              <TableCell>
+                <Badge variant={row.status === 'paid' ? 'default' : 'secondary'}>
+                  {STATUS_LABELS[row.status]}
+                </Badge>
+              </TableCell>
+              <TableCell>
+                <div className="flex flex-wrap gap-1">
+                  <Button variant="ghost" size="sm" onClick={() => void openFile(row.file_path)}>
+                    Ver PDF
+                  </Button>
+                  {row.status === 'submitted' && (
+                    <>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={updatingId === row.id}
+                        onClick={() => void updateStatus(row.id, 'approved')}
+                      >
+                        <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+                        Aprobar
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={updatingId === row.id}
+                        onClick={() => void updateStatus(row.id, 'rejected')}
+                      >
+                        <XCircle className="h-3.5 w-3.5 mr-1" />
+                        Rechazar
+                      </Button>
+                    </>
+                  )}
+                  {(row.status === 'submitted' || row.status === 'approved') && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={updatingId === row.id}
+                      onClick={() => void updateStatus(row.id, 'paid', row.payout_id)}
+                    >
+                      Marcar pagada
+                    </Button>
+                  )}
+                </div>
+              </TableCell>
+            </TableRow>
+          ))
+        )}
+      </TableBody>
+    </Table>
+  );
+
+  if (embedded) {
+    return table;
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -109,7 +210,7 @@ export function CollaboratorInvoicesSection() {
               <FileText className="h-5 w-5" />
               Facturas de comisión
             </CardTitle>
-            <CardDescription>Facturas enviadas por colaboradores desde el portal.</CardDescription>
+            <CardDescription>Facturas enviadas por el colaborador desde el portal.</CardDescription>
           </div>
           <Button variant="outline" size="sm" onClick={() => void fetchInvoices()} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
@@ -117,91 +218,7 @@ export function CollaboratorInvoicesSection() {
           </Button>
         </div>
       </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Fecha</TableHead>
-              <TableHead>Colaborador</TableHead>
-              <TableHead>Nº factura</TableHead>
-              <TableHead className="text-right">Importe</TableHead>
-              <TableHead>Estado</TableHead>
-              <TableHead>Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {rows.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-muted-foreground">
-                  {loading ? 'Cargando...' : 'Sin facturas de comisión'}
-                </TableCell>
-              </TableRow>
-            ) : (
-              rows.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell className="text-xs">
-                    {format(new Date(row.submitted_at), 'd MMM yyyy HH:mm', { locale: es })}
-                  </TableCell>
-                  <TableCell>
-                    <div className="font-medium">{row.collaborators?.name ?? row.collaborator_id}</div>
-                    {row.collaborators?.code && (
-                      <p className="text-xs text-muted-foreground">{row.collaborators.code}</p>
-                    )}
-                  </TableCell>
-                  <TableCell>{row.invoice_number ?? '—'}</TableCell>
-                  <TableCell className="text-right">
-                    {row.amount_eur != null ? `${Number(row.amount_eur).toFixed(2)} €` : '—'}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={row.status === 'paid' ? 'default' : 'secondary'}>
-                      {STATUS_LABELS[row.status]}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      <Button variant="ghost" size="sm" onClick={() => void openFile(row.file_path)}>
-                        Ver PDF
-                      </Button>
-                      {row.status === 'submitted' && (
-                        <>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={updatingId === row.id}
-                            onClick={() => void updateStatus(row.id, 'approved')}
-                          >
-                            <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
-                            Aprobar
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={updatingId === row.id}
-                            onClick={() => void updateStatus(row.id, 'rejected')}
-                          >
-                            <XCircle className="h-3.5 w-3.5 mr-1" />
-                            Rechazar
-                          </Button>
-                        </>
-                      )}
-                      {(row.status === 'submitted' || row.status === 'approved') && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={updatingId === row.id}
-                          onClick={() => void updateStatus(row.id, 'paid', row.payout_id)}
-                        >
-                          Marcar pagada
-                        </Button>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </CardContent>
+      <CardContent>{table}</CardContent>
     </Card>
   );
 }

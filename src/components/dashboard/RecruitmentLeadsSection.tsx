@@ -24,9 +24,10 @@ const STATUS_LABELS: Record<string, string> = {
 
 type RecruitmentLeadsSectionProps = {
   onConvertLead?: (lead: LeadRow) => void;
+  embedded?: boolean;
 };
 
-export function RecruitmentLeadsSection({ onConvertLead }: RecruitmentLeadsSectionProps) {
+export function RecruitmentLeadsSection({ onConvertLead, embedded = false }: RecruitmentLeadsSectionProps) {
   const [leads, setLeads] = useState<LeadRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedLead, setSelectedLead] = useState<LeadRow | null>(null);
@@ -59,82 +60,88 @@ export function RecruitmentLeadsSection({ onConvertLead }: RecruitmentLeadsSecti
     void fetchLeads();
   }, [fetchLeads]);
 
+  const table = (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Nombre</TableHead>
+          <TableHead>Contacto</TableHead>
+          <TableHead>Campaña</TableHead>
+          <TableHead>Estado</TableHead>
+          <TableHead>Fecha</TableHead>
+          <TableHead>Acción</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {loading ? (
+          <TableRow>
+            <TableCell colSpan={6}>Cargando...</TableCell>
+          </TableRow>
+        ) : leads.length === 0 ? (
+          <TableRow>
+            <TableCell colSpan={6} className="text-muted-foreground">
+              Sin leads de reclutamiento recientes.
+            </TableCell>
+          </TableRow>
+        ) : (
+          leads.map((lead) => (
+            <TableRow
+              key={lead.id}
+              className="cursor-pointer hover:bg-muted/50"
+              onClick={() => {
+                setSelectedLead(lead);
+                setDetailOpen(true);
+              }}
+            >
+              <TableCell className="font-medium">{lead.name ?? '—'}</TableCell>
+              <TableCell className="text-xs">
+                {[lead.phone, lead.email].filter(Boolean).join(' · ') || '—'}
+              </TableCell>
+              <TableCell>
+                <Badge variant="outline">{lead.campaign ?? '—'}</Badge>
+              </TableCell>
+              <TableCell>{STATUS_LABELS[lead.status] ?? lead.status}</TableCell>
+              <TableCell className="text-xs">
+                {format(new Date(lead.created_at), 'd MMM yyyy HH:mm', { locale: es })}
+              </TableCell>
+              <TableCell onClick={(e) => e.stopPropagation()}>
+                {onConvertLead && (
+                  <Button variant="outline" size="sm" onClick={() => onConvertLead(lead)}>
+                    <UserPlus className="h-3.5 w-3.5 mr-1" />
+                    Convertir
+                  </Button>
+                )}
+              </TableCell>
+            </TableRow>
+          ))
+        )}
+      </TableBody>
+    </Table>
+  );
+
   return (
     <>
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between gap-2">
-            <div>
-              <CardTitle>Leads de reclutamiento</CardTitle>
-              <CardDescription>
-                Prospectos desde /hazte-colaborador (campaña hazte_colaborador).
-              </CardDescription>
+      {embedded ? (
+        table
+      ) : (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <CardTitle>Leads de reclutamiento</CardTitle>
+                <CardDescription>
+                  Prospectos desde /hazte-colaborador (campaña hazte_colaborador).
+                </CardDescription>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => void fetchLeads()} disabled={loading}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                Recargar
+              </Button>
             </div>
-            <Button variant="outline" size="sm" onClick={() => void fetchLeads()} disabled={loading}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Recargar
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nombre</TableHead>
-                <TableHead>Contacto</TableHead>
-                <TableHead>Campaña</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Acción</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {loading ? (
-                <TableRow>
-                  <TableCell colSpan={6}>Cargando...</TableCell>
-                </TableRow>
-              ) : leads.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-muted-foreground">
-                    Sin leads de reclutamiento recientes.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                leads.map((lead) => (
-                  <TableRow
-                    key={lead.id}
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => {
-                      setSelectedLead(lead);
-                      setDetailOpen(true);
-                    }}
-                  >
-                    <TableCell className="font-medium">{lead.name ?? '—'}</TableCell>
-                    <TableCell className="text-xs">
-                      {[lead.phone, lead.email].filter(Boolean).join(' · ') || '—'}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{lead.campaign ?? '—'}</Badge>
-                    </TableCell>
-                    <TableCell>{STATUS_LABELS[lead.status] ?? lead.status}</TableCell>
-                    <TableCell className="text-xs">
-                      {format(new Date(lead.created_at), 'd MMM yyyy HH:mm', { locale: es })}
-                    </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      {onConvertLead && (
-                        <Button variant="outline" size="sm" onClick={() => onConvertLead(lead)}>
-                          <UserPlus className="h-3.5 w-3.5 mr-1" />
-                          Convertir
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+          </CardHeader>
+          <CardContent>{table}</CardContent>
+        </Card>
+      )}
 
       <LeadDetailSheet
         lead={selectedLead}

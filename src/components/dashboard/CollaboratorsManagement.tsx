@@ -5,48 +5,16 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
-import { Plus, RefreshCw, Users, Link2, Wallet, CheckCircle2, ExternalLink } from 'lucide-react';
-import { CollaboratorKitMenu } from './CollaboratorKitMenu';
-import { CollaboratorTokenManager } from './CollaboratorTokenManager';
+import { Plus, RefreshCw, Users, Link2, ExternalLink, ChevronRight } from 'lucide-react';
 import { RecruitmentLeadsSection } from './RecruitmentLeadsSection';
-import { CollaboratorInvoicesSection } from './CollaboratorInvoicesSection';
-import { CollaboratorCapturedClientsSection } from './CollaboratorCapturedClientsSection';
 import { ConvertLeadDialog } from './ConvertLeadDialog';
+import { CollaboratorDetailView, type CollaboratorRow } from './CollaboratorDetailView';
 import { COLABORADORES_RECRUITMENT_ROUTE } from '@/components/colaboradores/colaboradores-config';
 import type { Database } from '@/integrations/supabase/types';
 
 type RecruitmentLeadRow = Database['public']['Tables']['leads']['Row'];
-
-type CollaboratorRow = {
-  id: string;
-  code: string;
-  name: string;
-  commission_per_converted_eur: number;
-  email: string | null;
-  phone: string | null;
-  notes: string | null;
-  is_active: boolean;
-  created_at: string;
-};
-
-type CollaboratorPayoutRow = {
-  id: string;
-  collaborator_id: string;
-  period_from: string | null;
-  period_to: string | null;
-  leads_count: number;
-  amount_total_eur: number;
-  status: 'pending' | 'paid' | 'cancelled';
-  paid_at: string | null;
-  created_at: string;
-  collaborators?: {
-    name: string;
-    code: string;
-  } | null;
-};
 
 function slugifyCode(raw: string): string {
   return raw
@@ -59,41 +27,21 @@ function slugifyCode(raw: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-function formatDateTime(value: string | null): string {
-  if (!value) return '—';
-  return new Date(value).toLocaleString('es-ES', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
 export default function CollaboratorsManagement() {
   const [rows, setRows] = useState<CollaboratorRow[]>([]);
-  const [statsByCampaign, setStatsByCampaign] = useState<Record<string, {
-    total: number;
-    contacted: number;
-    qualified: number;
-    converted: number;
-    lost: number;
-  }>>({});
+  const [statsByCollaborator, setStatsByCollaborator] = useState<
+    Record<string, { total: number; converted: number }>
+  >({});
   const [loading, setLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [payoutsLoading, setPayoutsLoading] = useState(false);
-  const [creatingPayoutFor, setCreatingPayoutFor] = useState<string | null>(null);
-  const [markingPayoutId, setMarkingPayoutId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [notes, setNotes] = useState('');
   const [commissionPerConverted, setCommissionPerConverted] = useState('30');
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo, setDateTo] = useState('');
-  const [payouts, setPayouts] = useState<CollaboratorPayoutRow[]>([]);
+  const [selectedCollaborator, setSelectedCollaborator] = useState<CollaboratorRow | null>(null);
   const [convertLead, setConvertLead] = useState<RecruitmentLeadRow | null>(null);
   const [convertOpen, setConvertOpen] = useState(false);
 
@@ -102,10 +50,7 @@ export default function CollaboratorsManagement() {
     return window.location.origin;
   }, []);
 
-  const colaboradoresLandings = useMemo(
-    () => [{ id: 'hazte-colaborador', label: 'Hazte colaborador', path: `${COLABORADORES_RECRUITMENT_ROUTE}/` }],
-    [],
-  );
+  const recruitmentUrl = `${baseUrl}${COLABORADORES_RECRUITMENT_ROUTE}/`;
 
   const fetchCollaborators = useCallback(async () => {
     setLoading(true);
@@ -128,75 +73,49 @@ export default function CollaboratorsManagement() {
     }
   }, []);
 
-  const fetchStats = useCallback(
-    async (collaborators: CollaboratorRow[]) => {
-      const campaigns = collaborators.map((row) => `collaborator:${row.code}`);
-      if (campaigns.length === 0) {
-        setStatsByCampaign({});
-        return;
-      }
-      setStatsLoading(true);
-      try {
-        let query = supabase
-          .from('leads')
-          .select('status, campaign, created_at')
-          .eq('source', 'collaborator_referral')
-          .in('campaign', campaigns);
+  const refreshCollaborators = useCallback(async () => {
+    await fetchCollaborators();
+    if (selectedCollaborator) {
+      const { data } = await supabase
+        .from('collaborators')
+        .select('id, code, name, commission_per_converted_eur, email, phone, notes, is_active, created_at')
+        .eq('id', selectedCollaborator.id)
+        .maybeSingle();
+      if (data) setSelectedCollaborator(data as CollaboratorRow);
+    }
+  }, [fetchCollaborators, selectedCollaborator]);
 
-        if (dateFrom) query = query.gte('created_at', `${dateFrom}T00:00:00.000Z`);
-        if (dateTo) query = query.lte('created_at', `${dateTo}T23:59:59.999Z`);
-
-        const { data, error } = await query;
-        if (error) throw error;
-
-        const next: Record<string, { total: number; contacted: number; qualified: number; converted: number; lost: number }> = {};
-        for (const row of collaborators) {
-          const campaign = `collaborator:${row.code}`;
-          next[campaign] = { total: 0, contacted: 0, qualified: 0, converted: 0, lost: 0 };
-        }
-        for (const lead of data ?? []) {
-          const campaign = typeof lead.campaign === 'string' ? lead.campaign : null;
-          if (!campaign || !next[campaign]) continue;
-          next[campaign].total += 1;
-          if (lead.status === 'contacted') next[campaign].contacted += 1;
-          if (lead.status === 'qualified') next[campaign].qualified += 1;
-          if (lead.status === 'converted') next[campaign].converted += 1;
-          if (lead.status === 'lost') next[campaign].lost += 1;
-        }
-        setStatsByCampaign(next);
-      } catch (err) {
-        console.error(err);
-        toast({
-          title: 'Error',
-          description: 'No se pudieron calcular las métricas de colaboradores',
-          variant: 'destructive',
-        });
-      } finally {
-        setStatsLoading(false);
-      }
-    },
-    [dateFrom, dateTo]
-  );
-
-  const fetchPayouts = useCallback(async () => {
-    setPayoutsLoading(true);
+  const fetchStats = useCallback(async (collaborators: CollaboratorRow[]) => {
+    if (collaborators.length === 0) {
+      setStatsByCollaborator({});
+      return;
+    }
+    setStatsLoading(true);
     try {
+      const ids = collaborators.map((c) => c.id);
       const { data, error } = await supabase
-        .from('collaborator_payouts')
-        .select('id, collaborator_id, period_from, period_to, leads_count, amount_total_eur, status, paid_at, created_at, collaborators(name, code)')
-        .order('created_at', { ascending: false })
-        .limit(50);
+        .from('leads')
+        .select('status, collaborator_id')
+        .eq('source', 'collaborator_referral')
+        .in('collaborator_id', ids);
+
       if (error) throw error;
-      setPayouts((data as CollaboratorPayoutRow[]) ?? []);
+
+      const next: Record<string, { total: number; converted: number }> = {};
+      for (const c of collaborators) {
+        next[c.id] = { total: 0, converted: 0 };
+      }
+      for (const lead of data ?? []) {
+        const cid = lead.collaborator_id;
+        if (!cid || !next[cid]) continue;
+        next[cid].total += 1;
+        if (lead.status === 'converted') next[cid].converted += 1;
+      }
+      setStatsByCollaborator(next);
     } catch (err) {
       console.error(err);
-      toast({
-        title: 'Error',
-        description: 'No se pudieron cargar las liquidaciones',
-        variant: 'destructive',
-      });
     } finally {
-      setPayoutsLoading(false);
+      setStatsLoading(false);
     }
   }, []);
 
@@ -205,115 +124,12 @@ export default function CollaboratorsManagement() {
   }, [fetchCollaborators]);
 
   useEffect(() => {
-    void fetchPayouts();
-  }, [fetchPayouts]);
-
-  useEffect(() => {
     if (rows.length === 0) {
-      setStatsByCampaign({});
+      setStatsByCollaborator({});
       return;
     }
     void fetchStats(rows);
   }, [rows, fetchStats]);
-
-  const createPendingPayout = async (collaborator: CollaboratorRow) => {
-    setCreatingPayoutFor(collaborator.id);
-    try {
-      let leadsQuery = supabase
-        .from('leads')
-        .select('id, created_at')
-        .eq('collaborator_id', collaborator.id)
-        .eq('status', 'converted');
-
-      if (dateFrom) leadsQuery = leadsQuery.gte('created_at', `${dateFrom}T00:00:00.000Z`);
-      if (dateTo) leadsQuery = leadsQuery.lte('created_at', `${dateTo}T23:59:59.999Z`);
-
-      const { data: convertedLeads, error: convertedError } = await leadsQuery;
-      if (convertedError) throw convertedError;
-
-      const convertedIds = (convertedLeads ?? []).map((lead) => lead.id);
-      if (convertedIds.length === 0) {
-        toast({ title: 'Sin convertidos pendientes para este rango' });
-        return;
-      }
-
-      const { data: alreadyPaidRows, error: paidError } = await supabase
-        .from('collaborator_payout_leads')
-        .select('lead_id')
-        .in('lead_id', convertedIds);
-      if (paidError) throw paidError;
-
-      const alreadyPaid = new Set((alreadyPaidRows ?? []).map((row) => row.lead_id));
-      const pendingLeadIds = convertedIds.filter((id) => !alreadyPaid.has(id));
-
-      if (pendingLeadIds.length === 0) {
-        toast({ title: 'Todo liquidado', description: 'No hay convertidos pendientes de pago para este colaborador.' });
-        return;
-      }
-
-      const amountPerLead = collaborator.commission_per_converted_eur;
-      const totalAmount = Number((pendingLeadIds.length * amountPerLead).toFixed(2));
-      const { data: authData } = await supabase.auth.getUser();
-
-      const { data: payout, error: payoutError } = await supabase
-        .from('collaborator_payouts')
-        .insert({
-          collaborator_id: collaborator.id,
-          period_from: dateFrom || null,
-          period_to: dateTo || null,
-          leads_count: pendingLeadIds.length,
-          amount_total_eur: totalAmount,
-          status: 'pending',
-          created_by: authData.user?.id ?? null,
-        })
-        .select('id')
-        .single();
-
-      if (payoutError) throw payoutError;
-
-      const lines = pendingLeadIds.map((leadId) => ({
-        payout_id: payout.id,
-        collaborator_id: collaborator.id,
-        lead_id: leadId,
-        amount_eur: amountPerLead,
-      }));
-
-      const { error: linesError } = await supabase.from('collaborator_payout_leads').insert(lines);
-      if (linesError) {
-        await supabase.from('collaborator_payouts').delete().eq('id', payout.id);
-        throw linesError;
-      }
-
-      toast({
-        title: 'Liquidación creada',
-        description: `${pendingLeadIds.length} convertidos incluidos · ${totalAmount.toFixed(2)} €`,
-      });
-      await fetchPayouts();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'No se pudo crear la liquidación';
-      toast({ title: 'Error', description: message, variant: 'destructive' });
-    } finally {
-      setCreatingPayoutFor(null);
-    }
-  };
-
-  const markPayoutAsPaid = async (payoutId: string) => {
-    setMarkingPayoutId(payoutId);
-    try {
-      const { error } = await supabase
-        .from('collaborator_payouts')
-        .update({ status: 'paid', paid_at: new Date().toISOString() })
-        .eq('id', payoutId);
-      if (error) throw error;
-      toast({ title: 'Liquidación marcada como pagada' });
-      await fetchPayouts();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'No se pudo actualizar la liquidación';
-      toast({ title: 'Error', description: message, variant: 'destructive' });
-    } finally {
-      setMarkingPayoutId(null);
-    }
-  };
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -369,17 +185,6 @@ export default function CollaboratorsManagement() {
     }
   };
 
-  const toggleActive = async (id: string, next: boolean) => {
-    try {
-      const { error } = await supabase.from('collaborators').update({ is_active: next }).eq('id', id);
-      if (error) throw error;
-      setRows((prev) => prev.map((r) => (r.id === id ? { ...r, is_active: next } : r)));
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'No se pudo actualizar';
-      toast({ title: 'Error', description: message, variant: 'destructive' });
-    }
-  };
-
   const copyToClipboard = async (value: string) => {
     try {
       await navigator.clipboard.writeText(value);
@@ -394,32 +199,32 @@ export default function CollaboratorsManagement() {
     setConvertOpen(true);
   };
 
-  const totals = useMemo(() => {
-    const values = Object.values(statsByCampaign);
-    return values.reduce(
-      (acc, v) => {
-        acc.total += v.total;
-        acc.contacted += v.contacted;
-        acc.qualified += v.qualified;
-        acc.converted += v.converted;
-        acc.lost += v.lost;
-        return acc;
-      },
-      { total: 0, contacted: 0, qualified: 0, converted: 0, lost: 0 }
+  if (selectedCollaborator) {
+    return (
+      <CollaboratorDetailView
+        collaborator={selectedCollaborator}
+        onBack={() => setSelectedCollaborator(null)}
+        onUpdated={() => void refreshCollaborators()}
+      />
     );
-  }, [statsByCampaign]);
+  }
 
   return (
     <div className="space-y-6">
+      <div>
+        <h2 className="text-2xl font-semibold flex items-center gap-2">
+          <Users className="h-6 w-6" />
+          Colaboradores
+        </h2>
+        <p className="text-sm text-muted-foreground mt-1">
+          Gestiona colaboradores activos. Entra en cada ficha para ver clientes, liquidaciones y facturas.
+        </p>
+      </div>
+
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Zona de colaboradores
-          </CardTitle>
-          <CardDescription>
-            Crea colaboradores con código propio para atribuir leads y compartir enlaces de captación.
-          </CardDescription>
+          <CardTitle>Nuevo colaborador</CardTitle>
+          <CardDescription>Crea un colaborador con código propio para atribuir leads y compartir enlaces.</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="grid gap-3 md:grid-cols-2" onSubmit={handleCreate}>
@@ -472,10 +277,6 @@ export default function CollaboratorsManagement() {
                 <Plus className="h-4 w-4 mr-2" />
                 {saving ? 'Guardando...' : 'Crear colaborador'}
               </Button>
-              <Button type="button" variant="outline" onClick={() => void fetchCollaborators()} disabled={loading}>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Recargar
-              </Button>
             </div>
           </form>
         </CardContent>
@@ -483,143 +284,57 @@ export default function CollaboratorsManagement() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Link2 className="h-5 w-5" />
-            Landings de captación (colaboradores)
-          </CardTitle>
-          <CardDescription>
-            Páginas públicas para reclutar nuevos colaboradores. Los formularios crean leads en el CRM con campaña
-            identificada.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-          {colaboradoresLandings.map((landing) => {
-            const url = `${baseUrl}${landing.path}`;
-            return (
-              <div
-                key={landing.id}
-                className="flex min-w-[240px] flex-1 flex-col gap-2 rounded-lg border p-3"
-              >
-                <p className="text-sm font-medium">{landing.label}</p>
-                <p className="break-all text-xs text-muted-foreground">{url}</p>
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" variant="outline" size="sm" onClick={() => void copyToClipboard(url)}>
-                    Copiar enlace
-                  </Button>
-                  <Button type="button" variant="ghost" size="sm" asChild>
-                    <a href={landing.path} target="_blank" rel="noopener noreferrer">
-                      <ExternalLink className="mr-1 h-4 w-4" />
-                      Abrir
-                    </a>
-                  </Button>
-                </div>
-              </div>
-            );
-          })}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Colaboradores</CardTitle>
-          <CardDescription>
-            Activa/desactiva colaboradores y copia el enlace de captación de clientes (ahorro luz).
-          </CardDescription>
+          <div className="flex items-center justify-between gap-2">
+            <div>
+              <CardTitle>Listado de colaboradores</CardTitle>
+              <CardDescription>
+                {rows.length} colaborador{rows.length === 1 ? '' : 'es'} registrado{rows.length === 1 ? '' : 's'}.
+              </CardDescription>
+            </div>
+            <Button type="button" variant="outline" size="sm" onClick={() => void fetchCollaborators()} disabled={loading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Recargar
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
-          <div className="mb-4 grid gap-3 md:grid-cols-5">
-            <div className="space-y-1">
-              <Label htmlFor="collab-date-from">Desde</Label>
-              <Input id="collab-date-from" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="collab-date-to">Hasta</Label>
-              <Input id="collab-date-to" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-            </div>
-            <div className="md:col-span-3 flex items-end gap-2">
-              <Button variant="outline" onClick={() => void fetchStats(rows)} disabled={statsLoading}>
-                <RefreshCw className="h-4 w-4 mr-2" />
-                {statsLoading ? 'Calculando...' : 'Actualizar métricas'}
-              </Button>
-              {(dateFrom || dateTo) && (
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setDateFrom('');
-                    setDateTo('');
-                  }}
-                >
-                  Limpiar fechas
-                </Button>
-              )}
-            </div>
-          </div>
-
-          <div className="mb-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-            <div className="rounded-lg border p-3">
-              <p className="text-xs text-muted-foreground">Leads</p>
-              <p className="text-xl font-semibold">{totals.total}</p>
-            </div>
-            <div className="rounded-lg border p-3">
-              <p className="text-xs text-muted-foreground">Contactados</p>
-              <p className="text-xl font-semibold">{totals.contacted}</p>
-            </div>
-            <div className="rounded-lg border p-3">
-              <p className="text-xs text-muted-foreground">Calificados</p>
-              <p className="text-xl font-semibold">{totals.qualified}</p>
-            </div>
-            <div className="rounded-lg border p-3">
-              <p className="text-xs text-muted-foreground">Convertidos</p>
-              <p className="text-xl font-semibold">{totals.converted}</p>
-            </div>
-            <div className="rounded-lg border p-3">
-              <p className="text-xs text-muted-foreground">Conversión</p>
-              <p className="text-xl font-semibold">
-                {totals.total > 0 ? `${((totals.converted / totals.total) * 100).toFixed(1)}%` : '0.0%'}
-              </p>
-            </div>
-          </div>
-
           <Table>
             <TableHeader>
               <TableRow>
                 <TableHead>Nombre</TableHead>
                 <TableHead>Código</TableHead>
                 <TableHead>Estado</TableHead>
-                <TableHead className="text-right">Leads</TableHead>
-                <TableHead className="text-right">Contactados</TableHead>
-                <TableHead className="text-right">Calificados</TableHead>
+                <TableHead className="text-right">Clientes</TableHead>
                 <TableHead className="text-right">Convertidos</TableHead>
-                <TableHead className="text-right">Conv.%</TableHead>
-                <TableHead className="text-right">Comisión estimada</TableHead>
-                <TableHead>Liquidación</TableHead>
-                <TableHead>Kit captación</TableHead>
+                <TableHead className="text-right">Comisión/conv.</TableHead>
+                <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={11}>Cargando...</TableCell>
+                  <TableCell colSpan={7}>Cargando...</TableCell>
                 </TableRow>
               ) : rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-muted-foreground">
-                    Aun no hay colaboradores.
+                  <TableCell colSpan={7} className="text-muted-foreground">
+                    Aún no hay colaboradores. Crea el primero arriba.
                   </TableCell>
                 </TableRow>
               ) : (
                 rows.map((row) => {
-                  const campaign = `collaborator:${row.code}`;
-                  const stats = statsByCampaign[campaign] ?? { total: 0, contacted: 0, qualified: 0, converted: 0, lost: 0 };
-                  const conversion = stats.total > 0 ? ((stats.converted / stats.total) * 100).toFixed(1) : '0.0';
-                  const estimatedCommission = stats.converted * row.commission_per_converted_eur;
+                  const stats = statsByCollaborator[row.id] ?? { total: 0, converted: 0 };
                   return (
-                    <TableRow key={row.id}>
+                    <TableRow
+                      key={row.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() => setSelectedCollaborator(row)}
+                    >
                       <TableCell>
                         <div className="font-medium">{row.name}</div>
                         {(row.email || row.phone) && (
                           <p className="text-xs text-muted-foreground">
-                            {[row.email, row.phone].filter(Boolean).join(' - ')}
+                            {[row.email, row.phone].filter(Boolean).join(' · ')}
                           </p>
                         )}
                       </TableCell>
@@ -627,40 +342,20 @@ export default function CollaboratorsManagement() {
                         <Badge variant="secondary">{row.code}</Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="flex items-center gap-2">
-                          <Switch checked={row.is_active} onCheckedChange={(next) => void toggleActive(row.id, next)} />
-                          <span className="text-sm">{row.is_active ? 'Activo' : 'Inactivo'}</span>
-                        </div>
+                        <Badge variant={row.is_active ? 'default' : 'secondary'}>
+                          {row.is_active ? 'Activo' : 'Inactivo'}
+                        </Badge>
                       </TableCell>
-                      <TableCell className="text-right">{stats.total}</TableCell>
-                      <TableCell className="text-right">{stats.contacted}</TableCell>
-                      <TableCell className="text-right">{stats.qualified}</TableCell>
-                      <TableCell className="text-right font-medium">{stats.converted}</TableCell>
-                      <TableCell className="text-right">{conversion}%</TableCell>
-                      <TableCell className="text-right">
-                        {estimatedCommission.toFixed(2)} €
-                        <p className="text-[11px] text-muted-foreground">
-                          {row.commission_per_converted_eur.toFixed(2)} €/conv.
-                        </p>
+                      <TableCell className="text-right">{statsLoading ? '…' : stats.total}</TableCell>
+                      <TableCell className="text-right font-medium">
+                        {statsLoading ? '…' : stats.converted}
                       </TableCell>
+                      <TableCell className="text-right">{row.commission_per_converted_eur.toFixed(2)} €</TableCell>
                       <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => void createPendingPayout(row)}
-                          disabled={creatingPayoutFor === row.id}
-                        >
-                          <Wallet className="h-3.5 w-3.5 mr-2" />
-                          {creatingPayoutFor === row.id ? 'Creando...' : 'Liquidar pendientes'}
+                        <Button variant="ghost" size="sm" onClick={() => setSelectedCollaborator(row)}>
+                          Ver ficha
+                          <ChevronRight className="h-4 w-4 ml-1" />
                         </Button>
-                      </TableCell>
-                      <TableCell>
-                        <CollaboratorKitMenu
-                          collaboratorId={row.id}
-                          code={row.code}
-                          name={row.name}
-                          compact
-                        />
                       </TableCell>
                     </TableRow>
                   );
@@ -671,15 +366,38 @@ export default function CollaboratorsManagement() {
         </CardContent>
       </Card>
 
-      <RecruitmentLeadsSection onConvertLead={openConvertLead} />
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Link2 className="h-5 w-5" />
+            Reclutamiento de colaboradores
+          </CardTitle>
+          <CardDescription>
+            Prospectos desde la landing pública /hazte-colaborador. Es independiente de los colaboradores ya activos.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-2 rounded-lg border p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium">Landing «Hazte colaborador»</p>
+              <p className="break-all text-xs text-muted-foreground">{recruitmentUrl}</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => void copyToClipboard(recruitmentUrl)}>
+                Copiar enlace
+              </Button>
+              <Button type="button" variant="ghost" size="sm" asChild>
+                <a href={`${COLABORADORES_RECRUITMENT_ROUTE}/`} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="mr-1 h-4 w-4" />
+                  Abrir
+                </a>
+              </Button>
+            </div>
+          </div>
 
-      <CollaboratorCapturedClientsSection
-        collaborators={rows.map((r) => ({ id: r.id, name: r.name, code: r.code }))}
-      />
-
-      <CollaboratorInvoicesSection />
-
-      <CollaboratorTokenManager />
+          <RecruitmentLeadsSection onConvertLead={openConvertLead} embedded />
+        </CardContent>
+      </Card>
 
       <ConvertLeadDialog
         lead={convertLead}
@@ -687,85 +405,6 @@ export default function CollaboratorsManagement() {
         onOpenChange={setConvertOpen}
         onCreated={() => void fetchCollaborators()}
       />
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Liquidaciones</CardTitle>
-          <CardDescription>
-            Historial de liquidaciones generadas. Cada lead convertido se liquida una sola vez.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Fecha</TableHead>
-                <TableHead>Colaborador</TableHead>
-                <TableHead>Periodo</TableHead>
-                <TableHead className="text-right">Leads</TableHead>
-                <TableHead className="text-right">Importe</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Acción</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {payoutsLoading ? (
-                <TableRow>
-                  <TableCell colSpan={7}>Cargando liquidaciones...</TableCell>
-                </TableRow>
-              ) : payouts.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-muted-foreground">
-                    Aún no hay liquidaciones.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                payouts.map((payout) => (
-                  <TableRow key={payout.id}>
-                    <TableCell>{formatDateTime(payout.created_at)}</TableCell>
-                    <TableCell>
-                      <div className="font-medium">{payout.collaborators?.name ?? payout.collaborator_id}</div>
-                      {payout.collaborators?.code && (
-                        <p className="text-xs text-muted-foreground">{payout.collaborators.code}</p>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {payout.period_from || payout.period_to
-                        ? `${payout.period_from ?? '...'} -> ${payout.period_to ?? '...'}`
-                        : 'Sin filtro'}
-                    </TableCell>
-                    <TableCell className="text-right">{payout.leads_count}</TableCell>
-                    <TableCell className="text-right font-medium">{Number(payout.amount_total_eur).toFixed(2)} €</TableCell>
-                    <TableCell>
-                      <Badge variant={payout.status === 'paid' ? 'default' : 'secondary'}>
-                        {payout.status === 'paid' ? 'Pagada' : payout.status === 'pending' ? 'Pendiente' : 'Cancelada'}
-                      </Badge>
-                      {payout.status === 'paid' && payout.paid_at && (
-                        <p className="text-xs text-muted-foreground mt-1">{formatDateTime(payout.paid_at)}</p>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {payout.status === 'pending' ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => void markPayoutAsPaid(payout.id)}
-                          disabled={markingPayoutId === payout.id}
-                        >
-                          <CheckCircle2 className="h-3.5 w-3.5 mr-2" />
-                          {markingPayoutId === payout.id ? 'Guardando...' : 'Marcar pagada'}
-                        </Button>
-                      ) : (
-                        <span className="text-muted-foreground text-sm">—</span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
     </div>
   );
 }

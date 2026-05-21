@@ -40,7 +40,7 @@ function formatDt(value: string | null): string {
   return format(new Date(value), 'd MMM yyyy HH:mm', { locale: es });
 }
 
-export function CollaboratorTokenManager() {
+export function CollaboratorTokenManager({ collaboratorId, embedded = false }: { collaboratorId?: string; embedded?: boolean }) {
   const [referralLinks, setReferralLinks] = useState<ReferralLinkRow[]>([]);
   const [accessTokens, setAccessTokens] = useState<AccessTokenRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,18 +49,24 @@ export function CollaboratorTokenManager() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [refRes, accessRes] = await Promise.all([
-        supabase
-          .from('collaborator_referral_links')
-          .select('id, token, entry_mode, is_active, expires_at, label, created_at, collaborators(name, code)')
-          .order('created_at', { ascending: false })
-          .limit(40),
-        supabase
-          .from('collaborator_access_tokens')
-          .select('id, token, is_active, expires_at, label, created_at, last_used_at, collaborators(name, code)')
-          .order('created_at', { ascending: false })
-          .limit(40),
-      ]);
+      let refQuery = supabase
+        .from('collaborator_referral_links')
+        .select('id, token, entry_mode, is_active, expires_at, label, created_at, collaborators(name, code)')
+        .order('created_at', { ascending: false })
+        .limit(collaboratorId ? 100 : 40);
+
+      let accessQuery = supabase
+        .from('collaborator_access_tokens')
+        .select('id, token, is_active, expires_at, label, created_at, last_used_at, collaborators(name, code)')
+        .order('created_at', { ascending: false })
+        .limit(collaboratorId ? 100 : 40);
+
+      if (collaboratorId) {
+        refQuery = refQuery.eq('collaborator_id', collaboratorId);
+        accessQuery = accessQuery.eq('collaborator_id', collaboratorId);
+      }
+
+      const [refRes, accessRes] = await Promise.all([refQuery, accessQuery]);
       if (refRes.error) throw refRes.error;
       if (accessRes.error) throw accessRes.error;
       setReferralLinks((refRes.data as ReferralLinkRow[]) ?? []);
@@ -74,7 +80,7 @@ export function CollaboratorTokenManager() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [collaboratorId]);
 
   useEffect(() => {
     void fetchAll();
@@ -114,6 +120,116 @@ export function CollaboratorTokenManager() {
     toast({ title: 'Expiración actualizada' });
   };
 
+  const showCollaboratorColumn = !collaboratorId;
+
+  const content = (
+    <div className="space-y-6">
+      <div>
+        <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+          <Link2Icon />
+          Enlaces de captación (referral)
+        </h4>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {showCollaboratorColumn && <TableHead>Colaborador</TableHead>}
+              <TableHead>Modo</TableHead>
+              <TableHead>Creado</TableHead>
+              <TableHead>Expira</TableHead>
+              <TableHead>Activo</TableHead>
+              <TableHead>Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {referralLinks.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={showCollaboratorColumn ? 6 : 5} className="text-muted-foreground">
+                  {loading ? 'Cargando...' : 'Sin enlaces generados'}
+                </TableCell>
+              </TableRow>
+            ) : (
+              referralLinks.map((row) => (
+                <TableRow key={row.id}>
+                  {showCollaboratorColumn && (
+                    <TableCell>
+                      <div className="font-medium">{row.collaborators?.name ?? '—'}</div>
+                      <Badge variant="secondary" className="text-xs">
+                        {row.collaborators?.code}
+                      </Badge>
+                    </TableCell>
+                  )}
+                  <TableCell>{ENTRY_MODE_LABELS[row.entry_mode] ?? row.entry_mode}</TableCell>
+                  <TableCell className="text-xs">{formatDt(row.created_at)}</TableCell>
+                  <TableCell className="text-xs">{formatDt(row.expires_at)}</TableCell>
+                  <TableCell>
+                    <Switch checked={row.is_active} onCheckedChange={(v) => void toggleReferralActive(row.id, v)} />
+                  </TableCell>
+                  <TableCell>
+                    <Button variant="ghost" size="sm" onClick={() => void setReferralExpiry(row.id)}>
+                      Fijar expiración
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      <div>
+        <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+          <KeyRound className="h-4 w-4" />
+          Tokens de portal
+        </h4>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              {showCollaboratorColumn && <TableHead>Colaborador</TableHead>}
+              <TableHead>Etiqueta</TableHead>
+              <TableHead>Creado</TableHead>
+              <TableHead>Último uso</TableHead>
+              <TableHead>Expira</TableHead>
+              <TableHead>Activo</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {accessTokens.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={showCollaboratorColumn ? 6 : 5} className="text-muted-foreground">
+                  {loading ? 'Cargando...' : 'Sin tokens de portal'}
+                </TableCell>
+              </TableRow>
+            ) : (
+              accessTokens.map((row) => (
+                <TableRow key={row.id}>
+                  {showCollaboratorColumn && (
+                    <TableCell>
+                      <div className="font-medium">{row.collaborators?.name ?? '—'}</div>
+                      <Badge variant="secondary" className="text-xs">
+                        {row.collaborators?.code}
+                      </Badge>
+                    </TableCell>
+                  )}
+                  <TableCell className="text-xs">{row.label ?? '—'}</TableCell>
+                  <TableCell className="text-xs">{formatDt(row.created_at)}</TableCell>
+                  <TableCell className="text-xs">{formatDt(row.last_used_at)}</TableCell>
+                  <TableCell className="text-xs">{formatDt(row.expires_at)}</TableCell>
+                  <TableCell>
+                    <Switch checked={row.is_active} onCheckedChange={(v) => void toggleAccessActive(row.id, v)} />
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
+
+  if (embedded) {
+    return content;
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -144,103 +260,7 @@ export function CollaboratorTokenManager() {
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <div>
-          <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-            <Link2Icon />
-            Enlaces de captación (referral)
-          </h4>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Colaborador</TableHead>
-                <TableHead>Modo</TableHead>
-                <TableHead>Creado</TableHead>
-                <TableHead>Expira</TableHead>
-                <TableHead>Activo</TableHead>
-                <TableHead>Acciones</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {referralLinks.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-muted-foreground">
-                    {loading ? 'Cargando...' : 'Sin enlaces generados'}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                referralLinks.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell>
-                      <div className="font-medium">{row.collaborators?.name ?? '—'}</div>
-                      <Badge variant="secondary" className="text-xs">
-                        {row.collaborators?.code}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>{ENTRY_MODE_LABELS[row.entry_mode] ?? row.entry_mode}</TableCell>
-                    <TableCell className="text-xs">{formatDt(row.created_at)}</TableCell>
-                    <TableCell className="text-xs">{formatDt(row.expires_at)}</TableCell>
-                    <TableCell>
-                      <Switch checked={row.is_active} onCheckedChange={(v) => void toggleReferralActive(row.id, v)} />
-                    </TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="sm" onClick={() => void setReferralExpiry(row.id)}>
-                        Fijar expiración
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-
-        <div>
-          <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
-            <KeyRound className="h-4 w-4" />
-            Tokens de portal
-          </h4>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Colaborador</TableHead>
-                <TableHead>Etiqueta</TableHead>
-                <TableHead>Creado</TableHead>
-                <TableHead>Último uso</TableHead>
-                <TableHead>Expira</TableHead>
-                <TableHead>Activo</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {accessTokens.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-muted-foreground">
-                    {loading ? 'Cargando...' : 'Sin tokens de portal'}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                accessTokens.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell>
-                      <div className="font-medium">{row.collaborators?.name ?? '—'}</div>
-                      <Badge variant="secondary" className="text-xs">
-                        {row.collaborators?.code}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-xs">{row.label ?? '—'}</TableCell>
-                    <TableCell className="text-xs">{formatDt(row.created_at)}</TableCell>
-                    <TableCell className="text-xs">{formatDt(row.last_used_at)}</TableCell>
-                    <TableCell className="text-xs">{formatDt(row.expires_at)}</TableCell>
-                    <TableCell>
-                      <Switch checked={row.is_active} onCheckedChange={(v) => void toggleAccessActive(row.id, v)} />
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </CardContent>
+      <CardContent>{content}</CardContent>
     </Card>
   );
 }
