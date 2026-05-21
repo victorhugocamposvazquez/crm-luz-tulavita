@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,9 +39,7 @@ import { downloadQrPng, generateQrDataUrl } from '@/lib/collaborators/qr';
 import {
   clearPortalSession,
   getPortalSessionToken,
-  setPortalSessionToken,
 } from '@/lib/collaborators/portal-session';
-import { ColaboradorPortalLogin } from '@/components/colaboradores/ColaboradorPortalLogin';
 import { ColaboradorPortalBrandHeader } from '@/components/colaboradores/ColaboradorPortalBrandHeader';
 
 type PortalData = {
@@ -117,10 +115,8 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-export default function ColaboradorPortal() {
-  const [searchParams] = useSearchParams();
+export default function ColaboradorPortalPanel() {
   const navigate = useNavigate();
-  const urlToken = searchParams.get('token')?.trim() ?? '';
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [data, setData] = useState<PortalData | null>(null);
@@ -167,43 +163,34 @@ export default function ColaboradorPortal() {
     } catch (e) {
       clearPortalSession();
       setSessionToken(null);
-      setError(e instanceof Error ? e.message : 'No se pudo cargar el portal');
-      setData(null);
+      const message = e instanceof Error ? e.message : 'No se pudo cargar el portal';
+      navigate('/colaborador/acceso', { replace: true, state: { error: message } });
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
-    if (urlToken) {
-      setPortalSessionToken(urlToken);
-      setSessionToken(urlToken);
+    const stored = getPortalSessionToken();
+    if (!stored) {
       navigate('/colaborador/acceso', { replace: true });
-      setAuthReady(true);
       return;
     }
-
-    const stored = getPortalSessionToken();
     setSessionToken(stored);
     setAuthReady(true);
-  }, [urlToken, navigate]);
+  }, [navigate]);
 
   useEffect(() => {
     if (!authReady || !sessionToken) return;
     void loadPortal(sessionToken);
   }, [authReady, sessionToken, loadPortal]);
 
-  const handleAuthenticated = (token: string) => {
-    setPortalSessionToken(token);
-    setSessionToken(token);
-    setError(null);
-  };
-
   const handleLogout = () => {
     clearPortalSession();
     setSessionToken(null);
     setData(null);
     setError(null);
+    navigate('/colaborador/acceso', { replace: true });
   };
 
   useEffect(() => {
@@ -368,19 +355,7 @@ export default function ColaboradorPortal() {
     }
   };
 
-  if (!authReady) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-muted/30">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (!sessionToken) {
-    return <ColaboradorPortalLogin onAuthenticated={handleAuthenticated} initialError={error} />;
-  }
-
-  if (loading && !data) {
+  if (!authReady || !sessionToken || (loading && !data)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-muted/30">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -389,7 +364,11 @@ export default function ColaboradorPortal() {
   }
 
   if (error || !data) {
-    return <ColaboradorPortalLogin onAuthenticated={handleAuthenticated} initialError={error} />;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-muted/30">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
   }
 
   const { collaborator, stats, pending_payouts, captured_clients, commission_invoices } = data;

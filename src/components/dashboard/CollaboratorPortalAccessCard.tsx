@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
 import { ExternalLink, KeyRound, Copy, RefreshCw, Plus } from 'lucide-react';
-import { buildPortalUrl, getAppBaseUrl } from '@/lib/collaborators/links';
+import { buildPortalLoginUrl, buildPortalUrl, getAppBaseUrl } from '@/lib/collaborators/links';
 import { createAccessToken } from '@/lib/collaborators/tokens';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -71,6 +71,7 @@ export function CollaboratorPortalAccessCard({
   }, [tokens]);
 
   const portalUrl = activeToken ? buildPortalUrl(baseUrl, activeToken.token) : null;
+  const loginUrl = buildPortalLoginUrl(baseUrl);
 
   const copyUrl = async (url: string) => {
     try {
@@ -125,8 +126,9 @@ export function CollaboratorPortalAccessCard({
               Acceso al portal del colaborador
             </CardTitle>
             <CardDescription>
-              Magic link para que {collaboratorName} entre en{' '}
-              <span className="font-mono text-xs">/colaborador/acceso</span>. Compártelo por email o WhatsApp.
+              Zona privada con login en{' '}
+              <span className="font-mono text-xs">/colaborador/acceso</span>. Comparte el magic link para que{' '}
+              {collaboratorName} entre directamente, o la URL de login para que pegue su enlace allí.
             </CardDescription>
           </div>
           <Button variant="outline" size="sm" onClick={() => void fetchTokens()} disabled={loading}>
@@ -136,13 +138,22 @@ export function CollaboratorPortalAccessCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="rounded-lg border bg-background p-3 space-y-2">
+          <p className="text-xs font-medium text-muted-foreground">Página de login (zona protegida)</p>
+          <p className="break-all font-mono text-xs sm:text-sm">{loginUrl}</p>
+          <Button variant="outline" size="sm" onClick={() => void copyUrl(loginUrl)}>
+            <Copy className="h-4 w-4 mr-2" />
+            Copiar URL de login
+          </Button>
+        </div>
+
         {loading ? (
           <p className="text-sm text-muted-foreground">Cargando enlace de acceso…</p>
         ) : portalUrl && activeToken ? (
           <>
             <div className="rounded-lg border bg-background p-3 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="default">Enlace activo</Badge>
+                <Badge variant="default">Magic link activo</Badge>
                 {activeToken.label && <Badge variant="secondary">{activeToken.label}</Badge>}
                 {activeToken.expires_at && (
                   <span className="text-xs text-muted-foreground">
@@ -165,7 +176,7 @@ export function CollaboratorPortalAccessCard({
               <Button variant="outline" size="sm" asChild>
                 <a href={portalUrl} target="_blank" rel="noopener noreferrer">
                   <ExternalLink className="h-4 w-4 mr-2" />
-                  Abrir portal
+                  Probar magic link
                 </a>
               </Button>
               <Button variant="outline" size="sm" disabled={generating} onClick={() => void generateLink()}>

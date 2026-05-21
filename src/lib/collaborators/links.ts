@@ -28,6 +28,10 @@ export function buildRecruitmentUrl(baseUrl: string, recruitToken?: string): str
   return url.toString();
 }
 
+export function buildPortalLoginUrl(baseUrl: string): string {
+  return new URL('/colaborador/acceso', baseUrl || 'https://crm.virvita.es').toString();
+}
+
 export function buildPortalUrl(baseUrl: string, accessToken: string): string {
   const url = new URL('/colaborador/acceso', baseUrl || 'https://crm.virvita.es');
   url.searchParams.set('token', accessToken);

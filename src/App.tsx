@@ -13,7 +13,8 @@ import AhorroLuz from "./pages/AhorroLuz";
 import NotFound from "./pages/NotFound";
 
 const ColaboradoresHibrida = lazy(() => import("./pages/ColaboradoresHibrida"));
-const ColaboradorPortal = lazy(() => import("./pages/ColaboradorPortal"));
+const ColaboradorPortalAcceso = lazy(() => import("./pages/ColaboradorPortalAcceso"));
+const ColaboradorPortalPanel = lazy(() => import("./pages/ColaboradorPortal"));
 
 const queryClient = new QueryClient();
 
@@ -44,10 +45,19 @@ const App = () => (
               path="/colaborador/acceso"
               element={
                 <Suspense fallback={null}>
-                  <ColaboradorPortal />
+                  <ColaboradorPortalAcceso />
                 </Suspense>
               }
             />
+            <Route
+              path="/colaborador/panel"
+              element={
+                <Suspense fallback={null}>
+                  <ColaboradorPortalPanel />
+                </Suspense>
+              }
+            />
+            <Route path="/colaborador" element={<Navigate to="/colaborador/acceso" replace />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

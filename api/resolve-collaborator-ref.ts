@@ -60,12 +60,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
       if (error) throw error;
 
+type CollaboratorJoin = { id: string; code: string; name: string; is_active: boolean };
+
       const row = data as {
         entry_mode?: EntryMode;
         expires_at?: string | null;
-        collaborators?: { id: string; code: string; name: string; is_active: boolean };
+        collaborators?: CollaboratorJoin | CollaboratorJoin[];
       } | null;
-      const collab = row?.collaborators;
+      const collabRaw = row?.collaborators;
+      const collab = Array.isArray(collabRaw) ? collabRaw[0] : collabRaw;
       const expired = !!(row?.expires_at && new Date(row.expires_at).getTime() <= Date.now());
       if (collab && collab.is_active && !expired) {
         cors();

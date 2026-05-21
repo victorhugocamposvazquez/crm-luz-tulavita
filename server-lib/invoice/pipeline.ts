@@ -197,7 +197,7 @@ function reconcileConsumoPorPeriodo(e: InvoiceExtraction, fixes: string[]): void
   const rel = diff / e.consumption_kwh;
   if (rel > 0.50) {
     for (const k of keys) {
-      (e as Record<string, unknown>)[k] = null;
+      e[k] = null;
     }
     fixes.push(
       `consumo P1–P6 anulado: suma periodos ${sum.toFixed(1)} ≠ consumption_kwh ${e.consumption_kwh} (desvío ${(rel * 100).toFixed(0)}%; revisar en factura)`,
@@ -209,7 +209,7 @@ function reconcileConsumoPorPeriodo(e: InvoiceExtraction, fixes: string[]): void
   for (const k of keys) {
     const v = e[k];
     if (v != null && v > 0) {
-      (e as Record<string, unknown>)[k] = Math.round(v * factor * 1000) / 1000;
+      e[k] = Math.round(v * factor * 1000) / 1000;
     }
   }
   fixes.push(
@@ -338,7 +338,7 @@ function validateExtraction(e: InvoiceExtraction): InvoiceExtraction {
       const fixed = val / 1000;
       if (fixed >= 1 && fixed <= 500) {
         fixes.push(`${pKey} corregida: ${val} → ${fixed}`);
-        (e as Record<string, unknown>)[pKey] = fixed;
+        e[pKey] = fixed;
       }
     }
   }

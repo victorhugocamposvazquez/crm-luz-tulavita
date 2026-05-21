@@ -98,8 +98,8 @@ export function ColaboradorPortalLogin({ onAuthenticated, initialError }: Colabo
             Acceso colaboradores
           </CardTitle>
           <CardDescription>
-            Zona privada protegida. Entra con el enlace personal (magic link) que te envió Tulavita, del tipo{' '}
-            <span className="font-mono text-xs">/colaborador/acceso?token=portal_…</span>
+            Zona privada protegida. Entra con el enlace personal (magic link) que te envió Tulavita. Tras validarlo
+            accederás a tu panel en <span className="font-mono text-xs">/colaborador/panel</span>.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
