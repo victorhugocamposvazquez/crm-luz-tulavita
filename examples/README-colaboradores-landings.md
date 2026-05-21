@@ -7,7 +7,7 @@ Las landings públicas viven en el CRM como páginas React (Vite + React Router)
 | Variante | URL | Componente |
 |----------|-----|------------|
 | Compacta | `/colaboradores` | `src/pages/ColaboradoresCompacta.tsx` |
-| Híbrida | `/colaboradores/hibrida` | `src/pages/ColaboradoresHibrida.tsx` |
+| Hazte colaborador | `/hazte-colaborador` | `src/pages/ColaboradoresHibrida.tsx` |
 | Portal colaborador | `/colaborador/acceso?token=...` | `src/pages/ColaboradorPortal.tsx` |
 
 ## Código

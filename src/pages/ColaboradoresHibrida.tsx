@@ -4,7 +4,7 @@ import { LandingHibrida } from '@/components/colaboradores/LandingHibrida';
 export default function ColaboradoresHibridaPage() {
   return (
     <ColaboradoresLandingLayout
-      title="Tulavita · Colaboradores · Híbrida"
+      title="Tulavita · Hazte colaborador"
       description="Recomienda luz y cobra cada mes. Programa de colaboradores con simulador, FAQ y bot de atención."
     >
       <LandingHibrida />

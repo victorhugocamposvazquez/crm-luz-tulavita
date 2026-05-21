@@ -14,6 +14,7 @@ import { CollaboratorTokenManager } from './CollaboratorTokenManager';
 import { RecruitmentLeadsSection } from './RecruitmentLeadsSection';
 import { CollaboratorInvoicesSection } from './CollaboratorInvoicesSection';
 import { ConvertLeadDialog } from './ConvertLeadDialog';
+import { COLABORADORES_ROUTES } from '@/components/colaboradores/colaboradores-config';
 import type { Database } from '@/integrations/supabase/types';
 
 type RecruitmentLeadRow = Database['public']['Tables']['leads']['Row'];
@@ -102,8 +103,8 @@ export default function CollaboratorsManagement() {
 
   const colaboradoresLandings = useMemo(
     () => [
-      { id: 'compacta', label: 'Captación compacta', path: '/colaboradores/' },
-      { id: 'hibrida', label: 'Captación híbrida', path: '/colaboradores/hibrida/' },
+      { id: 'compacta', label: 'Captación compacta', path: `${COLABORADORES_ROUTES.compacta}/` },
+      { id: 'hibrida', label: 'Hazte colaborador', path: `${COLABORADORES_ROUTES.hibrida}/` },
     ],
     [],
   );

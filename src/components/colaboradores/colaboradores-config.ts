@@ -19,5 +19,18 @@ export type ColaboradoresLandingVariant = 'compacta' | 'hibrida';
 
 export const COLABORADORES_CAMPAIGNS: Record<ColaboradoresLandingVariant, string> = {
   compacta: 'colaboradores_compacta',
-  hibrida: 'colaboradores_hibrida',
+  hibrida: 'hazte_colaborador',
+};
+
+/** Campañas de reclutamiento (incluye legacy para consultas históricas). */
+export const RECRUITMENT_CAMPAIGNS = ['colaboradores_compacta', 'hazte_colaborador', 'colaboradores_hibrida'] as const;
+
+export function isRecruitmentCampaign(campaign: string | null | undefined): boolean {
+  if (typeof campaign !== 'string') return false;
+  return (RECRUITMENT_CAMPAIGNS as readonly string[]).includes(campaign);
+}
+
+export const COLABORADORES_ROUTES: Record<ColaboradoresLandingVariant, string> = {
+  compacta: '/colaboradores',
+  hibrida: '/hazte-colaborador',
 };

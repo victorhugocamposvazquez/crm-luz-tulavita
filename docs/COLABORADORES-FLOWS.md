@@ -4,14 +4,14 @@ Documentación de los dos funnels principales y las APIs involucradas.
 
 ## Funnel 1 — Reclutamiento de colaboradores
 
-**Rutas:** `/colaboradores`, `/colaboradores/hibrida`
+**Rutas:** `/colaboradores`, `/hazte-colaborador` (antes `/colaboradores/hibrida`, redirige)
 
 **Objetivo:** Captar prospectos que quieren unirse al programa de colaboradores.
 
 | Campo lead | Valor |
 |------------|-------|
 | `source` | `web_form` |
-| `campaign` | `colaboradores_compacta` o `colaboradores_hibrida` |
+| `campaign` | `colaboradores_compacta` o `hazte_colaborador` |
 | `status` | `contacted` (por defecto en API) |
 | `custom_fields.landing_type` | `colaboradores` |
 | `custom_fields.landing_variant` | `compacta` \| `hibrida` |

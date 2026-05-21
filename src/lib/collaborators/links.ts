@@ -22,7 +22,7 @@ export function buildClientCaptureUrl(
 }
 
 export function buildRecruitmentUrl(baseUrl: string, recruitToken?: string): string {
-  const url = new URL('/colaboradores', baseUrl || 'https://crm.virvita.es');
+  const url = new URL('/hazte-colaborador', baseUrl || 'https://crm.virvita.es');
   if (recruitToken) url.searchParams.set('ref', recruitToken);
   return url.toString();
 }

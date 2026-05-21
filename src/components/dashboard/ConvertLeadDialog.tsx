@@ -15,6 +15,7 @@ import { toast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
 import { CollaboratorKitMenu } from './CollaboratorKitMenu';
 import type { Database } from '@/integrations/supabase/types';
+import { isRecruitmentCampaign } from '@/components/colaboradores/colaboradores-config';
 
 type LeadRow = Database['public']['Tables']['leads']['Row'];
 
@@ -178,9 +179,5 @@ export function ConvertLeadDialog({ lead, open, onOpenChange, onCreated }: Conve
 }
 
 export function isRecruitmentLead(lead: LeadRow): boolean {
-  return (
-    lead.source === 'web_form' &&
-    typeof lead.campaign === 'string' &&
-    lead.campaign.startsWith('colaboradores_')
-  );
+  return lead.source === 'web_form' && isRecruitmentCampaign(lead.campaign);
 }

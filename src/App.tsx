@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
@@ -40,13 +40,14 @@ const App = () => (
               }
             />
             <Route
-              path="/colaboradores/hibrida"
+              path="/hazte-colaborador"
               element={
                 <Suspense fallback={null}>
                   <ColaboradoresHibrida />
                 </Suspense>
               }
             />
+            <Route path="/colaboradores/hibrida" element={<Navigate to="/hazte-colaborador" replace />} />
             <Route
               path="/colaborador/acceso"
               element={

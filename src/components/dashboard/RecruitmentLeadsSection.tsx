@@ -9,6 +9,7 @@ import { UserPlus, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import LeadDetailSheet from './LeadDetailSheet';
+import { RECRUITMENT_CAMPAIGNS } from '@/components/colaboradores/colaboradores-config';
 import type { Database } from '@/integrations/supabase/types';
 
 type LeadRow = Database['public']['Tables']['leads']['Row'];
@@ -38,7 +39,7 @@ export function RecruitmentLeadsSection({ onConvertLead }: RecruitmentLeadsSecti
         .from('leads')
         .select('*')
         .eq('source', 'web_form')
-        .or('campaign.eq.colaboradores_compacta,campaign.eq.colaboradores_hibrida')
+        .in('campaign', [...RECRUITMENT_CAMPAIGNS])
         .order('created_at', { ascending: false })
         .limit(30);
       if (error) throw error;
@@ -66,7 +67,7 @@ export function RecruitmentLeadsSection({ onConvertLead }: RecruitmentLeadsSecti
             <div>
               <CardTitle>Leads de reclutamiento</CardTitle>
               <CardDescription>
-                Prospectos desde /colaboradores* (campaña colaboradores_compacta o colaboradores_hibrida).
+                Prospectos desde /colaboradores o /hazte-colaborador (campañas colaboradores_compacta o hazte_colaborador).
               </CardDescription>
             </div>
             <Button variant="outline" size="sm" onClick={() => void fetchLeads()} disabled={loading}>

@@ -16,6 +16,4 @@ export const ENTRY_MODE_SHORT: Record<CollaboratorEntryMode, string> = {
 
 export const ALL_ENTRY_MODES: CollaboratorEntryMode[] = ['auto', 'upload', 'manual', 'callback'];
 
-export function isRecruitmentCampaign(campaign: string | null | undefined): boolean {
-  return typeof campaign === 'string' && campaign.startsWith('colaboradores_');
-}
+export { isRecruitmentCampaign, RECRUITMENT_CAMPAIGNS } from '@/components/colaboradores/colaboradores-config';

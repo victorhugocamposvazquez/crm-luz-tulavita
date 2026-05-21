@@ -24,6 +24,7 @@ import LeadDetailSheet from './LeadDetailSheet';
 import NewLeadDialog from './NewLeadDialog';
 import { LeadTagBadges } from './LeadTagBadges';
 import { LEAD_TAGS } from '@/data/lead-tags';
+import { RECRUITMENT_CAMPAIGNS } from '@/components/colaboradores/colaboradores-config';
 
 type LeadRow = Database['public']['Tables']['leads']['Row'];
 
@@ -88,7 +89,7 @@ export default function LeadsManagement() {
           query = query.eq('source', sourceFilter);
         }
         if (campaignFilter === 'recruitment') {
-          query = query.eq('source', 'web_form').in('campaign', ['colaboradores_compacta', 'colaboradores_hibrida']);
+          query = query.eq('source', 'web_form').in('campaign', [...RECRUITMENT_CAMPAIGNS]);
         } else if (campaignFilter === 'collaborator_clients') {
           query = query.eq('source', 'collaborator_referral');
         }
