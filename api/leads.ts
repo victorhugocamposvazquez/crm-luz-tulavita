@@ -104,6 +104,7 @@ async function createLead(
     adset?: string;
     ad?: string;
     collaborator_id?: string;
+    referred_by_collaborator_id?: string;
     status?: string;
     owner_id?: string;
     tags?: string[];
@@ -133,6 +134,7 @@ async function createLead(
         adset: input.adset ?? undefined,
         ad: input.ad ?? undefined,
         collaborator_id: input.collaborator_id ?? undefined,
+        referred_by_collaborator_id: input.referred_by_collaborator_id ?? undefined,
         tags: input.tags ?? undefined,
         custom_fields: input.custom_fields ?? undefined,
         updated_at: new Date().toISOString(),
@@ -179,6 +181,7 @@ async function createLead(
       adset: input.adset ?? null,
       ad: input.ad ?? null,
       collaborator_id: input.collaborator_id ?? null,
+      referred_by_collaborator_id: input.referred_by_collaborator_id ?? null,
       status: input.status ?? 'new',
       owner_id: ownerId,
       tags: input.tags ?? [],
@@ -265,6 +268,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       adset: typeof body.adset === 'string' ? body.adset : undefined,
       ad: typeof body.ad === 'string' ? body.ad : undefined,
       collaborator_id: typeof body.collaborator_id === 'string' && isUuid(body.collaborator_id) ? body.collaborator_id : undefined,
+      referred_by_collaborator_id:
+        typeof body.referred_by_collaborator_id === 'string' && isUuid(body.referred_by_collaborator_id)
+          ? body.referred_by_collaborator_id
+          : undefined,
       status: typeof body.status === 'string' ? body.status : undefined,
       owner_id: typeof body.owner_id === 'string' ? body.owner_id : undefined,
       tags: Array.isArray(body.tags)

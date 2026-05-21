@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, MessageSquarePlus, User, Mail, Phone, FileText, History, ExternalLink, MessageCircle, Expand, Tag, Pencil, Trash2, Handshake } from 'lucide-react';
+import { Loader2, MessageSquarePlus, User, Mail, Phone, FileText, History, ExternalLink, MessageCircle, Expand, Tag, Pencil, Trash2, Handshake, UserPlus } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -35,6 +35,7 @@ import { es } from 'date-fns/locale';
 import { supabase } from '@/integrations/supabase/client';
 import { getLeadFieldLabel } from './lead-field-labels';
 import { LeadTagSelector } from './LeadTagSelector';
+import { ConvertLeadDialog, isRecruitmentLead } from './ConvertLeadDialog';
 import type { Database } from '@/integrations/supabase/types';
 
 type LeadRow = Database['public']['Tables']['leads']['Row'];
@@ -228,6 +229,9 @@ export default function LeadDetailSheet({
   const [contactSaving, setContactSaving] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [collaboratorInfo, setCollaboratorInfo] = useState<{ id: string; code: string; name: string } | null>(null);
+  const [referrerInfo, setReferrerInfo] = useState<{ id: string; code: string; name: string } | null>(null);
+  const [convertOpen, setConvertOpen] = useState(false);
 
   const {
     timeline,
@@ -361,6 +365,52 @@ export default function LeadDetailSheet({
     setEditPhone(lead.phone ?? '');
     setEditEmail(lead.email ?? '');
   }, [open, lead?.id]);
+
+  useEffect(() => {
+    if (!open || !lead) {
+      setCollaboratorInfo(null);
+      setReferrerInfo(null);
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      if (lead.collaborator_id) {
+        const { data } = await supabase
+          .from('collaborators')
+          .select('id, code, name')
+          .eq('id', lead.collaborator_id)
+          .maybeSingle();
+        if (!cancelled) setCollaboratorInfo(data ?? null);
+      } else {
+        setCollaboratorInfo(null);
+      }
+
+      const referredId =
+        (lead as LeadRow & { referred_by_collaborator_id?: string | null }).referred_by_collaborator_id ??
+        (typeof lead.custom_fields === 'object' &&
+        lead.custom_fields !== null &&
+        !Array.isArray(lead.custom_fields) &&
+        typeof (lead.custom_fields as Record<string, unknown>).referred_by_collaborator_id === 'string'
+          ? ((lead.custom_fields as Record<string, unknown>).referred_by_collaborator_id as string)
+          : null);
+
+      if (referredId) {
+        const { data } = await supabase
+          .from('collaborators')
+          .select('id, code, name')
+          .eq('id', referredId)
+          .maybeSingle();
+        if (!cancelled) setReferrerInfo(data ?? null);
+      } else {
+        setReferrerInfo(null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, lead?.id, lead?.collaborator_id, lead?.custom_fields]);
 
   const handleSaveContact = async () => {
     if (!lead?.id) return;
@@ -587,7 +637,12 @@ export default function LeadDetailSheet({
                     {lead.source === 'collaborator_referral' ? (
                       <Badge className="gap-1.5 bg-emerald-100 text-emerald-800 hover:bg-emerald-100 border border-emerald-200">
                         <Handshake className="h-3.5 w-3.5" />
-                        Colaborador
+                        Cliente referido
+                      </Badge>
+                    ) : isRecruitmentLead(lead) ? (
+                      <Badge className="gap-1.5 bg-amber-100 text-amber-900 hover:bg-amber-100 border border-amber-200">
+                        <UserPlus className="h-3.5 w-3.5" />
+                        Reclutamiento colaborador
                       </Badge>
                     ) : (
                       <Badge variant="outline">{SOURCE_LABELS[lead.source] ?? lead.source}</Badge>
@@ -596,6 +651,36 @@ export default function LeadDetailSheet({
                       {format(new Date(lead.created_at), "d MMM yyyy, HH:mm", { locale: es })}
                     </Badge>
                   </div>
+                  {(collaboratorInfo || referrerInfo) && (
+                    <div className="mt-3 rounded-lg border bg-muted/40 p-3 space-y-2 text-sm">
+                      {collaboratorInfo && (
+                        <p>
+                          <span className="text-muted-foreground">Colaborador: </span>
+                          <span className="font-medium">{collaboratorInfo.name}</span>
+                          <Badge variant="secondary" className="ml-2 text-xs">
+                            {collaboratorInfo.code}
+                          </Badge>
+                        </p>
+                      )}
+                      {referrerInfo && (
+                        <p>
+                          <span className="text-muted-foreground">Referido por: </span>
+                          <span className="font-medium">{referrerInfo.name}</span>
+                          <Badge variant="secondary" className="ml-2 text-xs">
+                            {referrerInfo.code}
+                          </Badge>
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {isRecruitmentLead(lead) && (
+                    <div className="mt-3">
+                      <Button variant="outline" size="sm" className="gap-2" onClick={() => setConvertOpen(true)}>
+                        <UserPlus className="h-4 w-4" />
+                        Convertir a colaborador
+                      </Button>
+                    </div>
+                  )}
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button
                       variant="outline"
@@ -853,6 +938,13 @@ export default function LeadDetailSheet({
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        <ConvertLeadDialog
+          lead={lead}
+          open={convertOpen}
+          onOpenChange={setConvertOpen}
+          onCreated={() => onLeadUpdated?.()}
+        />
       </SheetContent>
     </Sheet>
   );

@@ -1,6 +1,7 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ColaboradoresLandingVariant } from '@/components/colaboradores/colaboradores-config';
 import { COLABORADORES_CAMPAIGNS } from '@/components/colaboradores/colaboradores-config';
+import { useMetaAttribution } from '@/hooks/useMetaAttribution';
 
 export type ColaboradoresLeadFormState = {
   nombre: string;
@@ -8,10 +9,35 @@ export type ColaboradoresLeadFormState = {
   email: string;
 };
 
+async function resolveRecruitReferrer(refToken: string): Promise<string | null> {
+  try {
+    const apiUrl = import.meta.env.VITE_RESOLVE_COLLABORATOR_REF_API_URL ?? '/api/resolve-collaborator-ref';
+    const res = await fetch(apiUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ref: refToken }),
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      collaborator?: { id: string } | null;
+    };
+    return data.collaborator?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function readRecruitRefFromUrl(): string | null {
+  if (typeof window === 'undefined') return null;
+  const ref = new URLSearchParams(window.location.search).get('ref');
+  return ref?.trim() || null;
+}
+
 export function useColaboradoresLeadSubmit(variant: ColaboradoresLandingVariant) {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  const { attribution } = useMetaAttribution();
+  const recruitRef = useMemo(() => readRecruitRefFromUrl(), []);
 
   const submit = useCallback(
     async (e: React.FormEvent, state: ColaboradoresLeadFormState) => {
@@ -22,17 +48,30 @@ export function useColaboradoresLeadSubmit(variant: ColaboradoresLandingVariant)
       setError(null);
 
       try {
-        const payload = {
+        const referredById = recruitRef ? await resolveRecruitReferrer(recruitRef) : null;
+
+        const customFields: Record<string, unknown> = {
+          landing_type: 'colaboradores',
+          landing_variant: variant,
+          ...(attribution.campaign ? { utm_campaign: attribution.campaign } : {}),
+          ...(attribution.adset ? { utm_term: attribution.adset } : {}),
+          ...(attribution.ad ? { utm_content: attribution.ad } : {}),
+          ...(recruitRef ? { recruit_ref_token: recruitRef } : {}),
+          ...(referredById ? { referred_by_collaborator_id: referredById } : {}),
+        };
+
+        const payload: Record<string, unknown> = {
           name: state.nombre.trim(),
           phone: state.tel.trim(),
           email: state.email.trim() || undefined,
           source: 'web_form',
           campaign: COLABORADORES_CAMPAIGNS[variant],
-          custom_fields: {
-            landing_type: 'colaboradores',
-            landing_variant: variant,
-          },
+          custom_fields: customFields,
         };
+
+        if (referredById) {
+          payload.referred_by_collaborator_id = referredById;
+        }
 
         const res = await fetch('/api/leads', {
           method: 'POST',
@@ -53,7 +92,14 @@ export function useColaboradoresLeadSubmit(variant: ColaboradoresLandingVariant)
           await fetch('/api/lead-entries', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ lead_id: data.lead.id, source: 'web_form' }),
+            body: JSON.stringify({
+              lead_id: data.lead.id,
+              source: 'web_form',
+              campaign: COLABORADORES_CAMPAIGNS[variant],
+              adset: attribution.adset ?? null,
+              ad: attribution.ad ?? null,
+              custom_fields: customFields,
+            }),
           }).catch(() => {});
         }
 
@@ -64,7 +110,7 @@ export function useColaboradoresLeadSubmit(variant: ColaboradoresLandingVariant)
         setSending(false);
       }
     },
-    [sending, variant],
+    [sending, variant, attribution, recruitRef],
   );
 
   return { submit, sending, error, sent, setSent };

@@ -9,6 +9,14 @@ import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
 import { Plus, RefreshCw, Users, Link2, Wallet, CheckCircle2, ExternalLink } from 'lucide-react';
+import { CollaboratorKitMenu } from './CollaboratorKitMenu';
+import { CollaboratorTokenManager } from './CollaboratorTokenManager';
+import { RecruitmentLeadsSection } from './RecruitmentLeadsSection';
+import { CollaboratorInvoicesSection } from './CollaboratorInvoicesSection';
+import { ConvertLeadDialog } from './ConvertLeadDialog';
+import type { Database } from '@/integrations/supabase/types';
+
+type RecruitmentLeadRow = Database['public']['Tables']['leads']['Row'];
 
 type CollaboratorRow = {
   id: string;
@@ -49,10 +57,6 @@ function slugifyCode(raw: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-function createReferralToken(): string {
-  return `${crypto.randomUUID().replace(/-/g, '')}${Math.random().toString(36).slice(2, 10)}`;
-}
-
 function formatDateTime(value: string | null): string {
   if (!value) return '—';
   return new Date(value).toLocaleString('es-ES', {
@@ -88,6 +92,8 @@ export default function CollaboratorsManagement() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [payouts, setPayouts] = useState<CollaboratorPayoutRow[]>([]);
+  const [convertLead, setConvertLead] = useState<RecruitmentLeadRow | null>(null);
+  const [convertOpen, setConvertOpen] = useState(false);
 
   const baseUrl = useMemo(() => {
     if (typeof window === 'undefined') return '';
@@ -384,27 +390,9 @@ export default function CollaboratorsManagement() {
     }
   };
 
-  const createSignedLink = async (collaboratorId: string, entryMode: 'auto' | 'upload') => {
-    const token = createReferralToken();
-    const { error } = await supabase.from('collaborator_referral_links').insert({
-      collaborator_id: collaboratorId,
-      token,
-      entry_mode: entryMode,
-      is_active: true,
-      expires_at: null,
-    });
-    if (error) throw error;
-    return `${baseUrl}/ahorra-factura-luz?ref=${encodeURIComponent(token)}`;
-  };
-
-  const copyGeneratedLink = async (collaboratorId: string, entryMode: 'auto' | 'upload') => {
-    try {
-      const link = await createSignedLink(collaboratorId, entryMode);
-      await copyToClipboard(link);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'No se pudo generar el enlace';
-      toast({ title: 'Error', description: message, variant: 'destructive' });
-    }
+  const openConvertLead = (lead: RecruitmentLeadRow) => {
+    setConvertLead(lead);
+    setConvertOpen(true);
   };
 
   const totals = useMemo(() => {
@@ -606,18 +594,17 @@ export default function CollaboratorsManagement() {
                 <TableHead className="text-right">Conv.%</TableHead>
                 <TableHead className="text-right">Comisión estimada</TableHead>
                 <TableHead>Liquidación</TableHead>
-                <TableHead>Enlace landing</TableHead>
-                <TableHead>Enlace directo factura</TableHead>
+                <TableHead>Kit captación</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={12}>Cargando...</TableCell>
+                  <TableCell colSpan={11}>Cargando...</TableCell>
                 </TableRow>
               ) : rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={12} className="text-muted-foreground">
+                  <TableCell colSpan={11} className="text-muted-foreground">
                     Aun no hay colaboradores.
                   </TableCell>
                 </TableRow>
@@ -669,16 +656,12 @@ export default function CollaboratorsManagement() {
                         </Button>
                       </TableCell>
                       <TableCell>
-                        <Button variant="outline" size="sm" onClick={() => void copyGeneratedLink(row.id, 'auto')}>
-                          <Link2 className="h-3.5 w-3.5 mr-2" />
-                          Generar y copiar
-                        </Button>
-                      </TableCell>
-                      <TableCell>
-                        <Button variant="outline" size="sm" onClick={() => void copyGeneratedLink(row.id, 'upload')}>
-                          <Link2 className="h-3.5 w-3.5 mr-2" />
-                          Generar y copiar
-                        </Button>
+                        <CollaboratorKitMenu
+                          collaboratorId={row.id}
+                          code={row.code}
+                          name={row.name}
+                          compact
+                        />
                       </TableCell>
                     </TableRow>
                   );
@@ -688,6 +671,19 @@ export default function CollaboratorsManagement() {
           </Table>
         </CardContent>
       </Card>
+
+      <RecruitmentLeadsSection onConvertLead={openConvertLead} />
+
+      <CollaboratorInvoicesSection />
+
+      <CollaboratorTokenManager />
+
+      <ConvertLeadDialog
+        lead={convertLead}
+        open={convertOpen}
+        onOpenChange={setConvertOpen}
+        onCreated={() => void fetchCollaborators()}
+      />
 
       <Card>
         <CardHeader>

@@ -62,6 +62,7 @@ export default function LeadsManagement() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [tagFilter, setTagFilter] = useState<string>('all');
+  const [campaignFilter, setCampaignFilter] = useState<string>('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [selectedLead, setSelectedLead] = useState<LeadRow | null>(null);
@@ -85,6 +86,11 @@ export default function LeadsManagement() {
         }
         if (sourceFilter !== 'all') {
           query = query.eq('source', sourceFilter);
+        }
+        if (campaignFilter === 'recruitment') {
+          query = query.eq('source', 'web_form').in('campaign', ['colaboradores_compacta', 'colaboradores_hibrida']);
+        } else if (campaignFilter === 'collaborator_clients') {
+          query = query.eq('source', 'collaborator_referral');
         }
         if (tagFilter !== 'all') {
           query = query.contains('tags', [tagFilter]);
@@ -116,7 +122,7 @@ export default function LeadsManagement() {
         setLoading(false);
       }
     },
-    [statusFilter, sourceFilter, tagFilter, dateFrom, dateTo]
+    [statusFilter, sourceFilter, tagFilter, campaignFilter, dateFrom, dateTo]
   );
 
   useEffect(() => {
@@ -262,6 +268,16 @@ export default function LeadsManagement() {
                       {label}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+              <Select value={campaignFilter} onValueChange={setCampaignFilter}>
+                <SelectTrigger className="w-full sm:w-[200px]">
+                  <SelectValue placeholder="Campaña" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas las campañas</SelectItem>
+                  <SelectItem value="recruitment">Reclutamiento colaboradores</SelectItem>
+                  <SelectItem value="collaborator_clients">Clientes vía colaborador</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={tagFilter} onValueChange={setTagFilter}>

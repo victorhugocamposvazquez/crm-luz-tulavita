@@ -14,6 +14,7 @@ import NotFound from "./pages/NotFound";
 
 const ColaboradoresCompacta = lazy(() => import("./pages/ColaboradoresCompacta"));
 const ColaboradoresHibrida = lazy(() => import("./pages/ColaboradoresHibrida"));
+const ColaboradorPortal = lazy(() => import("./pages/ColaboradorPortal"));
 
 const queryClient = new QueryClient();
 
@@ -43,6 +44,14 @@ const App = () => (
               element={
                 <Suspense fallback={null}>
                   <ColaboradoresHibrida />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/colaborador/acceso"
+              element={
+                <Suspense fallback={null}>
+                  <ColaboradorPortal />
                 </Suspense>
               }
             />
