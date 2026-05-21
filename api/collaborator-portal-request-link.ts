@@ -138,7 +138,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
       if (sendResult.sent) {
         delivery = 'email';
-      } else {
+      } else if (sendResult.sent === false) {
         delivery = 'manual';
         message =
           'Hemos generado tu acceso, pero el envío automático por email no está disponible ahora. Contacta con Tulavita por WhatsApp indicando tu email registrado.';

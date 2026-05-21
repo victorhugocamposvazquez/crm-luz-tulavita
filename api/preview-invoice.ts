@@ -16,6 +16,7 @@ import {
   upsertAttachmentAnalysisCache,
   pruneExpiredAttachmentCache,
   rowToCachePayload,
+  type AttachmentAnalysisCachePayload,
 } from '../server-lib/invoice/attachment-analysis-cache.js';
 
 const BUCKET = 'lead-attachments';
