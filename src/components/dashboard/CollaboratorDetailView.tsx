@@ -6,9 +6,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/hooks/use-toast';
-import { ArrowLeft, RefreshCw, Shield, Link2 } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Shield, Link2, Save } from 'lucide-react';
 import { CollaboratorKitMenu } from './CollaboratorKitMenu';
 import { CollaboratorCapturedClientsSection } from './CollaboratorCapturedClientsSection';
 import { CollaboratorPaymentsSection } from './CollaboratorPaymentsSection';
@@ -44,6 +45,37 @@ function formatDateTime(value: string | null): string {
   });
 }
 
+function slugifyCode(raw: string): string {
+  return raw
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9_-]+/g, '-')
+    .replace(/-{2,}/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+type CollaboratorFormState = {
+  name: string;
+  code: string;
+  email: string;
+  phone: string;
+  notes: string;
+  commission: string;
+};
+
+function formFromCollaborator(c: CollaboratorRow): CollaboratorFormState {
+  return {
+    name: c.name,
+    code: c.code,
+    email: c.email ?? '',
+    phone: c.phone ?? '',
+    notes: c.notes ?? '',
+    commission: String(c.commission_per_converted_eur),
+  };
+}
+
 export function CollaboratorDetailView({ collaborator, onBack, onUpdated }: CollaboratorDetailViewProps) {
   const [stats, setStats] = useState({ total: 0, contacted: 0, qualified: 0, converted: 0, lost: 0 });
   const [statsLoading, setStatsLoading] = useState(false);
@@ -51,6 +83,12 @@ export function CollaboratorDetailView({ collaborator, onBack, onUpdated }: Coll
   const [dateTo, setDateTo] = useState('');
   const [creatingPayout, setCreatingPayout] = useState(false);
   const [paymentsRefreshKey, setPaymentsRefreshKey] = useState(0);
+  const [form, setForm] = useState<CollaboratorFormState>(() => formFromCollaborator(collaborator));
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setForm(formFromCollaborator(collaborator));
+  }, [collaborator]);
 
   const campaign = `collaborator:${collaborator.code}`;
   const clientCaptureUrl = useMemo(
@@ -109,6 +147,66 @@ export function CollaboratorDetailView({ collaborator, onBack, onUpdated }: Coll
       toast({ title: 'Error', description: message, variant: 'destructive' });
     }
   };
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const normalizedName = form.name.trim();
+    const normalizedCode = slugifyCode(form.code || form.name);
+    if (!normalizedName) {
+      toast({ title: 'Nombre requerido', variant: 'destructive' });
+      return;
+    }
+    if (!normalizedCode || normalizedCode.length < 3) {
+      toast({
+        title: 'Código inválido',
+        description: 'El código debe tener al menos 3 caracteres (a-z, 0-9, -, _).',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const commissionValue = Number.parseFloat(form.commission.replace(',', '.'));
+    if (!Number.isFinite(commissionValue) || commissionValue < 0) {
+      toast({
+        title: 'Comisión inválida',
+        description: 'Introduce una comisión válida en euros (>= 0).',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('collaborators')
+        .update({
+          name: normalizedName,
+          code: normalizedCode,
+          email: form.email.trim() || null,
+          phone: form.phone.trim() || null,
+          notes: form.notes.trim() || null,
+          commission_per_converted_eur: Number(commissionValue.toFixed(2)),
+        })
+        .eq('id', collaborator.id);
+      if (error) throw error;
+
+      toast({ title: 'Datos guardados' });
+      onUpdated();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'No se pudieron guardar los datos';
+      toast({ title: 'Error', description: message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const formDirty =
+    form.name !== collaborator.name ||
+    form.code !== collaborator.code ||
+    form.email !== (collaborator.email ?? '') ||
+    form.phone !== (collaborator.phone ?? '') ||
+    form.notes !== (collaborator.notes ?? '') ||
+    form.commission !== String(collaborator.commission_per_converted_eur);
 
   const copyToClipboard = async (value: string) => {
     try {
@@ -241,24 +339,76 @@ export function CollaboratorDetailView({ collaborator, onBack, onUpdated }: Coll
             <Card>
               <CardHeader>
                 <CardTitle>Datos del colaborador</CardTitle>
+                <CardDescription>
+                  Edita la información de contacto y comisión. Si cambias el código, los enlaces nuevos usarán el código
+                  actualizado.
+                </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <div>
-                  <p className="text-muted-foreground">Email</p>
-                  <p>{collaborator.email ?? '—'}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Teléfono</p>
-                  <p>{collaborator.phone ?? '—'}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Comisión por convertido</p>
-                  <p className="font-medium">{collaborator.commission_per_converted_eur.toFixed(2)} €</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Notas</p>
-                  <p>{collaborator.notes ?? '—'}</p>
-                </div>
+              <CardContent>
+                <form className="grid gap-3 md:grid-cols-2" onSubmit={handleSave}>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-collab-name">Nombre</Label>
+                    <Input
+                      id="edit-collab-name"
+                      value={form.name}
+                      onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-collab-code">Código (URL)</Label>
+                    <Input
+                      id="edit-collab-code"
+                      value={form.code}
+                      onChange={(e) => setForm((prev) => ({ ...prev, code: slugifyCode(e.target.value) }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-collab-email">Email</Label>
+                    <Input
+                      id="edit-collab-email"
+                      type="email"
+                      value={form.email}
+                      onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-collab-phone">Teléfono</Label>
+                    <Input
+                      id="edit-collab-phone"
+                      value={form.phone}
+                      onChange={(e) => setForm((prev) => ({ ...prev, phone: e.target.value }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-collab-commission">Comisión por convertido (€)</Label>
+                    <Input
+                      id="edit-collab-commission"
+                      value={form.commission}
+                      onChange={(e) => setForm((prev) => ({ ...prev, commission: e.target.value }))}
+                      inputMode="decimal"
+                    />
+                  </div>
+                  <div className="space-y-2 md:col-span-2">
+                    <Label htmlFor="edit-collab-notes">Notas</Label>
+                    <Textarea
+                      id="edit-collab-notes"
+                      value={form.notes}
+                      onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
+                      rows={3}
+                    />
+                  </div>
+                  <div className="md:col-span-2 flex flex-wrap items-center gap-2">
+                    <Button type="submit" disabled={saving || !formDirty}>
+                      <Save className="h-4 w-4 mr-2" />
+                      {saving ? 'Guardando...' : 'Guardar cambios'}
+                    </Button>
+                    {formDirty && (
+                      <Button type="button" variant="ghost" onClick={() => setForm(formFromCollaborator(collaborator))}>
+                        Descartar
+                      </Button>
+                    )}
+                  </div>
+                </form>
               </CardContent>
             </Card>
 
