@@ -83,6 +83,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       .order('created_at', { ascending: false })
       .limit(20);
 
+    const { data: capturedClients } = await supabase
+      .from('leads')
+      .select(
+        'id, name, phone, email, status, created_at, custom_fields, energy_comparisons(id, status, estimated_savings_percentage, estimated_savings_amount, error_message, created_at)',
+      )
+      .eq('collaborator_id', collaborator.id)
+      .eq('source', 'collaborator_referral')
+      .order('created_at', { ascending: false })
+      .limit(50);
+
     cors(res);
     res.status(200).json({
       success: true,
@@ -103,6 +113,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         ...l,
         entry_mode: (l.entry_mode ?? 'auto') as EntryMode,
       })),
+      captured_clients: (capturedClients ?? []).map((row) => {
+        const comparisons = Array.isArray(row.energy_comparisons) ? row.energy_comparisons : [];
+        const latest = comparisons.sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+        )[0] ?? null;
+        const cf = row.custom_fields as Record<string, unknown> | null;
+        const adj = cf?.adjuntar_factura;
+        const hasInvoice =
+          (adj &&
+            typeof adj === 'object' &&
+            typeof (adj as { path?: string }).path === 'string' &&
+            (adj as { path: string }).path.trim().length > 0) ||
+          !!cf?.manual_extraction;
+        return {
+          id: row.id,
+          name: row.name,
+          phone: row.phone,
+          email: row.email,
+          status: row.status,
+          created_at: row.created_at,
+          has_invoice: hasInvoice,
+          comparison_status: latest?.status ?? null,
+          estimated_savings_percentage: latest?.estimated_savings_percentage ?? null,
+          estimated_savings_amount: latest?.estimated_savings_amount ?? null,
+        };
+      }),
     });
   } catch (e) {
     const err = e instanceof Error ? e : new Error(String(e));

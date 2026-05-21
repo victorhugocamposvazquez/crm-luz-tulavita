@@ -13,6 +13,7 @@ import { CollaboratorKitMenu } from './CollaboratorKitMenu';
 import { CollaboratorTokenManager } from './CollaboratorTokenManager';
 import { RecruitmentLeadsSection } from './RecruitmentLeadsSection';
 import { CollaboratorInvoicesSection } from './CollaboratorInvoicesSection';
+import { CollaboratorCapturedClientsSection } from './CollaboratorCapturedClientsSection';
 import { ConvertLeadDialog } from './ConvertLeadDialog';
 import { COLABORADORES_RECRUITMENT_ROUTE } from '@/components/colaboradores/colaboradores-config';
 import type { Database } from '@/integrations/supabase/types';
@@ -671,6 +672,10 @@ export default function CollaboratorsManagement() {
       </Card>
 
       <RecruitmentLeadsSection onConvertLead={openConvertLead} />
+
+      <CollaboratorCapturedClientsSection
+        collaborators={rows.map((r) => ({ id: r.id, name: r.name, code: r.code }))}
+      />
 
       <CollaboratorInvoicesSection />
 

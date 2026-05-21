@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, MessageSquarePlus, User, Mail, Phone, FileText, History, ExternalLink, MessageCircle, Expand, Tag, Pencil, Trash2, Handshake, UserPlus } from 'lucide-react';
+import { Loader2, MessageSquarePlus, User, Mail, Phone, FileText, History, ExternalLink, MessageCircle, Expand, Tag, Pencil, Trash2, Handshake, UserPlus, Zap } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -36,6 +36,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { getLeadFieldLabel } from './lead-field-labels';
 import { LeadTagSelector } from './LeadTagSelector';
 import { ConvertLeadDialog, isRecruitmentLead } from './ConvertLeadDialog';
+import { LeadEnergyComparisonCard } from './LeadEnergyComparisonCard';
+import type { EnergyComparisonSummary } from '@/lib/leads/invoice-utils';
 import type { Database } from '@/integrations/supabase/types';
 
 type LeadRow = Database['public']['Tables']['leads']['Row'];
@@ -232,6 +234,8 @@ export default function LeadDetailSheet({
   const [collaboratorInfo, setCollaboratorInfo] = useState<{ id: string; code: string; name: string } | null>(null);
   const [referrerInfo, setReferrerInfo] = useState<{ id: string; code: string; name: string } | null>(null);
   const [convertOpen, setConvertOpen] = useState(false);
+  const [energyComparison, setEnergyComparison] = useState<EnergyComparisonSummary | null>(null);
+  const [comparisonLoading, setComparisonLoading] = useState(false);
 
   const {
     timeline,
@@ -411,6 +415,40 @@ export default function LeadDetailSheet({
       cancelled = true;
     };
   }, [open, lead?.id, lead?.collaborator_id, lead?.custom_fields]);
+
+  useEffect(() => {
+    if (!open || !lead?.id) {
+      setEnergyComparison(null);
+      return;
+    }
+
+    let cancelled = false;
+    setComparisonLoading(true);
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('energy_comparisons')
+          .select(
+            'id, status, current_company, current_monthly_cost, best_offer_company, estimated_savings_amount, estimated_savings_percentage, prudent_mode, error_message, created_at',
+          )
+          .eq('lead_id', lead.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (cancelled) return;
+        if (error) throw error;
+        setEnergyComparison((data as EnergyComparisonSummary | null) ?? null);
+      } catch {
+        if (!cancelled) setEnergyComparison(null);
+      } finally {
+        if (!cancelled) setComparisonLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, lead?.id]);
 
   const handleSaveContact = async () => {
     if (!lead?.id) return;
@@ -821,6 +859,15 @@ export default function LeadDetailSheet({
                 </div>
               </section>
             )}
+
+            {/* Comparativa de ahorro (factura analizada) */}
+            <section>
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-muted-foreground mb-3">
+                <Zap className="h-4 w-4" />
+                Comparativa de ahorro
+              </h3>
+              <LeadEnergyComparisonCard comparison={energyComparison} loading={comparisonLoading} />
+            </section>
 
             {/* Añadir nota */}
             <section>

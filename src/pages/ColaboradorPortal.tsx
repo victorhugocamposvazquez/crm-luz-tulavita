@@ -7,7 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, QrCode, UserPlus, Wallet, Copy, Upload } from 'lucide-react';
+import { Loader2, QrCode, UserPlus, Wallet, Copy, Upload, Users, FileText } from 'lucide-react';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
+import { formatSavingsPercent } from '@/lib/leads/invoice-utils';
 import {
   ALL_ENTRY_MODES,
   ENTRY_MODE_LABELS,
@@ -40,6 +43,26 @@ type PortalData = {
     is_active: boolean;
     expires_at: string | null;
   }>;
+  captured_clients: Array<{
+    id: string;
+    name: string | null;
+    phone: string | null;
+    email: string | null;
+    status: string;
+    created_at: string;
+    has_invoice: boolean;
+    comparison_status: string | null;
+    estimated_savings_percentage: number | null;
+    estimated_savings_amount: number | null;
+  }>;
+};
+
+const CLIENT_STATUS_LABELS: Record<string, string> = {
+  new: 'Nuevo',
+  contacted: 'Contactado',
+  qualified: 'Calificado',
+  converted: 'Convertido',
+  lost: 'Perdido',
 };
 
 function fileToBase64(file: File): Promise<string> {
@@ -89,7 +112,7 @@ export default function ColaboradorPortal() {
       });
       const json = (await res.json()) as { success?: boolean; error?: string } & PortalData;
       if (!res.ok || !json.success) throw new Error(json.error ?? 'Acceso denegado');
-      setData(json);
+      setData({ ...json, captured_clients: json.captured_clients ?? [] });
       if (json.pending_payouts?.[0]) setInvoicePayoutId(json.pending_payouts[0].id);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'No se pudo cargar el portal');
@@ -223,7 +246,7 @@ export default function ColaboradorPortal() {
     );
   }
 
-  const { collaborator, stats, pending_payouts } = data;
+  const { collaborator, stats, pending_payouts, captured_clients } = data;
 
   return (
     <div className="min-h-screen bg-muted/30 py-8 px-4">
@@ -256,8 +279,9 @@ export default function ColaboradorPortal() {
         </div>
 
         <Tabs defaultValue="links">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 h-auto">
             <TabsTrigger value="links">Enlaces</TabsTrigger>
+            <TabsTrigger value="clientes">Mis clientes</TabsTrigger>
             <TabsTrigger value="client">Nuevo cliente</TabsTrigger>
             <TabsTrigger value="payouts">Liquidaciones</TabsTrigger>
             <TabsTrigger value="qr">QR</TabsTrigger>
@@ -281,6 +305,69 @@ export default function ColaboradorPortal() {
                 </Card>
               );
             })}
+          </TabsContent>
+
+          <TabsContent value="clientes" className="mt-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Mis clientes captados
+                </CardTitle>
+                <CardDescription>
+                  Estado de tus referidos y resultado del análisis de factura cuando está disponible.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {captured_clients.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Aún no tienes clientes registrados.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {captured_clients.map((client) => (
+                      <div key={client.id} className="rounded-lg border p-3 space-y-1">
+                        <div className="flex flex-wrap items-start justify-between gap-2">
+                          <div>
+                            <p className="font-medium">{client.name ?? 'Sin nombre'}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {[client.phone, client.email].filter(Boolean).join(' · ') || '—'}
+                            </p>
+                          </div>
+                          <Badge variant="secondary">
+                            {CLIENT_STATUS_LABELS[client.status] ?? client.status}
+                          </Badge>
+                        </div>
+                        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                          <span>
+                            {format(new Date(client.created_at), 'd MMM yyyy', { locale: es })}
+                          </span>
+                          {client.has_invoice ? (
+                            <span className="inline-flex items-center gap-1">
+                              <FileText className="h-3 w-3" />
+                              Factura recibida
+                            </span>
+                          ) : (
+                            <span>Sin factura</span>
+                          )}
+                          {client.comparison_status === 'completed' && (
+                            <span className="font-medium text-emerald-700">
+                              Ahorro est.: {formatSavingsPercent(client.estimated_savings_percentage)}
+                            </span>
+                          )}
+                          {client.comparison_status === 'failed' && (
+                            <span className="text-destructive">Análisis no disponible</span>
+                          )}
+                          {client.comparison_status &&
+                            client.comparison_status !== 'completed' &&
+                            client.comparison_status !== 'failed' && (
+                              <span>Análisis en proceso</span>
+                            )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
 
           <TabsContent value="client" className="mt-4">
