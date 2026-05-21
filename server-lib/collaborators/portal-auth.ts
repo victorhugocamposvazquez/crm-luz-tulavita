@@ -27,13 +27,16 @@ export async function resolvePortalToken(
 
   if (error || !data) return null;
 
+  type CollaboratorJoin = PortalCollaborator & { is_active: boolean };
+
   const row = data as {
     id: string;
     expires_at?: string | null;
-    collaborators?: PortalCollaborator & { is_active: boolean };
+    collaborators?: CollaboratorJoin | CollaboratorJoin[];
   };
 
-  const collab = row.collaborators;
+  const collabRaw = row.collaborators;
+  const collab = Array.isArray(collabRaw) ? collabRaw[0] : collabRaw;
   if (!collab?.is_active) return null;
 
   const expired = !!(row.expires_at && new Date(row.expires_at).getTime() <= Date.now());
