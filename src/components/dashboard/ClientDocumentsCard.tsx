@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
-import { ExternalLink, FileText, IdCard, Loader2, Receipt, Trash2, Upload } from 'lucide-react';
+import { ExternalLink, FileText, IdCard, Loader2, Receipt, Trash2, Upload, CheckCircle2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
@@ -200,7 +200,7 @@ export default function ClientDocumentsCard({ clientId }: ClientDocumentsCardPro
   const dniInputRef = useRef<HTMLInputElement>(null);
   const invoiceInputRef = useRef<HTMLInputElement>(null);
   const [deleteTarget, setDeleteTarget] = useState<ClientDocRow | null>(null);
-  const [previewDoc, setPreviewDoc] = useState<ClientDocRow | null>(null);
+  const [markingProcessedId, setMarkingProcessedId] = useState<string | null>(null);
 
   const fetchDocs = useCallback(async () => {
     setLoading(true);
@@ -260,6 +260,7 @@ export default function ClientDocumentsCard({ clientId }: ClientDocumentsCardPro
         mime_type: file.type || null,
         size_bytes: file.size,
         created_by: uid,
+        processing_status: kind === 'invoice' ? 'pending' : null,
       });
       if (insErr) {
         await supabase.storage.from(BUCKET).remove([objectPath]);
@@ -304,10 +305,41 @@ export default function ClientDocumentsCard({ clientId }: ClientDocumentsCardPro
     }
   };
 
-  const dniDocs = docs.filter((d) => d.doc_type === 'dni');
-  const invoiceDocs = docs.filter((d) => d.doc_type === 'invoice');
+  const markAsProcessed = async (doc: ClientDocRow) => {
+    setMarkingProcessedId(doc.id);
+    try {
+      const { error } = await supabase
+        .from('client_documents')
+        .update({ processing_status: 'processed' })
+        .eq('id', doc.id);
+      if (error) throw error;
+      toast({ title: 'Factura marcada como tramitada' });
+      await fetchDocs();
+    } catch (e) {
+      console.error(e);
+      toast({
+        title: 'Error',
+        description: e instanceof Error ? e.message : 'No se pudo actualizar la factura',
+        variant: 'destructive',
+      });
+    } finally {
+      setMarkingProcessedId(null);
+    }
+  };
 
-  const renderList = (items: ClientDocRow[]) => {
+  const isPendingInvoice = (doc: ClientDocRow) =>
+    doc.doc_type === 'invoice' && doc.processing_status === 'pending';
+
+  const isProcessedInvoice = (doc: ClientDocRow) =>
+    doc.doc_type === 'invoice' && doc.processing_status !== 'pending';
+
+  const processedInvoiceDocs = docs.filter(isProcessedInvoice);
+  const pendingInvoiceDocs = docs.filter(isPendingInvoice);
+
+  const renderList = (
+    items: ClientDocRow[],
+    opts?: { showMarkProcessed?: boolean },
+  ) => {
     if (items.length === 0) {
       return <p className="text-sm text-muted-foreground py-2">Sin archivos.</p>;
     }
@@ -331,6 +363,23 @@ export default function ClientDocumentsCard({ clientId }: ClientDocumentsCardPro
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-1">
+              {opts?.showMarkProcessed && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1 text-emerald-700 hover:text-emerald-800"
+                  disabled={markingProcessedId === doc.id}
+                  onClick={() => void markAsProcessed(doc)}
+                >
+                  {markingProcessedId === doc.id ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  )}
+                  Tramitar
+                </Button>
+              )}
               <Button type="button" variant="ghost" size="sm" onClick={() => setPreviewDoc(doc)}>
                 Ver
               </Button>
@@ -349,6 +398,8 @@ export default function ClientDocumentsCard({ clientId }: ClientDocumentsCardPro
       </ul>
     );
   };
+
+  const dniDocs = docs.filter((d) => d.doc_type === 'dni');
 
   return (
     <>
@@ -406,40 +457,58 @@ export default function ClientDocumentsCard({ clientId }: ClientDocumentsCardPro
               {renderList(dniDocs)}
             </div>
 
-            <div className="rounded-lg border bg-card p-4 space-y-3">
-              <div className="flex items-center justify-between gap-2">
-                <h4 className="flex items-center gap-2 text-sm font-semibold">
-                  <Receipt className="h-4 w-4" />
-                  Facturas
-                </h4>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="gap-1.5"
-                  disabled={loading || uploadKind !== null}
-                  onClick={() => invoiceInputRef.current?.click()}
-                >
-                  {uploadKind === 'invoice' ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Upload className="h-3.5 w-3.5" />
-                  )}
-                  Subir
-                </Button>
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-card p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="flex items-center gap-2 text-sm font-semibold">
+                    <Receipt className="h-4 w-4" />
+                    Facturas tramitadas
+                  </h4>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Facturas ya revisadas o gestionadas en el proceso comercial.
+                </p>
+                {renderList(processedInvoiceDocs)}
               </div>
-              <input
-                ref={invoiceInputRef}
-                type="file"
-                accept=".pdf,image/jpeg,image/png,image/webp,image/gif"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  e.target.value = '';
-                  if (f) void handleFile(f, 'invoice');
-                }}
-              />
-              {renderList(invoiceDocs)}
+
+              <div className="rounded-lg border border-dashed bg-card p-4 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="flex items-center gap-2 text-sm font-semibold">
+                    <Receipt className="h-4 w-4 text-amber-600" />
+                    Facturas no tramitadas
+                  </h4>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5"
+                    disabled={loading || uploadKind !== null}
+                    onClick={() => invoiceInputRef.current?.click()}
+                  >
+                    {uploadKind === 'invoice' ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Upload className="h-3.5 w-3.5" />
+                    )}
+                    Subir
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Nuevas facturas pendientes de revisión. Al tramitarlas pasan a la sección superior.
+                </p>
+                <input
+                  ref={invoiceInputRef}
+                  type="file"
+                  accept=".pdf,image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = '';
+                    if (f) void handleFile(f, 'invoice');
+                  }}
+                />
+                {renderList(pendingInvoiceDocs, { showMarkProcessed: true })}
+              </div>
             </div>
           </div>
           )}

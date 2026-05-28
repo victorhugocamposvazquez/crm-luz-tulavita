@@ -148,6 +148,7 @@ export type Database = {
           size_bytes: number | null
           created_by: string | null
           created_at: string
+          processing_status: string | null
         }
         Insert: {
           id?: string
@@ -159,6 +160,7 @@ export type Database = {
           size_bytes?: number | null
           created_by?: string | null
           created_at?: string
+          processing_status?: string | null
         }
         Update: {
           id?: string
@@ -170,6 +172,7 @@ export type Database = {
           size_bytes?: number | null
           created_by?: string | null
           created_at?: string
+          processing_status?: string | null
         }
         Relationships: [
           {
