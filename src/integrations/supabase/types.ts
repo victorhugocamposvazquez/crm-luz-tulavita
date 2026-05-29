@@ -184,6 +184,79 @@ export type Database = {
           },
         ]
       }
+      crm_folders: {
+        Row: {
+          id: string
+          name: string
+          client_id: string | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          client_id?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          client_id?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_folders_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      crm_folder_files: {
+        Row: {
+          id: string
+          folder_id: string
+          storage_path: string
+          file_name: string | null
+          mime_type: string | null
+          size_bytes: number | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          folder_id: string
+          storage_path: string
+          file_name?: string | null
+          mime_type?: string | null
+          size_bytes?: number | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          folder_id?: string
+          storage_path?: string
+          file_name?: string | null
+          mime_type?: string | null
+          size_bytes?: number | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "crm_folder_files_folder_id_fkey"
+            columns: ["folder_id"]
+            isOneToOne: false
+            referencedRelation: "crm_folders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_supply_addresses: {
         Row: {
           id: string

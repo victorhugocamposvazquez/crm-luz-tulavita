@@ -17,6 +17,7 @@ import CollaboratorsManagement from '@/components/dashboard/CollaboratorsManagem
 
 const ClientManagement = lazy(() => import('@/components/dashboard/ClientManagement'));
 const InvoiceEstimateSettingsManagement = lazy(() => import('@/components/dashboard/InvoiceEstimateSettingsManagement'));
+const FoldersManagement = lazy(() => import('@/components/dashboard/FoldersManagement'));
 
 export default function Dashboard() {
   const { user, userRole, loading } = useAuth();
@@ -55,6 +56,12 @@ export default function Dashboard() {
         return isAdmin ? (
           <Suspense fallback={<div>Cargando cliente...</div>}>
             <ClientManagement />
+          </Suspense>
+        ) : <CommercialVisitsManager />;
+      case 'folders':
+        return isAdmin ? (
+          <Suspense fallback={<div className="p-6">Cargando…</div>}>
+            <FoldersManagement />
           </Suspense>
         ) : <CommercialVisitsManager />;
       case 'visits':
