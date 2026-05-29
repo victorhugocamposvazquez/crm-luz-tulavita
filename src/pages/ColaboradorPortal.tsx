@@ -308,10 +308,10 @@ export default function ColaboradorPortalPanel() {
   const openInvoiceFile = async (invoiceId: string) => {
     if (!sessionToken) return;
     try {
-      const res = await fetch('/api/collaborator-invoice-file', {
+      const res = await fetch('/api/collaborator-invoice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ access_token: sessionToken, invoice_id: invoiceId }),
+        body: JSON.stringify({ action: 'file', access_token: sessionToken, invoice_id: invoiceId }),
       });
       const json = (await res.json()) as { success?: boolean; signed_url?: string; error?: string };
       if (!res.ok || !json.success || !json.signed_url) throw new Error(json.error ?? 'No se pudo abrir');
@@ -329,10 +329,11 @@ export default function ColaboradorPortalPanel() {
     if (!sessionToken || !deleteInvoiceId || deleteReason.trim().length < 5) return;
     setDeletingInvoice(true);
     try {
-      const res = await fetch('/api/collaborator-invoice-delete', {
+      const res = await fetch('/api/collaborator-invoice', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: 'delete',
           access_token: sessionToken,
           invoice_id: deleteInvoiceId,
           reason: deleteReason.trim(),

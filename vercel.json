@@ -1,5 +1,7 @@
 {
   "rewrites": [
+    { "source": "/api/collaborator-invoice-file", "destination": "/api/collaborator-invoice?action=file" },
+    { "source": "/api/collaborator-invoice-delete", "destination": "/api/collaborator-invoice?action=delete" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }
