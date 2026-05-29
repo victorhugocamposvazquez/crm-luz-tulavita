@@ -200,6 +200,7 @@ export default function ClientDocumentsCard({ clientId }: ClientDocumentsCardPro
   const dniInputRef = useRef<HTMLInputElement>(null);
   const invoiceInputRef = useRef<HTMLInputElement>(null);
   const [deleteTarget, setDeleteTarget] = useState<ClientDocRow | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<ClientDocRow | null>(null);
   const [markingProcessedId, setMarkingProcessedId] = useState<string | null>(null);
 
   const fetchDocs = useCallback(async () => {
