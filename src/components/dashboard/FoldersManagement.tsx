@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -30,7 +29,6 @@ import {
   Download,
   ExternalLink,
   FileText,
-  Folder,
   FolderPlus,
   Loader2,
   Pencil,
@@ -55,6 +53,49 @@ type FolderWithMeta = FolderRow & {
   file_count: number;
   client_name: string | null;
 };
+
+function IpadFolderIcon({ className }: { className?: string }) {
+  const uid = useId().replace(/:/g, '');
+  const gradId = `ipad-folder-grad-${uid}`;
+  const tabId = `ipad-folder-tab-${uid}`;
+
+  return (
+    <svg
+      viewBox="0 0 64 52"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      aria-hidden
+    >
+      <defs>
+        <linearGradient id={gradId} x1="32" y1="4" x2="32" y2="50" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#5AC8FA" />
+          <stop offset="0.45" stopColor="#007AFF" />
+          <stop offset="1" stopColor="#0051D5" />
+        </linearGradient>
+        <linearGradient id={tabId} x1="20" y1="4" x2="20" y2="18" gradientUnits="userSpaceOnUse">
+          <stop stopColor="#64D2FF" />
+          <stop offset="1" stopColor="#0A84FF" />
+        </linearGradient>
+      </defs>
+      <path
+        d="M8 14C8 10.6863 10.6863 8 14 8H22C23.5 8 24.8 8.7 25.6 9.8L27 11.5C27.8 12.6 29.1 13.3 30.6 13.3H50C53.3137 13.3 56 16 56 19.3V42C56 45.3137 53.3137 48 50 48H14C10.6863 48 8 45.3137 8 42V14Z"
+        fill={`url(#${gradId})`}
+      />
+      <path
+        d="M14 8H22C23.5 8 24.8 8.7 25.6 9.8L27 11.5C27.8 12.6 29.1 13.3 30.6 13.3H14C10.6863 13.3 8 10.6 8 7.3V14C8 10.6863 10.6863 8 14 8Z"
+        fill={`url(#${tabId})`}
+        opacity="0.85"
+      />
+      <path
+        d="M8 19.3C8 16 10.6863 13.3 14 13.3H50C53.3137 13.3 56 16 56 19.3"
+        stroke="white"
+        strokeOpacity="0.25"
+        strokeWidth="0.5"
+      />
+    </svg>
+  );
+}
 
 function isFileImage(file: FolderFileRow): boolean {
   if (file.mime_type === 'application/pdf') return false;
@@ -322,7 +363,7 @@ function FolderDetail({ folder, onBack, onChanged }: { folder: FolderRow; onBack
             </Button>
             <div className="min-w-0">
               <h2 className="text-2xl font-bold flex items-center gap-2 truncate">
-                <Folder className="h-6 w-6 shrink-0" />
+                <IpadFolderIcon className="h-8 w-10 shrink-0" />
                 {folder.name}
               </h2>
               <p className="text-muted-foreground text-sm">{files.length} archivo(s)</p>
@@ -637,57 +678,55 @@ export default function FoldersManagement() {
             </CardContent>
           </Card>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-3 gap-x-3 gap-y-5 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-8">
             {folders.map((folder) => (
-              <Card key={folder.id} className="transition-colors hover:border-primary/40">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <button
-                      type="button"
-                      className="flex items-center gap-2 text-left min-w-0"
-                      onClick={() => setSelectedFolder(folder)}
-                    >
-                      <Folder className="h-5 w-5 shrink-0 text-primary" />
-                      <CardTitle className="text-base truncate">{folder.name}</CardTitle>
-                    </button>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => openEdit(folder)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => setDeleteFolderTarget(folder)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <button
+              <div key={folder.id} className="group relative flex flex-col items-center">
+                <button
+                  type="button"
+                  className="flex w-full max-w-[88px] flex-col items-center gap-1 rounded-xl p-2 transition-colors hover:bg-muted/60 active:scale-95"
+                  onClick={() => setSelectedFolder(folder)}
+                >
+                  <IpadFolderIcon className="h-12 w-[3.25rem] drop-shadow-sm" />
+                  <span className="w-full text-center text-[11px] font-medium leading-tight line-clamp-2 text-foreground">
+                    {folder.name}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {folder.file_count} {folder.file_count === 1 ? 'archivo' : 'archivos'}
+                  </span>
+                  {folder.client_name ? (
+                    <span className="flex max-w-full items-center gap-0.5 truncate text-[9px] text-blue-600 dark:text-blue-400">
+                      <User className="h-2.5 w-2.5 shrink-0" />
+                      <span className="truncate">{folder.client_name}</span>
+                    </span>
+                  ) : null}
+                </button>
+                <div className="absolute -right-0.5 top-0 flex opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+                  <Button
                     type="button"
-                    className="flex w-full flex-col items-start gap-2 text-left"
-                    onClick={() => setSelectedFolder(folder)}
+                    variant="secondary"
+                    size="icon"
+                    className="h-6 w-6 rounded-full shadow-sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openEdit(folder);
+                    }}
                   >
-                    <span className="text-sm text-muted-foreground">{folder.file_count} archivo(s)</span>
-                    {folder.client_name ? (
-                      <Badge variant="secondary" className="gap-1">
-                        <User className="h-3 w-3" />
-                        {folder.client_name}
-                      </Badge>
-                    ) : null}
-                  </button>
-                </CardContent>
-              </Card>
+                    <Pencil className="h-3 w-3" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="icon"
+                    className="h-6 w-6 rounded-full shadow-sm text-destructive hover:text-destructive"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteFolderTarget(folder);
+                    }}
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              </div>
             ))}
           </div>
         )}
