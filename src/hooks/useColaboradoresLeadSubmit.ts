@@ -33,12 +33,19 @@ function readRecruitRefFromUrl(): string | null {
   return ref?.trim() || null;
 }
 
+function readUtmSourceFromUrl(): string | null {
+  if (typeof window === 'undefined') return null;
+  const v = new URLSearchParams(window.location.search).get('utm_source');
+  return v?.trim() || null;
+}
+
 export function useColaboradoresLeadSubmit() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
   const { attribution } = useMetaAttribution();
   const recruitRef = useMemo(() => readRecruitRefFromUrl(), []);
+  const utmSource = useMemo(() => readUtmSourceFromUrl(), []);
 
   const submit = useCallback(
     async (e: React.FormEvent, state: ColaboradoresLeadFormState) => {
@@ -53,6 +60,7 @@ export function useColaboradoresLeadSubmit() {
 
         const customFields: Record<string, unknown> = {
           landing_type: 'colaboradores',
+          ...(utmSource ? { utm_source: utmSource } : {}),
           ...(attribution.campaign ? { utm_campaign: attribution.campaign } : {}),
           ...(attribution.adset ? { utm_term: attribution.adset } : {}),
           ...(attribution.ad ? { utm_content: attribution.ad } : {}),
@@ -66,6 +74,8 @@ export function useColaboradoresLeadSubmit() {
           email: state.email.trim() || undefined,
           source: 'web_form',
           campaign: COLABORADORES_RECRUITMENT_CAMPAIGN,
+          adset: attribution.adset ?? undefined,
+          ad: attribution.ad ?? undefined,
           custom_fields: customFields,
         };
 
@@ -110,7 +120,7 @@ export function useColaboradoresLeadSubmit() {
         setSending(false);
       }
     },
-    [sending, attribution, recruitRef],
+    [sending, attribution, recruitRef, utmSource],
   );
 
   return { submit, sending, error, sent, setSent };

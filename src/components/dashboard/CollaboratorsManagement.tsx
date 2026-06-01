@@ -10,6 +10,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/hooks/use-toast';
 import { Plus, RefreshCw, Users, Link2, ExternalLink, ChevronRight, Megaphone } from 'lucide-react';
 import { RecruitmentLeadsSection } from './RecruitmentLeadsSection';
+import { RecruitmentChannelLinks } from './RecruitmentChannelLinks';
+import { CollaboratorManagerSetting } from './CollaboratorManagerSetting';
+import { CollaboratorKitMenu } from './CollaboratorKitMenu';
 import { ConvertLeadDialog } from './ConvertLeadDialog';
 import { CollaboratorDetailView, type CollaboratorRow } from './CollaboratorDetailView';
 import { COLABORADORES_RECRUITMENT_ROUTE } from '@/components/colaboradores/colaboradores-config';
@@ -43,6 +46,7 @@ export default function CollaboratorsManagement() {
   const [notes, setNotes] = useState('');
   const [commissionPerConverted, setCommissionPerConverted] = useState('30');
   const [selectedCollaborator, setSelectedCollaborator] = useState<CollaboratorRow | null>(null);
+  const [createdCollaborator, setCreatedCollaborator] = useState<{ id: string; code: string; name: string } | null>(null);
   const [convertLead, setConvertLead] = useState<RecruitmentLeadRow | null>(null);
   const [convertOpen, setConvertOpen] = useState(false);
 
@@ -161,16 +165,21 @@ export default function CollaboratorsManagement() {
         setSaving(false);
         return;
       }
-      const { error } = await supabase.from('collaborators').insert({
-        name: normalizedName,
-        code: normalizedCode,
-        commission_per_converted_eur: Number(commissionValue.toFixed(2)),
-        email: email.trim() || null,
-        phone: phone.trim() || null,
-        notes: notes.trim() || null,
-      });
+      const { data: created, error } = await supabase
+        .from('collaborators')
+        .insert({
+          name: normalizedName,
+          code: normalizedCode,
+          commission_per_converted_eur: Number(commissionValue.toFixed(2)),
+          email: email.trim() || null,
+          phone: phone.trim() || null,
+          notes: notes.trim() || null,
+        })
+        .select('id, code, name')
+        .single();
       if (error) throw error;
-      toast({ title: 'Colaborador creado' });
+      toast({ title: 'Colaborador creado', description: 'Genera su kit de enlaces y QR abajo.' });
+      setCreatedCollaborator(created);
       setName('');
       setCode('');
       setEmail('');
@@ -329,6 +338,8 @@ export default function CollaboratorsManagement() {
         </TabsContent>
 
         <TabsContent value="marketing" className="space-y-6">
+          <CollaboratorManagerSetting />
+
           <Card>
             <CardHeader>
               <CardTitle>Nuevo colaborador</CardTitle>
@@ -389,6 +400,29 @@ export default function CollaboratorsManagement() {
                   </Button>
                 </div>
               </form>
+
+              {createdCollaborator && (
+                <div className="mt-4 flex flex-col gap-3 rounded-lg border border-dashed bg-muted/30 p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-medium">{createdCollaborator.name} creado</p>
+                    <p className="text-xs text-muted-foreground">
+                      Código <code className="rounded bg-muted px-1">{createdCollaborator.code}</code>. Genera
+                      sus enlaces, QR y acceso al portal.
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <CollaboratorKitMenu
+                      collaboratorId={createdCollaborator.id}
+                      code={createdCollaborator.code}
+                      name={createdCollaborator.name}
+                      compact
+                    />
+                    <Button type="button" variant="ghost" size="sm" onClick={() => setCreatedCollaborator(null)}>
+                      Ocultar
+                    </Button>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -424,6 +458,8 @@ export default function CollaboratorsManagement() {
               <RecruitmentLeadsSection onConvertLead={openConvertLead} embedded />
             </CardContent>
           </Card>
+
+          <RecruitmentChannelLinks />
         </TabsContent>
       </Tabs>
 

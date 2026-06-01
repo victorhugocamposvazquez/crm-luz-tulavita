@@ -10,13 +10,18 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from '@/hooks/use-toast';
-import { Link2, QrCode, Copy, ExternalLink, KeyRound, ChevronDown } from 'lucide-react';
+import { Link2, QrCode, Copy, ExternalLink, KeyRound, ChevronDown, UserPlus } from 'lucide-react';
 import {
   ALL_ENTRY_MODES,
   ENTRY_MODE_LABELS,
   type CollaboratorEntryMode,
 } from '@/lib/collaborators/types';
-import { buildClientCaptureUrl, buildPortalUrl, getAppBaseUrl } from '@/lib/collaborators/links';
+import {
+  buildClientCaptureUrl,
+  buildPortalUrl,
+  buildRecruitmentUrl,
+  getAppBaseUrl,
+} from '@/lib/collaborators/links';
 import { createReferralToken, createAccessToken } from '@/lib/collaborators/tokens';
 import { downloadQrPng, generateQrDataUrl } from '@/lib/collaborators/qr';
 
@@ -82,6 +87,56 @@ export function CollaboratorKitMenu({ collaboratorId, code, name, compact }: Col
       const dataUrl = await generateQrDataUrl(url);
       downloadQrPng(dataUrl, `qr-${code}-${mode}.png`);
       toast({ title: 'QR descargado' });
+    } catch (e) {
+      toast({
+        title: 'Error',
+        description: e instanceof Error ? e.message : 'No se pudo generar el QR',
+        variant: 'destructive',
+      });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const createRecruitToken = async () => {
+    const token = createReferralToken();
+    const { error } = await supabase.from('collaborator_referral_links').insert({
+      collaborator_id: collaboratorId,
+      token,
+      entry_mode: 'auto',
+      is_active: true,
+      expires_at: null,
+      label: 'Reclutamiento',
+    });
+    if (error) throw error;
+    return token;
+  };
+
+  const handleCopyRecruit = async () => {
+    setBusy('recruit-copy');
+    try {
+      const token = await createRecruitToken();
+      const url = buildRecruitmentUrl(baseUrl, { recruitToken: token });
+      await copyText(url, 'Enlace de reclutamiento copiado');
+    } catch (e) {
+      toast({
+        title: 'Error',
+        description: e instanceof Error ? e.message : 'No se pudo generar el enlace',
+        variant: 'destructive',
+      });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleQrRecruit = async () => {
+    setBusy('recruit-qr');
+    try {
+      const token = await createRecruitToken();
+      const url = buildRecruitmentUrl(baseUrl, { recruitToken: token });
+      const dataUrl = await generateQrDataUrl(url);
+      downloadQrPng(dataUrl, `qr-reclutamiento-${code}.png`);
+      toast({ title: 'QR de reclutamiento descargado' });
     } catch (e) {
       toast({
         title: 'Error',
@@ -162,6 +217,18 @@ export function CollaboratorKitMenu({ collaboratorId, code, name, compact }: Col
         <DropdownMenuItem onClick={() => void handleQr('auto', true)}>
           <QrCode className="h-3.5 w-3.5 mr-2" />
           QR captación completa
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+          Reclutar colaboradores (su referido)
+        </DropdownMenuLabel>
+        <DropdownMenuItem onClick={() => void handleCopyRecruit()} disabled={!!busy}>
+          <UserPlus className="h-3.5 w-3.5 mr-2" />
+          Copiar enlace de reclutamiento
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => void handleQrRecruit()} disabled={!!busy}>
+          <QrCode className="h-3.5 w-3.5 mr-2" />
+          QR de reclutamiento
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">

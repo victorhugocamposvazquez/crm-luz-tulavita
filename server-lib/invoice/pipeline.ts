@@ -9,6 +9,7 @@ import { createHash } from 'crypto';
 import type { InvoiceExtraction } from './types.js';
 import { emptyExtraction } from './types.js';
 import { parse20TDFromTextDetailed, type Parser20TDDiagnostics } from './parser-20td.js';
+import { parse30TDFromTextDetailed } from './parser-30td.js';
 
 const IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
@@ -49,7 +50,9 @@ export interface InvoiceExtractionDebugMeta {
     | '2.0td-text-parser'
     | '2.0td-llm-text'
     | '2.0td-llm-pdf'
+    | '3.0td-parser'
     | '3.0td-llm'
+    | '3.0td-llm-text'
     | '3.0td-llm-retry'
     | 'generic-llm'
     | 'generic-llm-retry'
@@ -527,9 +530,36 @@ export async function extractInvoiceFromBufferDetailed(
       }
     } else if (rawDetectedTarifa === '3.0TD') {
       const t30 = Date.now();
-      let extraction = await (await loadLLMExtractModule()).extractWithLLM30TD(buffer, mimeType);
+
+      const extractedPdf = providedPdfText
+        ? null
+        : (mimeType === 'application/pdf' ? await extractPdfText(buffer) : null);
+      if (extractedPdf) {
+        debug.usedPdfParse = true;
+        debug.timings.pdfParseMs = extractedPdf.ms;
+      }
+      const extractedPdfText = providedPdfText ?? extractedPdf?.text ?? null;
+
+      // 1) Parser determinista 3.0TD (sin LLM) sobre el mejor texto disponible.
+      const parser30Text = extractedPdfText ?? rawPdfText ?? null;
+      const parsed30 = parser30Text ? parse30TDFromTextDetailed(parser30Text) : null;
+      if (parsed30?.diagnostics.accepted && parsed30.extraction) {
+        console.log(`[pipeline] 3.0TD sin LLM (parser aceptado, score=${parsed30.diagnostics.score.toFixed(2)})`);
+        validated = validateExtraction(parsed30.extraction);
+        debug.usedLLM = false;
+        debug.path = '3.0td-parser';
+        console.log(`[pipeline] 3.0TD parser path finished in ${Date.now() - t30}ms`);
+        extractionCache.set(hash, { extraction: validated, ts: Date.now(), pv: PROMPT_VERSION });
+        debug.timings.totalMs = Date.now() - t0;
+        return { extraction: validated, debug };
+      }
+
+      // 2) LLM: texto-only si tenemos texto del PDF; si no, binario.
+      const extraction = extractedPdfText
+        ? await (await loadLLMExtractModule()).extractWithLLM30TDFromText(extractedPdfText)
+        : await (await loadLLMExtractModule()).extractWithLLM30TD(buffer, mimeType);
       debug.usedLLM = true;
-      debug.path = '3.0td-llm';
+      debug.path = extractedPdfText ? '3.0td-llm-text' : '3.0td-llm';
       validated = validateExtraction(extraction);
 
       if (!validated.consumption_kwh && !validated.total_factura) {
@@ -600,9 +630,24 @@ export async function extractInvoiceFromBufferDetailed(
       }
 
       if (detectedTarifa === '3.0TD') {
-        let extraction = await (await loadLLMExtractModule()).extractWithLLM30TD(buffer, mimeType);
+        const parser30Text = extractedPdfText ?? rawPdfText ?? null;
+        const parsed30 = parser30Text ? parse30TDFromTextDetailed(parser30Text) : null;
+        if (parsed30?.diagnostics.accepted && parsed30.extraction) {
+          console.log(`[pipeline] fallback 3.0TD sin LLM (parser aceptado, score=${parsed30.diagnostics.score.toFixed(2)})`);
+          validated = validateExtraction(parsed30.extraction);
+          debug.usedLLM = false;
+          debug.path = '3.0td-parser';
+          extractionCache.set(hash, { extraction: validated, ts: Date.now(), pv: PROMPT_VERSION });
+          console.log(`[pipeline] total ${Date.now() - t0}ms`);
+          debug.timings.totalMs = Date.now() - t0;
+          return { extraction: validated, debug };
+        }
+
+        const extraction = extractedPdfText
+          ? await (await loadLLMExtractModule()).extractWithLLM30TDFromText(extractedPdfText)
+          : await (await loadLLMExtractModule()).extractWithLLM30TD(buffer, mimeType);
         debug.usedLLM = true;
-        debug.path = '3.0td-llm';
+        debug.path = extractedPdfText ? '3.0td-llm-text' : '3.0td-llm';
         validated = validateExtraction(extraction);
 
         if (needs30TDRetry(validated)) {

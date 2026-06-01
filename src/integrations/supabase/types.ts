@@ -440,6 +440,7 @@ export type Database = {
           entry_mode: string
           is_active: boolean
           expires_at: string | null
+          label: string | null
           created_by: string | null
           created_at: string
         }
@@ -450,6 +451,7 @@ export type Database = {
           entry_mode?: string
           is_active?: boolean
           expires_at?: string | null
+          label?: string | null
           created_by?: string | null
           created_at?: string
         }
@@ -460,6 +462,7 @@ export type Database = {
           entry_mode?: string
           is_active?: boolean
           expires_at?: string | null
+          label?: string | null
           created_by?: string | null
           created_at?: string
         }
@@ -601,6 +604,139 @@ export type Database = {
           },
         ]
       }
+      collaborator_access_tokens: {
+        Row: {
+          id: string
+          collaborator_id: string
+          token: string
+          label: string | null
+          is_active: boolean
+          expires_at: string | null
+          created_by: string | null
+          created_at: string
+          last_used_at: string | null
+        }
+        Insert: {
+          id?: string
+          collaborator_id: string
+          token: string
+          label?: string | null
+          is_active?: boolean
+          expires_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          last_used_at?: string | null
+        }
+        Update: {
+          id?: string
+          collaborator_id?: string
+          token?: string
+          label?: string | null
+          is_active?: boolean
+          expires_at?: string | null
+          created_by?: string | null
+          created_at?: string
+          last_used_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collaborator_access_tokens_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      collaborator_invoices: {
+        Row: {
+          id: string
+          collaborator_id: string
+          payout_id: string | null
+          file_path: string
+          file_name: string | null
+          invoice_number: string | null
+          amount_eur: number | null
+          status: string
+          rejection_reason: string | null
+          submitted_at: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          collaborator_id: string
+          payout_id?: string | null
+          file_path: string
+          file_name?: string | null
+          invoice_number?: string | null
+          amount_eur?: number | null
+          status?: string
+          rejection_reason?: string | null
+          submitted_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          collaborator_id?: string
+          payout_id?: string | null
+          file_path?: string
+          file_name?: string | null
+          invoice_number?: string | null
+          amount_eur?: number | null
+          status?: string
+          rejection_reason?: string | null
+          submitted_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collaborator_invoices_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "collaborator_invoices_payout_id_fkey"
+            columns: ["payout_id"]
+            isOneToOne: false
+            referencedRelation: "collaborator_payouts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      collaborator_settings: {
+        Row: {
+          id: number
+          collaborator_manager_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          id?: number
+          collaborator_manager_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          id?: number
+          collaborator_manager_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collaborator_settings_collaborator_manager_id_fkey"
+            columns: ["collaborator_manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoice_estimate_settings: {
         Row: {
           id: number
@@ -677,6 +813,7 @@ export type Database = {
           status: string
           owner_id: string | null
           collaborator_id: string | null
+          referred_by_collaborator_id: string | null
           tags: string[]
           custom_fields: Json
           created_at: string
@@ -694,6 +831,7 @@ export type Database = {
           status?: string
           owner_id?: string | null
           collaborator_id?: string | null
+          referred_by_collaborator_id?: string | null
           tags?: string[]
           custom_fields?: Json
           created_at?: string
@@ -711,6 +849,7 @@ export type Database = {
           status?: string
           owner_id?: string | null
           collaborator_id?: string | null
+          referred_by_collaborator_id?: string | null
           tags?: string[]
           custom_fields?: Json
           created_at?: string
@@ -720,6 +859,13 @@ export type Database = {
           {
             foreignKeyName: "leads_collaborator_id_fkey"
             columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_referred_by_collaborator_id_fkey"
+            columns: ["referred_by_collaborator_id"]
             isOneToOne: false
             referencedRelation: "collaborators"
             referencedColumns: ["id"]

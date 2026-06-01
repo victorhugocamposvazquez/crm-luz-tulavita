@@ -166,6 +166,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       customFields.manual_extraction = manualExtraction;
     }
 
+    // Asignar al responsable de colaboradores si está configurado.
+    let ownerId: string | null = null;
+    {
+      const { data: settings } = await supabase
+        .from('collaborator_settings')
+        .select('collaborator_manager_id')
+        .eq('id', 1)
+        .maybeSingle();
+      ownerId =
+        (settings as { collaborator_manager_id?: string | null } | null)?.collaborator_manager_id ??
+        null;
+    }
+
     const { data: lead, error: leadErr } = await supabase
       .from('leads')
       .insert({
@@ -176,6 +189,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         campaign: `collaborator:${collaborator.code}`,
         collaborator_id: collaborator.id,
         status: 'new',
+        owner_id: ownerId,
         custom_fields: customFields,
       })
       .select('id')

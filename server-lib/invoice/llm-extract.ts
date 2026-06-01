@@ -555,6 +555,45 @@ export async function extractWithLLM30TD(
   return full.confidence >= fast.confidence ? full : fast;
 }
 
+/**
+ * Camino 3.0TD cuando ya tenemos el texto del PDF: evita reenviar el binario y
+ * reduce latencia. gpt-4o-mini → fallback gpt-4o si la confianza es baja.
+ */
+export async function extractWithLLM30TDFromText(
+  text: string,
+): Promise<InvoiceExtraction> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    console.error('[llm-extract] OPENAI_API_KEY not set');
+    return emptyExtraction();
+  }
+  const opts: CallOptions = { systemPrompt: SYSTEM_PROMPT_30TD, maxTokens: MAX_TOKENS_30TD };
+
+  const tFast = Date.now();
+  const fast = await callResponsesAPIText(text, MODEL_FAST, apiKey, opts);
+  fast.confidence = computeConfidence(fast);
+  console.log(`[llm-extract] 3.0TD text gpt-4o-mini in ${Date.now() - tFast}ms (confidence: ${fast.confidence.toFixed(2)}, chars=${text.length})`);
+
+  if (fast.confidence >= CONFIDENCE_THRESHOLD) {
+    return fast;
+  }
+
+  const noFallback = process.env.INVOICE_LLM_DISABLE_FALLBACK === '1'
+    || process.env.INVOICE_LLM_DISABLE_FALLBACK === 'true';
+  if (noFallback) {
+    console.log('[llm-extract] 3.0TD text fallback desactivado, devolviendo mini');
+    return fast;
+  }
+
+  console.log(`[llm-extract] 3.0TD text gpt-4o-mini bajo umbral (${fast.confidence.toFixed(2)} < ${CONFIDENCE_THRESHOLD}), fallback gpt-4o...`);
+  const tFull = Date.now();
+  const full = await callResponsesAPIText(text, MODEL_FULL, apiKey, opts);
+  full.confidence = computeConfidence(full);
+  console.log(`[llm-extract] 3.0TD text gpt-4o in ${Date.now() - tFull}ms (confidence: ${full.confidence.toFixed(2)})`);
+
+  return full.confidence >= fast.confidence ? full : fast;
+}
+
 /** Camino genérico cuando la tarifa no se ha podido pre-detectar. */
 export async function extractWithLLMGeneric(
   fileBuffer: Buffer,

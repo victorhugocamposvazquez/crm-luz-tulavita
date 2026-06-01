@@ -38,13 +38,13 @@ export interface Parse20TDTextResult {
   diagnostics: Parser20TDDiagnostics;
 }
 
-interface ExtractedField<T> {
+export interface ExtractedField<T> {
   value: T | null;
   confidence: number;
   source: string | null;
 }
 
-interface NumberPatternSpec {
+export interface NumberPatternSpec {
   label: string;
   pattern: RegExp;
   confidence: number;
@@ -58,7 +58,7 @@ interface StringPatternSpec {
   transform?: (value: string) => string | null;
 }
 
-interface BetweenLabelSpec {
+export interface BetweenLabelSpec {
   label: string;
   startPatterns: RegExp[];
   endPatterns: RegExp[];
@@ -96,7 +96,7 @@ const COMPANY_PATTERNS: Array<{ label: string; pattern: RegExp; value: string; c
   { label: 'gesternova', pattern: /GESTERNOVA/i, value: 'Gesternova', confidence: 0.88 },
 ];
 
-const TOTAL_PATTERNS: NumberPatternSpec[] = [
+export const TOTAL_PATTERNS: NumberPatternSpec[] = [
   { label: 'total-factura', pattern: /Total factura\s+([\d.,]+)\s*€/i, confidence: 0.98 },
   { label: 'total-importe-factura', pattern: /TOTAL IMPORTE FACTURA\s+([\d.,]+)\s*€/i, confidence: 0.97 },
   { label: 'importe-total', pattern: /IMPORTE TOTAL ELECTRICIDAD \+ TASAS E IMPUESTOS\s+([\d.,]+)\s*€/i, confidence: 0.96 },
@@ -104,7 +104,7 @@ const TOTAL_PATTERNS: NumberPatternSpec[] = [
   { label: 'total-fallback', pattern: /\bTOTAL\s+([\d.,]+)\s*€/i, confidence: 0.84 },
 ];
 
-const CONSUMPTION_PATTERNS: NumberPatternSpec[] = [
+export const CONSUMPTION_PATTERNS: NumberPatternSpec[] = [
   { label: 'consumo-total', pattern: /Consumo Total\s+([\d.,]+)\s*kWh/i, confidence: 0.98 },
   { label: 'consumo-periodo', pattern: /Consumo en este periodo\s+([\d.,]+)\s*kWh/i, confidence: 0.97 },
   { label: 'tu-consumo-periodo', pattern: /Tu consumo en el periodo facturado ha sido de\s+([\d.,]+)\s*kWh/i, confidence: 0.96 },
@@ -203,7 +203,7 @@ const CUPS_PATTERNS: StringPatternSpec[] = [
   },
 ];
 
-function extractCupsField(text: string): ExtractedField<string> {
+export function extractCupsField(text: string): ExtractedField<string> {
   const fromPatterns = extractStringField(text, CUPS_PATTERNS);
   if (fromPatterns.value) return fromPatterns;
 
@@ -240,7 +240,7 @@ const TITULAR_END_BEFORE_POWER: RegExp[] = [
   /\bPeaje\s+de\s+acceso\b/i,
 ];
 
-const TITULAR_SPECS: BetweenLabelSpec[] = [
+export const TITULAR_SPECS: BetweenLabelSpec[] = [
   {
     label: 'titular-nombre-cliente',
     startPatterns: [
@@ -307,7 +307,7 @@ const TITULAR_SPECS: BetweenLabelSpec[] = [
 ];
 
 /** Evita que queden restos de potencia/dirección pegados al nombre (misma línea PDF). */
-function sanitizeTitularValue(raw: string | null | undefined): string | null {
+export function sanitizeTitularValue(raw: string | null | undefined): string | null {
   const cleaned = cleanCapturedText(raw);
   if (!cleaned) return null;
   const cut = cleaned.split(/\bPotencia\s+(?:punta|valle|P[12])\b/i)[0];
@@ -384,7 +384,7 @@ function trimDireccionSuministroTail(raw: string): string | null {
   return cut;
 }
 
-const ADDRESS_SPECS: BetweenLabelSpec[] = [
+export const ADDRESS_SPECS: BetweenLabelSpec[] = [
   {
     label: 'direccion-suministro',
     startPatterns: [
@@ -436,7 +436,7 @@ const PRICE_P1_PATTERNS: NumberPatternSpec[] = [
   { label: 'precio-medio-etiqueta', pattern: /[Pp]recio\s+medio[^:]{0,30}:\s*([\d.,]+)\s*(?:€|eur)\s*\/\s*kWh/i, confidence: 0.8 },
 ];
 
-function emptyField<T>(): ExtractedField<T> {
+export function emptyField<T>(): ExtractedField<T> {
   return { value: null, confidence: 0, source: null };
 }
 
@@ -448,7 +448,7 @@ function roundScore(value: number): number {
   return Math.round(value * 1000) / 1000;
 }
 
-function parseSpanishNum(text: string | null | undefined): number | null {
+export function parseSpanishNum(text: string | null | undefined): number | null {
   if (!text) return null;
   const clean = text.trim().replace(/\s/g, '');
   if (clean === '') return null;
@@ -481,7 +481,7 @@ function cleanCapturedText(value: string | null | undefined): string | null {
   return cleaned || null;
 }
 
-function extractNumberField(text: string, patterns: NumberPatternSpec[]): ExtractedField<number> {
+export function extractNumberField(text: string, patterns: NumberPatternSpec[]): ExtractedField<number> {
   for (const pattern of patterns) {
     const match = text.match(pattern.pattern);
     const value = parseSpanishNum(match?.[1]);
@@ -504,7 +504,7 @@ function extractStringField(text: string, patterns: StringPatternSpec[]): Extrac
   return emptyField<string>();
 }
 
-function extractBetweenLabels(text: string, specs: BetweenLabelSpec[]): ExtractedField<string> {
+export function extractBetweenLabels(text: string, specs: BetweenLabelSpec[]): ExtractedField<string> {
   for (const spec of specs) {
     for (const startPattern of spec.startPatterns) {
       const startMatch = text.match(startPattern);
@@ -531,7 +531,7 @@ function extractBetweenLabels(text: string, specs: BetweenLabelSpec[]): Extracte
   return emptyField<string>();
 }
 
-function detectCompany(text: string): ExtractedField<string> {
+export function detectCompany(text: string): ExtractedField<string> {
   for (const pattern of COMPANY_PATTERNS) {
     if (pattern.pattern.test(text)) {
       return { value: pattern.value, confidence: pattern.confidence, source: pattern.label };
@@ -556,7 +556,7 @@ function toIsoDate(raw: string | null | undefined): string | null {
   return `${yyyy.padStart(4, '0')}-${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`;
 }
 
-function safePeriodMonthsFromDates(start: string | null, end: string | null): number {
+export function safePeriodMonthsFromDates(start: string | null, end: string | null): number {
   if (!start || !end) return 1;
   try {
     const s = new Date(start);
@@ -569,7 +569,7 @@ function safePeriodMonthsFromDates(start: string | null, end: string | null): nu
   }
 }
 
-function extractPeriodRange(text: string): ExtractedField<{ start: string; end: string }> {
+export function extractPeriodRange(text: string): ExtractedField<{ start: string; end: string }> {
   for (const pattern of PERIOD_PATTERNS) {
     const match = text.match(pattern);
     if (!match) continue;

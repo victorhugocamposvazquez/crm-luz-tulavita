@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, QrCode, UserPlus, Wallet, Copy, Upload, Users, FileText, Trash2, Eye, LogOut } from 'lucide-react';
+import { Loader2, QrCode, UserPlus, Wallet, Copy, Upload, Users, FileText, Trash2, Eye, LogOut, Share2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatSavingsPercent } from '@/lib/leads/invoice-utils';
@@ -209,6 +209,21 @@ export default function ColaboradorPortalPanel() {
   const copyLink = async (url: string) => {
     await navigator.clipboard.writeText(url);
     toast({ title: 'Enlace copiado' });
+  };
+
+  const shareLink = async (url: string, title: string) => {
+    const nav = navigator as Navigator & {
+      share?: (data: { title?: string; text?: string; url?: string }) => Promise<void>;
+    };
+    if (typeof nav.share === 'function') {
+      try {
+        await nav.share({ title, text: 'Calcula tu ahorro en la factura de la luz', url });
+        return;
+      } catch {
+        /* el usuario canceló o no se pudo compartir: caemos a copiar */
+      }
+    }
+    await copyLink(url);
   };
 
   const downloadQr = async (url: string, filename: string) => {
@@ -436,19 +451,50 @@ export default function ColaboradorPortalPanel() {
           </TabsList>
 
           <TabsContent value="links" className="space-y-3 mt-4">
+            <Card className="bg-muted/40">
+              <CardContent className="pt-4 text-sm text-muted-foreground space-y-1">
+                <p className="font-medium text-foreground">Cómo usar tus enlaces</p>
+                <p>
+                  Comparte tu enlace por WhatsApp o redes. Cuando un cliente lo abra y suba su factura,
+                  el lead se te atribuye automáticamente y lo verás en «Mis clientes».
+                </p>
+                <p className="text-xs">
+                  <strong>Subir factura</strong>: el cliente solo adjunta su factura.{' '}
+                  <strong>Captación completa</strong>: el cliente ve el ahorro estimado al instante.
+                </p>
+              </CardContent>
+            </Card>
             {ALL_ENTRY_MODES.map((mode) => {
               const url = getLinkForMode(mode);
               return (
                 <Card key={mode}>
                   <CardContent className="pt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                    <div>
+                    <div className="min-w-0">
                       <p className="font-medium">{ENTRY_MODE_LABELS[mode]}</p>
                       <p className="text-xs text-muted-foreground break-all">{url}</p>
                     </div>
-                    <Button variant="outline" size="sm" onClick={() => void copyLink(url)}>
-                      <Copy className="h-3.5 w-3.5 mr-1" />
-                      Copiar
-                    </Button>
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      <Button variant="outline" size="sm" onClick={() => void copyLink(url)}>
+                        <Copy className="h-3.5 w-3.5 mr-1" />
+                        Copiar
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void shareLink(url, ENTRY_MODE_LABELS[mode])}
+                      >
+                        <Share2 className="h-3.5 w-3.5 mr-1" />
+                        Compartir
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void downloadQr(url, `qr-${collaborator.code}-${mode}`)}
+                      >
+                        <QrCode className="h-3.5 w-3.5 mr-1" />
+                        QR
+                      </Button>
+                    </div>
                   </CardContent>
                 </Card>
               );

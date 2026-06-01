@@ -316,8 +316,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         .lt('created_at', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString());
     }
 
+    // Asignar al responsable de colaboradores los leads de captación/reclutamiento
+    // si no llega un owner explícito.
+    let defaultOwnerId = body.default_owner_id as string | undefined;
+    if (!input.owner_id && !defaultOwnerId) {
+      const RECRUITMENT_CAMPAIGNS = ['hazte_colaborador', 'colaboradores_compacta', 'colaboradores_hibrida'];
+      const isCollaboratorLead = !!input.collaborator_id || !!input.referred_by_collaborator_id;
+      const isRecruitmentLead =
+        typeof input.campaign === 'string' && RECRUITMENT_CAMPAIGNS.includes(input.campaign);
+      if (isCollaboratorLead || isRecruitmentLead) {
+        const { data: settings } = await supabase
+          .from('collaborator_settings')
+          .select('collaborator_manager_id')
+          .eq('id', 1)
+          .maybeSingle();
+        const managerId = (settings as { collaborator_manager_id?: string | null } | null)
+          ?.collaborator_manager_id;
+        if (managerId) defaultOwnerId = managerId;
+      }
+    }
+
     const result = await createLead(supabase, input, {
-      defaultOwnerId: body.default_owner_id as string | undefined,
+      defaultOwnerId,
       createInitialTask: body.create_initial_task as boolean | undefined,
     });
 

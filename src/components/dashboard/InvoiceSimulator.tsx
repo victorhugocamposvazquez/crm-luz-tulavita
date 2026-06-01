@@ -1261,8 +1261,15 @@ export default function InvoiceSimulator() {
       if (!prev) return prev;
       const numericFields: (keyof InvoiceExtraction)[] = [
         'consumption_kwh', 'total_factura', 'period_months', 'confidence',
-        'potencia_contratada_kw', 'potencia_p1_kw', 'potencia_p2_kw', 'potencia_p3_kw',
-        'precio_energia_kwh', 'precio_p1_kwh', 'precio_p2_kwh', 'precio_p3_kwh',
+        'importe_energia_activa', 'importe_potencia',
+        'potencia_contratada_kw',
+        'potencia_p1_kw', 'potencia_p2_kw', 'potencia_p3_kw',
+        'potencia_p4_kw', 'potencia_p5_kw', 'potencia_p6_kw',
+        'precio_energia_kwh',
+        'precio_p1_kwh', 'precio_p2_kwh', 'precio_p3_kwh',
+        'precio_p4_kwh', 'precio_p5_kwh', 'precio_p6_kwh',
+        'consumo_p1_kwh', 'consumo_p2_kwh', 'consumo_p3_kwh',
+        'consumo_p4_kwh', 'consumo_p5_kwh', 'consumo_p6_kwh',
       ];
       if (numericFields.includes(field)) {
         const num = value === '' ? null : parseFloat(value);

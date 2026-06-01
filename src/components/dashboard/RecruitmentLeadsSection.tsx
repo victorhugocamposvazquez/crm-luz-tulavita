@@ -1,9 +1,16 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
 import { UserPlus, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
@@ -22,6 +29,18 @@ const STATUS_LABELS: Record<string, string> = {
   lost: 'Perdido',
 };
 
+const STATUS_OPTIONS = ['new', 'contacted', 'qualified', 'converted', 'lost'] as const;
+const ALL = '__all__';
+
+/** Canal de origen del lead a partir de la atribución guardada. */
+function leadChannel(lead: LeadRow): string {
+  const cf = (lead.custom_fields ?? {}) as Record<string, unknown>;
+  const utmSource = typeof cf.utm_source === 'string' ? cf.utm_source : null;
+  if (utmSource) return utmSource;
+  if (lead.source === 'meta_ads_web') return 'meta';
+  return lead.source || '—';
+}
+
 type RecruitmentLeadsSectionProps = {
   onConvertLead?: (lead: LeadRow) => void;
   embedded?: boolean;
@@ -32,6 +51,8 @@ export function RecruitmentLeadsSection({ onConvertLead, embedded = false }: Rec
   const [loading, setLoading] = useState(true);
   const [selectedLead, setSelectedLead] = useState<LeadRow | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
+  const [statusFilter, setStatusFilter] = useState<string>(ALL);
+  const [channelFilter, setChannelFilter] = useState<string>(ALL);
 
   const fetchLeads = useCallback(async () => {
     setLoading(true);
@@ -42,7 +63,7 @@ export function RecruitmentLeadsSection({ onConvertLead, embedded = false }: Rec
         .eq('source', 'web_form')
         .in('campaign', [...RECRUITMENT_CAMPAIGNS])
         .order('created_at', { ascending: false })
-        .limit(30);
+        .limit(200);
       if (error) throw error;
       setLeads(data ?? []);
     } catch (e) {
@@ -60,6 +81,52 @@ export function RecruitmentLeadsSection({ onConvertLead, embedded = false }: Rec
     void fetchLeads();
   }, [fetchLeads]);
 
+  const channels = useMemo(() => {
+    return [...new Set(leads.map(leadChannel))].sort((a, b) => a.localeCompare(b, 'es'));
+  }, [leads]);
+
+  const filteredLeads = useMemo(() => {
+    return leads.filter((l) => {
+      if (statusFilter !== ALL && l.status !== statusFilter) return false;
+      if (channelFilter !== ALL && leadChannel(l) !== channelFilter) return false;
+      return true;
+    });
+  }, [leads, statusFilter, channelFilter]);
+
+  const filters = (
+    <div className="flex flex-wrap items-center gap-2">
+      <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <SelectTrigger className="h-8 w-40 text-sm">
+          <SelectValue placeholder="Estado" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL}>Todos los estados</SelectItem>
+          {STATUS_OPTIONS.map((s) => (
+            <SelectItem key={s} value={s}>
+              {STATUS_LABELS[s]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <Select value={channelFilter} onValueChange={setChannelFilter}>
+        <SelectTrigger className="h-8 w-44 text-sm">
+          <SelectValue placeholder="Canal" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={ALL}>Todos los canales</SelectItem>
+          {channels.map((c) => (
+            <SelectItem key={c} value={c}>
+              {c}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <span className="text-xs text-muted-foreground">
+        {filteredLeads.length} de {leads.length}
+      </span>
+    </div>
+  );
+
   const table = (
     <Table>
       <TableHeader>
@@ -67,6 +134,7 @@ export function RecruitmentLeadsSection({ onConvertLead, embedded = false }: Rec
           <TableHead>Nombre</TableHead>
           <TableHead>Contacto</TableHead>
           <TableHead>Campaña</TableHead>
+          <TableHead>Canal</TableHead>
           <TableHead>Estado</TableHead>
           <TableHead>Fecha</TableHead>
           <TableHead>Acción</TableHead>
@@ -75,16 +143,18 @@ export function RecruitmentLeadsSection({ onConvertLead, embedded = false }: Rec
       <TableBody>
         {loading ? (
           <TableRow>
-            <TableCell colSpan={6}>Cargando...</TableCell>
+            <TableCell colSpan={7}>Cargando...</TableCell>
           </TableRow>
-        ) : leads.length === 0 ? (
+        ) : filteredLeads.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={6} className="text-muted-foreground">
-              Sin leads de reclutamiento recientes.
+            <TableCell colSpan={7} className="text-muted-foreground">
+              {leads.length === 0
+                ? 'Sin leads de reclutamiento recientes.'
+                : 'Sin resultados para los filtros seleccionados.'}
             </TableCell>
           </TableRow>
         ) : (
-          leads.map((lead) => (
+          filteredLeads.map((lead) => (
             <TableRow
               key={lead.id}
               className="cursor-pointer hover:bg-muted/50"
@@ -100,6 +170,7 @@ export function RecruitmentLeadsSection({ onConvertLead, embedded = false }: Rec
               <TableCell>
                 <Badge variant="outline">{lead.campaign ?? '—'}</Badge>
               </TableCell>
+              <TableCell className="text-xs">{leadChannel(lead)}</TableCell>
               <TableCell>{STATUS_LABELS[lead.status] ?? lead.status}</TableCell>
               <TableCell className="text-xs">
                 {format(new Date(lead.created_at), 'd MMM yyyy HH:mm', { locale: es })}
@@ -122,7 +193,10 @@ export function RecruitmentLeadsSection({ onConvertLead, embedded = false }: Rec
   return (
     <>
       {embedded ? (
-        table
+        <div className="space-y-3">
+          {filters}
+          {table}
+        </div>
       ) : (
         <Card>
           <CardHeader>
@@ -139,7 +213,10 @@ export function RecruitmentLeadsSection({ onConvertLead, embedded = false }: Rec
               </Button>
             </div>
           </CardHeader>
-          <CardContent>{table}</CardContent>
+          <CardContent className="space-y-3">
+            {filters}
+            {table}
+          </CardContent>
         </Card>
       )}
 
