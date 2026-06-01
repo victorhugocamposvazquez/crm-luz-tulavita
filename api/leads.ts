@@ -332,7 +332,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           .maybeSingle();
         const managerId = (settings as { collaborator_manager_id?: string | null } | null)
           ?.collaborator_manager_id;
-        if (managerId) defaultOwnerId = managerId;
+        if (managerId) {
+          // Verifica que el responsable conserve un rol válido; si lo perdió, no se asigna
+          // (el lead queda sin owner en vez de asignarse a alguien que ya no gestiona).
+          const { data: roleRow } = await supabase
+            .from('user_roles')
+            .select('user_id')
+            .eq('user_id', managerId)
+            .in('role', ['commercial', 'admin'])
+            .limit(1)
+            .maybeSingle();
+          if (roleRow) {
+            defaultOwnerId = managerId;
+          } else {
+            console.warn(`[leads] responsable de colaboradores ${managerId} sin rol válido; lead sin asignar`);
+          }
+        }
       }
     }
 

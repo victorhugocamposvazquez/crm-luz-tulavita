@@ -2,9 +2,12 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-// Variables producción (usadas si .env no está o tiene placeholders)
-const DEFAULT_SUPABASE_URL = "https://kamfdjczamfgumkiwjpw.supabase.co";
-const DEFAULT_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImthbWZkamN6YW1mZ3Vta2l3anB3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTQwNzM5NDQsImV4cCI6MjA2OTY0OTk0NH0.ut5c7kjfAqOOy4dhP1XJxhU9W6VkLJpGSxz4DKQIMwU";
+// Variables producción (usadas si .env no está o tiene placeholders).
+// Proyecto real de esta app: nrlawnrmxlipizjwebbz (3Ws-luz), el único que contiene
+// el esquema de colaboradores. NO usar kamfdjczamfgumkiwjpw (3Ws): es un proyecto
+// antiguo sin esas tablas y caer en él rompería las funciones de colaboradores.
+const DEFAULT_SUPABASE_URL = "https://nrlawnrmxlipizjwebbz.supabase.co";
+const DEFAULT_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5ybGF3bnJteGxpcGl6andlYmJ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc2MTEwNTUsImV4cCI6MjA3MzE4NzA1NX0.5SJK-kc56fuJDpiy8NxYlSry5Uz2vrwwKAHK4UUY6Ck";
 
 const envUrl = import.meta.env.VITE_SUPABASE_URL;
 const envKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -13,10 +16,6 @@ const isPlaceholderUrl = typeof envUrl === 'string' && (envUrl.includes('TU_PROY
 const isPlaceholderKey = typeof envKey === 'string' && (envKey.length < 100 || envKey.includes('aquí') || envKey.includes('tu_'));
 const SUPABASE_URL = !isPlaceholderUrl && envUrl ? envUrl : DEFAULT_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = !isPlaceholderKey && envKey ? envKey : DEFAULT_SUPABASE_ANON_KEY;
-
-// Variables Vite estáticas para que el build reemplace correctamente en desarrollo
-/* const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? "https://oslvdbmcwzfwekulqabk.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "sb_publishable_gcGxmugcVAA6445C7n5ZfA_dHS7BWnY"; */
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";

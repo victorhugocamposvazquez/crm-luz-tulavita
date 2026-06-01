@@ -41,7 +41,32 @@ export function CollaboratorKitMenu({ collaboratorId, code, name, compact }: Col
     toast({ title: label });
   };
 
-  const createSignedLink = async (entryMode: CollaboratorEntryMode, expiresInDays?: number) => {
+  /**
+   * Get-or-create de enlace de referido. Para enlaces permanentes reutiliza uno
+   * activo existente (mismo modo + etiqueta) en vez de crear un token nuevo en cada
+   * clic, evitando que se acumulen cientos de tokens por colaborador.
+   */
+  const getOrCreateReferralToken = async (
+    entryMode: CollaboratorEntryMode,
+    label: string,
+    expiresInDays?: number,
+  ): Promise<string> => {
+    if (expiresInDays == null) {
+      const nowIso = new Date().toISOString();
+      const { data: existing } = await supabase
+        .from('collaborator_referral_links')
+        .select('token, expires_at')
+        .eq('collaborator_id', collaboratorId)
+        .eq('entry_mode', entryMode)
+        .eq('label', label)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (existing?.token && (existing.expires_at == null || existing.expires_at > nowIso)) {
+        return existing.token;
+      }
+    }
     const token = createReferralToken();
     const expiresAt =
       expiresInDays != null
@@ -53,9 +78,14 @@ export function CollaboratorKitMenu({ collaboratorId, code, name, compact }: Col
       entry_mode: entryMode,
       is_active: true,
       expires_at: expiresAt,
-      label: ENTRY_MODE_LABELS[entryMode],
+      label,
     });
     if (error) throw error;
+    return token;
+  };
+
+  const createSignedLink = async (entryMode: CollaboratorEntryMode, expiresInDays?: number) => {
+    const token = await getOrCreateReferralToken(entryMode, ENTRY_MODE_LABELS[entryMode], expiresInDays);
     return buildClientCaptureUrl(baseUrl, { token });
   };
 
@@ -98,19 +128,7 @@ export function CollaboratorKitMenu({ collaboratorId, code, name, compact }: Col
     }
   };
 
-  const createRecruitToken = async () => {
-    const token = createReferralToken();
-    const { error } = await supabase.from('collaborator_referral_links').insert({
-      collaborator_id: collaboratorId,
-      token,
-      entry_mode: 'auto',
-      is_active: true,
-      expires_at: null,
-      label: 'Reclutamiento',
-    });
-    if (error) throw error;
-    return token;
-  };
+  const createRecruitToken = async () => getOrCreateReferralToken('auto', 'Reclutamiento');
 
   const handleCopyRecruit = async () => {
     setBusy('recruit-copy');
@@ -151,19 +169,38 @@ export function CollaboratorKitMenu({ collaboratorId, code, name, compact }: Col
   const handlePortalLink = async (expiresInDays?: number) => {
     setBusy('portal');
     try {
-      const token = createAccessToken();
-      const expiresAt =
-        expiresInDays != null
-          ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString()
-          : null;
-      const { error } = await supabase.from('collaborator_access_tokens').insert({
-        collaborator_id: collaboratorId,
-        token,
-        is_active: true,
-        expires_at: expiresAt,
-        label: expiresInDays ? `Portal ${expiresInDays}d` : 'Portal permanente',
-      });
-      if (error) throw error;
+      let token: string | null = null;
+      // El enlace de portal permanente se reutiliza; los temporales siempre son nuevos.
+      if (expiresInDays == null) {
+        const nowIso = new Date().toISOString();
+        const { data: existing } = await supabase
+          .from('collaborator_access_tokens')
+          .select('token, expires_at')
+          .eq('collaborator_id', collaboratorId)
+          .eq('label', 'Portal permanente')
+          .eq('is_active', true)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (existing?.token && (existing.expires_at == null || existing.expires_at > nowIso)) {
+          token = existing.token;
+        }
+      }
+      if (!token) {
+        token = createAccessToken();
+        const expiresAt =
+          expiresInDays != null
+            ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString()
+            : null;
+        const { error } = await supabase.from('collaborator_access_tokens').insert({
+          collaborator_id: collaboratorId,
+          token,
+          is_active: true,
+          expires_at: expiresAt,
+          label: expiresInDays ? `Portal ${expiresInDays}d` : 'Portal permanente',
+        });
+        if (error) throw error;
+      }
       const url = buildPortalUrl(baseUrl, token);
       await copyText(url, 'Enlace de portal copiado');
     } catch (e) {

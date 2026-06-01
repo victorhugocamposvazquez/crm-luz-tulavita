@@ -20,6 +20,8 @@ const MAX_TOKENS_20TD = 400;
 const MAX_TOKENS_30TD = 2000;
 /** Tope de texto enviado al LLM en 2.0TD (menos tokens → menos latencia). */
 const MAX_TEXT_CHARS_20TD = 5_500;
+/** Tope de texto en 3.0TD: más alto porque hay 6 periodos (potencias, consumos, precios). */
+const MAX_TEXT_CHARS_30TD = 14_000;
 
 // ────────────────────────────────────────────────────────────
 // Sección compartida de formato numérico
@@ -292,6 +294,61 @@ export function select20TDTextForLLM(text: string): string {
   }
 
   return normalized.slice(0, MAX_TEXT_CHARS_20TD);
+}
+
+const KEYWORDS_30TD = [
+  /3[\.\s]?0\s*TD/gi,
+  /6[\.\s]?1\s*TD/gi,
+  /CUPS/gi,
+  /Total factura/gi,
+  /TOTAL IMPORTE FACTURA/gi,
+  /IMPORTE TOTAL/gi,
+  /Consumo Total/gi,
+  /Consumo en este periodo/gi,
+  /Periodo de facturaci[oó]n/gi,
+  /Potencias? contratadas?/gi,
+  /T[eé]rmino de potencia/gi,
+  /T[eé]rmino de energ[ií]a/gi,
+  /Energ[ií]a activa/gi,
+  /Energ[ií]a reactiva/gi,
+  /\bP[1-6]\b/g,
+  /(?:€|Eur)\/kWh/gi,
+  /Titular/gi,
+  /Nombre y Apellidos del titular/gi,
+  /Direcci[oó]n de suministro/gi,
+  /Peaje de transporte y distribuci[oó]n/gi,
+];
+
+/**
+ * Selección inteligente de texto para 3.0TD: si el texto excede el tope, recorta a
+ * las regiones relevantes (encabezado + ventanas alrededor de palabras clave de los
+ * 6 periodos) en vez de truncar a ciegas, para no perder potencias/consumos P4-P6.
+ */
+export function select30TDTextForLLM(text: string): string {
+  const normalized = normalize20TDInputText(text);
+  if (normalized.length <= MAX_TEXT_CHARS_30TD) return normalized;
+
+  const ranges: Array<[number, number]> = [[0, Math.min(normalized.length, 2200)]];
+  for (const regex of KEYWORDS_30TD) {
+    for (const match of normalized.matchAll(regex)) {
+      if (match.index == null) continue;
+      const start = Math.max(0, match.index - 320);
+      const end = Math.min(normalized.length, match.index + match[0].length + 640);
+      ranges.push([start, end]);
+    }
+  }
+
+  const merged = mergeRanges(ranges, normalized.length);
+  const selected = merged
+    .map(([start, end]) => normalized.slice(start, end).trim())
+    .filter(Boolean)
+    .join('\n...\n');
+
+  if (selected.length >= 2000) {
+    return selected.length > MAX_TEXT_CHARS_30TD ? selected.slice(0, MAX_TEXT_CHARS_30TD) : selected;
+  }
+
+  return normalized.slice(0, MAX_TEXT_CHARS_30TD);
 }
 
 function readResponseOutput(
@@ -568,11 +625,12 @@ export async function extractWithLLM30TDFromText(
     return emptyExtraction();
   }
   const opts: CallOptions = { systemPrompt: SYSTEM_PROMPT_30TD, maxTokens: MAX_TOKENS_30TD };
+  const preparedText = select30TDTextForLLM(text);
 
   const tFast = Date.now();
-  const fast = await callResponsesAPIText(text, MODEL_FAST, apiKey, opts);
+  const fast = await callResponsesAPIText(preparedText, MODEL_FAST, apiKey, opts);
   fast.confidence = computeConfidence(fast);
-  console.log(`[llm-extract] 3.0TD text gpt-4o-mini in ${Date.now() - tFast}ms (confidence: ${fast.confidence.toFixed(2)}, chars=${text.length})`);
+  console.log(`[llm-extract] 3.0TD text gpt-4o-mini in ${Date.now() - tFast}ms (confidence: ${fast.confidence.toFixed(2)}, chars=${preparedText.length})`);
 
   if (fast.confidence >= CONFIDENCE_THRESHOLD) {
     return fast;
@@ -587,7 +645,7 @@ export async function extractWithLLM30TDFromText(
 
   console.log(`[llm-extract] 3.0TD text gpt-4o-mini bajo umbral (${fast.confidence.toFixed(2)} < ${CONFIDENCE_THRESHOLD}), fallback gpt-4o...`);
   const tFull = Date.now();
-  const full = await callResponsesAPIText(text, MODEL_FULL, apiKey, opts);
+  const full = await callResponsesAPIText(preparedText, MODEL_FULL, apiKey, opts);
   full.confidence = computeConfidence(full);
   console.log(`[llm-extract] 3.0TD text gpt-4o in ${Date.now() - tFull}ms (confidence: ${full.confidence.toFixed(2)})`);
 

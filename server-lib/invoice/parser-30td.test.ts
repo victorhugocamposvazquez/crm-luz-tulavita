@@ -35,7 +35,7 @@ describe('parse30TDFromTextDetailed — factura 3.0TD completa', () => {
     expect(extraction.tipo_tarifa).toBe('3.0TD');
     expect(extraction.total_factura).toBe(1234.56);
     expect(extraction.consumption_kwh).toBe(6000);
-    expect(extraction.cups).toBe('ES0031408000000001AB');
+    expect(extraction.cups).toBe('ES0031408000000001AB0F');
     expect(extraction.company_name).toBe('Endesa Energía');
 
     expect(extraction.potencia_p1_kw).toBe(30);

@@ -134,11 +134,9 @@ function normalizeCupsFromCapture(raw: string): string | null {
   const valid20 = (s: string) => /^\d{16}[A-Z0-9]{4}$/.test(s);
 
   if (rest.length === 18 && valid18(rest)) return `ES${rest}`;
-  /** Sufijos tipo "0F" pegados al CUPS 18 chars (Plenitude / OCR). */
-  if (rest.length === 20 && valid18(rest.slice(0, 18))) {
-    const tail = rest.slice(18);
-    if (/^0[A-Z]$/.test(tail)) return `ES${rest.slice(0, 18)}`;
-  }
+  // CUPS de 22 chars válido (16 dígitos + 2 control + punto frontera tipo "0F"/"1P"):
+  // se mantiene completo. Es lossless; recortar el punto frontera perdería información
+  // que no puede distinguirse de un CUPS de 20 con dato extra.
   if (rest.length === 20 && valid20(rest)) return `ES${rest}`;
 
   if (rest.length >= 21) {

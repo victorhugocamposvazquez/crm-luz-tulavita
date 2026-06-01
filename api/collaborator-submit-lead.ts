@@ -174,9 +174,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         .select('collaborator_manager_id')
         .eq('id', 1)
         .maybeSingle();
-      ownerId =
+      const managerId =
         (settings as { collaborator_manager_id?: string | null } | null)?.collaborator_manager_id ??
         null;
+      if (managerId) {
+        // Solo se asigna si el responsable conserva un rol válido.
+        const { data: roleRow } = await supabase
+          .from('user_roles')
+          .select('user_id')
+          .eq('user_id', managerId)
+          .in('role', ['commercial', 'admin'])
+          .limit(1)
+          .maybeSingle();
+        ownerId = roleRow ? managerId : null;
+      }
     }
 
     const { data: lead, error: leadErr } = await supabase

@@ -9,7 +9,16 @@ import { createHash } from 'crypto';
 import type { InvoiceExtraction } from './types.js';
 import { emptyExtraction } from './types.js';
 import { parse20TDFromTextDetailed, type Parser20TDDiagnostics } from './parser-20td.js';
-import { parse30TDFromTextDetailed } from './parser-30td.js';
+import { parse30TDFromTextDetailed, type Parse30TDTextResult, type Parser30TDDiagnostics } from './parser-30td.js';
+
+/**
+ * El parser determinista 3.0TD es nuevo y aún no validado con facturas reales.
+ * Por defecto corre en MODO SOMBRA: se calcula y registra en debug, pero NO se usa
+ * (la fuente de verdad sigue siendo el LLM). Para confiar en él, activar
+ * INVOICE_30TD_PARSER_TRUST=1 una vez haya fixtures reales que respalden el score.
+ */
+const TRUST_30TD_PARSER =
+  process.env.INVOICE_30TD_PARSER_TRUST === '1' || process.env.INVOICE_30TD_PARSER_TRUST === 'true';
 
 const IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
@@ -39,6 +48,32 @@ function summarize20TDParser(diagnostics: Parser20TDDiagnostics | null): Invoice
   };
 }
 
+function summarize30TDParser(
+  diagnostics: Parser30TDDiagnostics | null,
+  trusted: boolean,
+): InvoiceExtractionDebugMeta['parser30td'] {
+  if (!diagnostics) return null;
+  return {
+    attempted: true,
+    trusted,
+    score: diagnostics.score,
+    accepted: diagnostics.accepted,
+    criticalMissing: [...diagnostics.criticalMissing],
+    warnings: [...diagnostics.warnings],
+  };
+}
+
+/** Log de comparación en sombra parser 3.0TD vs LLM (sin afectar el resultado). */
+function logShadow30TD(parsed: Parse30TDTextResult | null, llm: InvoiceExtraction): void {
+  if (!parsed) return;
+  const p = parsed.extraction;
+  console.log(
+    `[pipeline][shadow-3.0td] accepted=${parsed.diagnostics.accepted} score=${parsed.diagnostics.score.toFixed(2)} ` +
+      `parser(consumo=${p?.consumption_kwh ?? 'null'}, total=${p?.total_factura ?? 'null'}) ` +
+      `llm(consumo=${llm.consumption_kwh ?? 'null'}, total=${llm.total_factura ?? 'null'})`,
+  );
+}
+
 export interface InvoiceExtractionDebugMeta {
   cacheHit: boolean;
   providedPdfText: boolean;
@@ -65,6 +100,14 @@ export interface InvoiceExtractionDebugMeta {
   usedRetry: boolean;
   parser20td: {
     attempted: boolean;
+    score: number | null;
+    accepted: boolean;
+    criticalMissing: string[];
+    warnings: string[];
+  } | null;
+  parser30td: {
+    attempted: boolean;
+    trusted: boolean;
     score: number | null;
     accepted: boolean;
     criticalMissing: string[];
@@ -451,6 +494,7 @@ export async function extractInvoiceFromBufferDetailed(
     usedLLM: false,
     usedRetry: false,
     parser20td: null,
+    parser30td: null,
     timings: { totalMs: 0, pdfParseMs: null },
   };
   const isPdf = mimeType === 'application/pdf';
@@ -540,10 +584,12 @@ export async function extractInvoiceFromBufferDetailed(
       }
       const extractedPdfText = providedPdfText ?? extractedPdf?.text ?? null;
 
-      // 1) Parser determinista 3.0TD (sin LLM) sobre el mejor texto disponible.
+      // 1) Parser determinista 3.0TD sobre el mejor texto disponible.
       const parser30Text = extractedPdfText ?? rawPdfText ?? null;
       const parsed30 = parser30Text ? parse30TDFromTextDetailed(parser30Text) : null;
-      if (parsed30?.diagnostics.accepted && parsed30.extraction) {
+      debug.parser30td = summarize30TDParser(parsed30?.diagnostics ?? null, TRUST_30TD_PARSER);
+
+      if (TRUST_30TD_PARSER && parsed30?.diagnostics.accepted && parsed30.extraction) {
         console.log(`[pipeline] 3.0TD sin LLM (parser aceptado, score=${parsed30.diagnostics.score.toFixed(2)})`);
         validated = validateExtraction(parsed30.extraction);
         debug.usedLLM = false;
@@ -561,6 +607,7 @@ export async function extractInvoiceFromBufferDetailed(
       debug.usedLLM = true;
       debug.path = extractedPdfText ? '3.0td-llm-text' : '3.0td-llm';
       validated = validateExtraction(extraction);
+      logShadow30TD(parsed30, validated);
 
       if (!validated.consumption_kwh && !validated.total_factura) {
         console.warn('[pipeline] LLM returned no consumption and no total — possible non-energy document');
@@ -632,7 +679,9 @@ export async function extractInvoiceFromBufferDetailed(
       if (detectedTarifa === '3.0TD') {
         const parser30Text = extractedPdfText ?? rawPdfText ?? null;
         const parsed30 = parser30Text ? parse30TDFromTextDetailed(parser30Text) : null;
-        if (parsed30?.diagnostics.accepted && parsed30.extraction) {
+        debug.parser30td = summarize30TDParser(parsed30?.diagnostics ?? null, TRUST_30TD_PARSER);
+
+        if (TRUST_30TD_PARSER && parsed30?.diagnostics.accepted && parsed30.extraction) {
           console.log(`[pipeline] fallback 3.0TD sin LLM (parser aceptado, score=${parsed30.diagnostics.score.toFixed(2)})`);
           validated = validateExtraction(parsed30.extraction);
           debug.usedLLM = false;
@@ -649,6 +698,7 @@ export async function extractInvoiceFromBufferDetailed(
         debug.usedLLM = true;
         debug.path = extractedPdfText ? '3.0td-llm-text' : '3.0td-llm';
         validated = validateExtraction(extraction);
+        logShadow30TD(parsed30, validated);
 
         if (needs30TDRetry(validated)) {
           console.log('[pipeline] tarifa detectada por pdf-parse como 3.0TD, retry gpt-4o forzado');

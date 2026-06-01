@@ -35,10 +35,10 @@ describe('parse20TDFromTextDetailed — CUPS', () => {
     expect(extraction?.cups).toBe('ES0022000004140388AF1P');
   });
 
-  it('CUPS Plenitude: quita sufijo 0F típico de OCR', () => {
+  it('CUPS de 22 chars: mantiene el punto frontera (p. ej. 0F)', () => {
     const text = minimal20TDText('CUPS ES0033770058242001LA0F');
     const { extraction } = parse20TDFromTextDetailed(text);
-    expect(extraction?.cups).toBe('ES0033770058242001LA');
+    expect(extraction?.cups).toBe('ES0033770058242001LA0F');
   });
 
   it('detecta CUPS en línea con espacios entre grupos', () => {
