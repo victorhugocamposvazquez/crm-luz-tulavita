@@ -10,6 +10,7 @@ import { useReminderDesktopNotifications } from '@/hooks/useReminderDesktopNotif
 import { usePwaInstallPrompt } from '@/hooks/usePwaInstallPrompt';
 import { isRunningAsInstalledPwa } from '@/lib/pwa/registerCrmServiceWorker';
 import { useToast } from '@/hooks/use-toast';
+import { usePendingCollaboratorLeads } from '@/hooks/usePendingCollaboratorLeads';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,7 +37,9 @@ export default function Layout({ children, currentView, onViewChange }: LayoutPr
   const isCommercial = userRole?.role === 'commercial';
 
   useReminderDesktopNotifications(isAdmin);
-  
+
+  const { total: pendingCollaboratorLeads } = usePendingCollaboratorLeads(isAdmin);
+
   const showGpsButton = isCommercial && !location && !geoLoading;
 
   const navigation = isAdmin ? [
@@ -207,20 +210,31 @@ export default function Layout({ children, currentView, onViewChange }: LayoutPr
             </div>
             
             <nav className="flex-1 p-4 space-y-2">
-              {navigation.map((item) => (
-                <Button
-                  key={item.view}
-                  variant={currentView === item.view ? "default" : "ghost"}
-                  className="w-full justify-start"
-                  onClick={() => {
-                    onViewChange(item.view);
-                    setSidebarOpen(false);
-                  }}
-                >
-                  <item.icon className="mr-2 h-4 w-4" />
-                  {item.name}
-                </Button>
-              ))}
+              {navigation.map((item) => {
+                const badgeCount = item.view === 'collaborators' ? pendingCollaboratorLeads : 0;
+                return (
+                  <Button
+                    key={item.view}
+                    variant={currentView === item.view ? "default" : "ghost"}
+                    className="w-full justify-start"
+                    onClick={() => {
+                      onViewChange(item.view);
+                      setSidebarOpen(false);
+                    }}
+                  >
+                    <item.icon className="mr-2 h-4 w-4" />
+                    {item.name}
+                    {badgeCount > 0 && (
+                      <span
+                        className="ml-auto inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-orange-500 px-1.5 text-xs font-semibold text-white"
+                        title={`${badgeCount} lead${badgeCount === 1 ? '' : 's'} para revisar`}
+                      >
+                        {badgeCount > 99 ? '99+' : badgeCount}
+                      </span>
+                    )}
+                  </Button>
+                );
+              })}
             </nav>
 
             {canInstall && !runsAsPwa && (

@@ -17,7 +17,20 @@ import { CollaboratorProgramGuide, type CollaboratorTab } from './CollaboratorPr
 import { ConvertLeadDialog } from './ConvertLeadDialog';
 import { CollaboratorDetailView, type CollaboratorRow } from './CollaboratorDetailView';
 import { COLABORADORES_RECRUITMENT_ROUTE } from '@/components/colaboradores/colaboradores-config';
+import { usePendingCollaboratorLeads } from '@/hooks/usePendingCollaboratorLeads';
 import type { Database } from '@/integrations/supabase/types';
+
+function TabBadge({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <span
+      className="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-orange-500 px-1.5 text-xs font-semibold text-white"
+      title={`${count} lead${count === 1 ? '' : 's'} para revisar`}
+    >
+      {count > 99 ? '99+' : count}
+    </span>
+  );
+}
 
 type RecruitmentLeadRow = Database['public']['Tables']['leads']['Row'];
 
@@ -52,6 +65,7 @@ export default function CollaboratorsManagement() {
   const [convertOpen, setConvertOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<CollaboratorTab>('inicio');
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const { recruitment: pendingRecruitment, captured: pendingCaptured } = usePendingCollaboratorLeads();
 
   const baseUrl = useMemo(() => {
     if (typeof window === 'undefined') return '';
@@ -243,10 +257,12 @@ export default function CollaboratorsManagement() {
           <TabsTrigger value="colaboradores" className="gap-2">
             <Users className="h-4 w-4" />
             Colaboradores
+            <TabBadge count={pendingCaptured} />
           </TabsTrigger>
           <TabsTrigger value="reclutamiento" className="gap-2">
             <Megaphone className="h-4 w-4" />
             Reclutamiento
+            <TabBadge count={pendingRecruitment} />
           </TabsTrigger>
           <TabsTrigger value="ajustes" className="gap-2">
             <Settings className="h-4 w-4" />
