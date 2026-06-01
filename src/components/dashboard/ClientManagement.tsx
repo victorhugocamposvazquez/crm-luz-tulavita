@@ -31,6 +31,7 @@ import ReminderDialog from '@/components/reminders/ReminderDialog';
 import ClientSupplyAddressesEditor from './ClientSupplyAddressesEditor';
 import { cn } from '@/lib/utils';
 import { ComercializadoraCombobox } from '@/components/dashboard/ComercializadoraCombobox';
+import { ClientTagSelector } from '@/components/dashboard/ClientTagSelector';
 import type { Database } from '@/integrations/supabase/types';
 import type { SupplyAddressDraft } from '@/lib/clients/supplyAddresses';
 import { draftFromSupplyRow, syncClientSupplyAddresses } from '@/lib/clients/supplyAddresses';
@@ -159,7 +160,7 @@ export default function ClientManagement() {
   const tableColCount = isAdmin ? 10 : 9;
 
   const [formComercializadora, setFormComercializadora] = useState<string | null>(null);
-  const [formTags, setFormTags] = useState<string>('');
+  const [formTags, setFormTags] = useState<string[]>([]);
 
   const [assignedCommercialId, setAssignedCommercialId] = useState<string>('__none__');
   const [commercialUsers, setCommercialUsers] = useState<Array<{ id: string; label: string }>>([]);
@@ -217,7 +218,7 @@ export default function ClientManagement() {
   useEffect(() => {
     if (!dialogOpen) return;
     setFormComercializadora(editingClient?.comercializadora ?? null);
-    setFormTags((editingClient?.tags ?? []).join(', '));
+    setFormTags(editingClient?.tags ?? []);
   }, [dialogOpen, editingClient?.id, editingClient?.comercializadora, editingClient?.tags]);
 
   const commercialSelectOptions = useMemo(() => {
@@ -473,12 +474,7 @@ export default function ClientManagement() {
     
     const clientData = normalizeClientData(rawClientData);
     const parsedTags = Array.from(
-      new Set(
-        formTags
-          .split(',')
-          .map((t) => t.trim())
-          .filter((t) => t.length > 0),
-      ),
+      new Set(formTags.map((t) => t.trim()).filter((t) => t.length > 0)),
     );
     const payload: ClientTableUpdate = {
       ...clientData,
@@ -1469,15 +1465,13 @@ export default function ClientManagement() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="client-tags">Etiquetas</Label>
-                  <Input
-                    id="client-tags"
+                  <ClientTagSelector
                     value={formTags}
-                    onChange={(e) => setFormTags(e.target.value)}
-                    placeholder="KO, Liquidado, en trámite…"
-                    autoComplete="off"
+                    onChange={setFormTags}
+                    suggestions={availableTags}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Separadas por comas. P. ej. estados comerciales (KO, Liquidado, en trámite, Baja…).
+                    Estados comerciales. Elige del listado o añade una personalizada.
                   </p>
                 </div>
                 <div className="space-y-2">
