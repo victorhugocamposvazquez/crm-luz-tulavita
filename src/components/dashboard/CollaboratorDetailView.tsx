@@ -329,6 +329,12 @@ export function CollaboratorDetailView({ collaborator, onBack, onUpdated }: Coll
 
       <CollaboratorPortalAccessCard collaboratorId={collaborator.id} collaboratorName={collaborator.name} />
 
+      <p className="text-xs text-muted-foreground">
+        <strong>Resumen</strong>: datos y métricas · <strong>Clientes captados</strong>: leads que trajo ·{' '}
+        <strong>Pagos y facturas</strong>: liquida comisiones y valida facturas · <strong>Accesos y kit</strong>:
+        genera sus enlaces, QR y acceso al portal.
+      </p>
+
       <Tabs defaultValue="resumen" className="space-y-4">
         <TabsList className="flex h-auto flex-wrap justify-start gap-1">
           <TabsTrigger value="resumen">Resumen</TabsTrigger>

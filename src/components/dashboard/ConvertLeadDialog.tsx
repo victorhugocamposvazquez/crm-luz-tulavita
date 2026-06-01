@@ -129,6 +129,10 @@ export function ConvertLeadDialog({ lead, open, onOpenChange, onCreated }: Conve
               <span className="font-medium">{createdCollab.name}</span> creado con código{' '}
               <code className="text-xs bg-muted px-1 rounded">{createdCollab.code}</code>
             </p>
+            <p className="text-xs text-muted-foreground">
+              Siguiente paso: genera su <strong>kit</strong> (enlaces y QR para captar clientes) y, si quiere
+              autoservicio, un <strong>acceso al portal</strong>. Lo tienes también en su ficha → «Accesos y kit».
+            </p>
             <CollaboratorKitMenu
               collaboratorId={createdCollab.id}
               code={createdCollab.code}
