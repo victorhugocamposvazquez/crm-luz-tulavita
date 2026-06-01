@@ -3,7 +3,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Link2, ShieldCheck, Mail, MessageCircle } from 'lucide-react';
+import {
+  Loader2,
+  Link2,
+  ShieldCheck,
+  Mail,
+  MessageCircle,
+  ArrowLeft,
+  KeyRound,
+} from 'lucide-react';
 import { extractPortalToken } from '@/lib/collaborators/portal-session';
 import { ColaboradorPortalBrandHeader } from './ColaboradorPortalBrandHeader';
 import { waLink } from './colaboradores-config';
@@ -13,27 +21,79 @@ type ColaboradorPortalLoginProps = {
   initialError?: string | null;
 };
 
-export function ColaboradorPortalLogin({ onAuthenticated, initialError }: ColaboradorPortalLoginProps) {
-  const [linkInput, setLinkInput] = useState('');
-  const [error, setError] = useState<string | null>(initialError ?? null);
-  const [submitting, setSubmitting] = useState(false);
-  const [showRecovery, setShowRecovery] = useState(false);
-  const [recoveryEmail, setRecoveryEmail] = useState('');
-  const [recoveryPhone, setRecoveryPhone] = useState('');
-  const [recoverySubmitting, setRecoverySubmitting] = useState(false);
-  const [recoveryMessage, setRecoveryMessage] = useState<string | null>(null);
-  const [recoveryDelivery, setRecoveryDelivery] = useState<'email' | 'manual' | 'unknown' | null>(null);
+type Step = 'email' | 'code' | 'link';
 
-  const handleSubmit = async (e: React.FormEvent) => {
+export function ColaboradorPortalLogin({ onAuthenticated, initialError }: ColaboradorPortalLoginProps) {
+  const [step, setStep] = useState<Step>('email');
+  const [email, setEmail] = useState('');
+  const [code, setCode] = useState('');
+  const [linkInput, setLinkInput] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(initialError ?? null);
+  const [info, setInfo] = useState<string | null>(null);
+
+  const requestCode = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    setError(null);
+    setInfo(null);
+    const normalized = email.trim().toLowerCase();
+    if (!normalized.includes('@')) {
+      setError('Introduce un email válido.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/collaborator-portal-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'request', email: normalized }),
+      });
+      const json = (await res.json()) as { success?: boolean; error?: string; message?: string };
+      if (!res.ok || !json.success) throw new Error(json.error ?? 'No se pudo enviar el código');
+      setInfo(json.message ?? 'Si tu email está registrado, recibirás un código en breve.');
+      setStep('code');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo enviar el código');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const verifyCode = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    const cleaned = code.replace(/\D/g, '').slice(0, 6);
+    if (cleaned.length !== 6) {
+      setError('El código tiene 6 dígitos.');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/collaborator-portal-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'verify', email: email.trim().toLowerCase(), code: cleaned }),
+      });
+      const json = (await res.json()) as { success?: boolean; error?: string; token?: string };
+      if (!res.ok || !json.success || !json.token) {
+        throw new Error(json.error ?? 'Código incorrecto o caducado');
+      }
+      onAuthenticated(json.token);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No se pudo validar el código');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
+  const submitLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
     const token = extractPortalToken(linkInput);
     if (!token) {
       setError('Pega el enlace de acceso completo o el token que te envió Tulavita.');
       return;
     }
-
     setSubmitting(true);
     try {
       const res = await fetch('/api/resolve-collaborator-portal', {
@@ -42,9 +102,7 @@ export function ColaboradorPortalLogin({ onAuthenticated, initialError }: Colabo
         body: JSON.stringify({ token }),
       });
       const json = (await res.json()) as { success?: boolean; error?: string };
-      if (!res.ok || !json.success) {
-        throw new Error(json.error ?? 'Enlace de acceso inválido o expirado');
-      }
+      if (!res.ok || !json.success) throw new Error(json.error ?? 'Enlace de acceso inválido o expirado');
       onAuthenticated(token);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No se pudo validar el acceso');
@@ -53,39 +111,8 @@ export function ColaboradorPortalLogin({ onAuthenticated, initialError }: Colabo
     }
   };
 
-  const handleRecovery = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setRecoveryMessage(null);
-    setRecoveryDelivery(null);
-    setRecoverySubmitting(true);
-    try {
-      const res = await fetch('/api/collaborator-portal-request-link', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: recoveryEmail.trim() || undefined,
-          phone: recoveryPhone.trim() || undefined,
-        }),
-      });
-      const json = (await res.json()) as {
-        success?: boolean;
-        error?: string;
-        message?: string;
-        delivery?: 'email' | 'manual' | 'unknown';
-      };
-      if (!res.ok || !json.success) throw new Error(json.error ?? 'No se pudo enviar la solicitud');
-      setRecoveryMessage(json.message ?? 'Si tus datos están registrados, te enviaremos un nuevo enlace.');
-      setRecoveryDelivery(json.delivery ?? 'unknown');
-    } catch (err) {
-      setRecoveryMessage(err instanceof Error ? err.message : 'No se pudo enviar la solicitud');
-      setRecoveryDelivery(null);
-    } finally {
-      setRecoverySubmitting(false);
-    }
-  };
-
-  const whatsappRecoveryHref = waLink(
-    `Hola Tulavita, soy colaborador/a y he olvidado mi enlace de acceso al portal. Mi email es ${recoveryEmail || '...'} y mi teléfono ${recoveryPhone || '...'}.`,
+  const whatsappHref = waLink(
+    `Hola Tulavita, soy colaborador/a y no consigo acceder al portal. Mi email es ${email || '...'}.`,
   );
 
   return (
@@ -98,14 +125,120 @@ export function ColaboradorPortalLogin({ onAuthenticated, initialError }: Colabo
             Acceso colaboradores
           </CardTitle>
           <CardDescription>
-            Zona privada protegida. Entra con el enlace personal (magic link) que te envió Tulavita. Tras validarlo
-            accederás a tu panel en <span className="font-mono text-xs">/colaborador/panel</span>.
+            {step === 'code'
+              ? 'Introduce el código de 6 dígitos que te hemos enviado por email.'
+              : step === 'link'
+                ? 'Pega el enlace personal (magic link) que te envió Tulavita.'
+                : 'Entra con tu email registrado. Te enviaremos un código de un solo uso para acceder.'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!showRecovery ? (
+          {step === 'email' && (
             <>
-              <form className="space-y-4" onSubmit={(e) => void handleSubmit(e)}>
+              <form className="space-y-4" onSubmit={(e) => void requestCode(e)}>
+                <div className="space-y-2">
+                  <Label htmlFor="portal-email">Email registrado</Label>
+                  <Input
+                    id="portal-email"
+                    type="email"
+                    inputMode="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="tu@email.com"
+                    autoComplete="email"
+                    autoFocus
+                  />
+                  <p className="text-xs text-muted-foreground flex items-start gap-1.5">
+                    <Mail className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                    Usa el email que diste al registrarte como colaborador.
+                  </p>
+                </div>
+                {error && <p className="text-sm text-destructive">{error}</p>}
+                <Button type="submit" className="w-full" disabled={submitting || !email.trim()}>
+                  {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Mail className="h-4 w-4 mr-2" />}
+                  Enviar código de acceso
+                </Button>
+              </form>
+
+              <div className="border-t pt-4 space-y-2">
+                <Button
+                  variant="link"
+                  className="h-auto p-0 text-sm"
+                  onClick={() => {
+                    setError(null);
+                    setInfo(null);
+                    setStep('link');
+                  }}
+                >
+                  <Link2 className="h-3.5 w-3.5 mr-1.5" />
+                  Tengo un enlace de acceso
+                </Button>
+              </div>
+            </>
+          )}
+
+          {step === 'code' && (
+            <>
+              <form className="space-y-4" onSubmit={(e) => void verifyCode(e)}>
+                {info && <p className="text-sm text-muted-foreground">{info}</p>}
+                <div className="space-y-2">
+                  <Label htmlFor="portal-code">Código de acceso</Label>
+                  <Input
+                    id="portal-code"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={code}
+                    onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="••••••"
+                    className="text-center text-2xl tracking-[0.5em] font-mono"
+                    maxLength={6}
+                    autoFocus
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Enviado a <span className="font-medium">{email}</span>. Caduca en 10 minutos.
+                  </p>
+                </div>
+                {error && <p className="text-sm text-destructive">{error}</p>}
+                <Button type="submit" className="w-full" disabled={submitting || code.length !== 6}>
+                  {submitting ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <KeyRound className="h-4 w-4 mr-2" />
+                  )}
+                  Entrar al portal
+                </Button>
+              </form>
+
+              <div className="flex items-center justify-between border-t pt-4">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto p-0 text-sm"
+                  onClick={() => {
+                    setError(null);
+                    setCode('');
+                    setStep('email');
+                  }}
+                >
+                  <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
+                  Cambiar email
+                </Button>
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="h-auto p-0 text-sm"
+                  disabled={submitting}
+                  onClick={() => void requestCode()}
+                >
+                  Reenviar código
+                </Button>
+              </div>
+            </>
+          )}
+
+          {step === 'link' && (
+            <>
+              <form className="space-y-4" onSubmit={(e) => void submitLink(e)}>
                 <div className="space-y-2">
                   <Label htmlFor="portal-magic-link">Enlace o token de acceso</Label>
                   <Input
@@ -114,6 +247,7 @@ export function ColaboradorPortalLogin({ onAuthenticated, initialError }: Colabo
                     onChange={(e) => setLinkInput(e.target.value)}
                     placeholder="https://…/colaborador/acceso?token=portal_…"
                     autoComplete="off"
+                    autoFocus
                   />
                   <p className="text-xs text-muted-foreground flex items-start gap-1.5">
                     <Link2 className="h-3.5 w-3.5 mt-0.5 shrink-0" />
@@ -123,79 +257,35 @@ export function ColaboradorPortalLogin({ onAuthenticated, initialError }: Colabo
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 <Button type="submit" className="w-full" disabled={submitting || !linkInput.trim()}>
                   {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  Acceder al portal
+                  Acceder con enlace
                 </Button>
               </form>
 
               <div className="border-t pt-4">
-                <Button variant="link" className="h-auto p-0 text-sm" onClick={() => setShowRecovery(true)}>
-                  ¿Has olvidado tu enlace de acceso?
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-auto p-0 text-sm"
+                  onClick={() => {
+                    setError(null);
+                    setStep('email');
+                  }}
+                >
+                  <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
+                  Acceder con email
                 </Button>
               </div>
             </>
-          ) : (
-            <>
-              <form className="space-y-4" onSubmit={(e) => void handleRecovery(e)}>
-                <div className="space-y-2">
-                  <Label htmlFor="recovery-email">Email registrado</Label>
-                  <Input
-                    id="recovery-email"
-                    type="email"
-                    value={recoveryEmail}
-                    onChange={(e) => setRecoveryEmail(e.target.value)}
-                    placeholder="tu@email.com"
-                    autoComplete="email"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="recovery-phone">Teléfono registrado (alternativa)</Label>
-                  <Input
-                    id="recovery-phone"
-                    value={recoveryPhone}
-                    onChange={(e) => setRecoveryPhone(e.target.value)}
-                    placeholder="600 000 000"
-                    autoComplete="tel"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Usa el email o teléfono que diste al darte de alta como colaborador. Te enviaremos un nuevo magic
-                    link si coinciden con nuestros datos.
-                  </p>
-                </div>
-                {recoveryMessage && (
-                  <p
-                    className={`text-sm ${recoveryDelivery === 'manual' ? 'text-amber-700' : 'text-muted-foreground'}`}
-                  >
-                    {recoveryMessage}
-                  </p>
-                )}
-                <Button
-                  type="submit"
-                  className="w-full"
-                  disabled={recoverySubmitting || (!recoveryEmail.trim() && !recoveryPhone.trim())}
-                >
-                  {recoverySubmitting ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <Mail className="h-4 w-4 mr-2" />
-                  )}
-                  Enviar nuevo enlace
-                </Button>
-              </form>
-
-              {(recoveryDelivery === 'manual' || recoveryDelivery === 'unknown') && (
-                <Button variant="outline" className="w-full" asChild>
-                  <a href={whatsappRecoveryHref} target="_blank" rel="noopener noreferrer">
-                    <MessageCircle className="h-4 w-4 mr-2" />
-                    Pedir enlace por WhatsApp
-                  </a>
-                </Button>
-              )}
-
-              <Button variant="ghost" className="w-full" onClick={() => setShowRecovery(false)}>
-                Volver al acceso con enlace
-              </Button>
-            </>
           )}
+
+          <div className="border-t pt-4">
+            <Button variant="outline" size="sm" className="w-full" asChild>
+              <a href={whatsappHref} target="_blank" rel="noopener noreferrer">
+                <MessageCircle className="h-4 w-4 mr-2" />
+                ¿Problemas para entrar? Escríbenos por WhatsApp
+              </a>
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

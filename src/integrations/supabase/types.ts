@@ -648,6 +648,50 @@ export type Database = {
           },
         ]
       }
+      collaborator_otp_codes: {
+        Row: {
+          id: string
+          collaborator_id: string
+          email: string
+          code_hash: string
+          expires_at: string
+          attempts: number
+          consumed_at: string | null
+          ip: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          collaborator_id: string
+          email: string
+          code_hash: string
+          expires_at: string
+          attempts?: number
+          consumed_at?: string | null
+          ip?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          collaborator_id?: string
+          email?: string
+          code_hash?: string
+          expires_at?: string
+          attempts?: number
+          consumed_at?: string | null
+          ip?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "collaborator_otp_codes_collaborator_id_fkey"
+            columns: ["collaborator_id"]
+            isOneToOne: false
+            referencedRelation: "collaborators"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       collaborator_invoices: {
         Row: {
           id: string

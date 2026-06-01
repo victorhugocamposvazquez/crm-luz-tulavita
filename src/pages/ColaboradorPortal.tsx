@@ -25,7 +25,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, QrCode, UserPlus, Wallet, Copy, Upload, Users, FileText, Trash2, Eye, LogOut, Share2 } from 'lucide-react';
+import { Loader2, QrCode, UserPlus, Wallet, Copy, Upload, Users, FileText, Trash2, Eye, LogOut, Share2, Home, ArrowRight, BadgeEuro, Link2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { formatSavingsPercent } from '@/lib/leads/invoice-utils';
@@ -134,6 +134,7 @@ export default function ColaboradorPortalPanel() {
   const [manualTotal, setManualTotal] = useState('');
   const [submittingClient, setSubmittingClient] = useState(false);
 
+  const [activeTab, setActiveTab] = useState('inicio');
   const [showAdvancedLinks, setShowAdvancedLinks] = useState(false);
   const [invoicePayoutId, setInvoicePayoutId] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
@@ -406,6 +407,15 @@ export default function ColaboradorPortalPanel() {
 
   const visibleInvoices = commission_invoices.filter((inv) => inv.status !== 'cancelled');
 
+  // ── Datos para la pestaña «Inicio» (orientada a acciones) ──
+  const mainCaptureUrl = getLinkForMode('auto');
+  const totalPendingEur = pending_payouts.reduce((sum, p) => sum + Number(p.amount_total_eur), 0);
+  const pendingInvoiceCount = payoutsWithoutActiveInvoice.length;
+  const clientsInProcess = captured_clients.filter(
+    (c) => !['converted', 'lost'].includes(c.status),
+  ).length;
+  const firstName = collaborator.name.split(' ')[0] ?? collaborator.name;
+
   return (
     <div className="min-h-screen bg-muted/30 py-8 px-4">
       <div className="max-w-3xl mx-auto space-y-6">
@@ -443,13 +453,138 @@ export default function ColaboradorPortalPanel() {
           </Card>
         </div>
 
-        <Tabs defaultValue="links">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto">
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 h-auto">
+            <TabsTrigger value="inicio">Inicio</TabsTrigger>
             <TabsTrigger value="links">Enlaces</TabsTrigger>
             <TabsTrigger value="clientes">Mis clientes</TabsTrigger>
-            <TabsTrigger value="client">Registrar cliente</TabsTrigger>
+            <TabsTrigger value="client">Registrar</TabsTrigger>
             <TabsTrigger value="payouts">Mis pagos</TabsTrigger>
           </TabsList>
+
+          <TabsContent value="inicio" className="space-y-4 mt-4">
+            <Card className="bg-gradient-to-br from-lime-50 to-emerald-50 border-emerald-200">
+              <CardContent className="pt-5 space-y-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Hola {firstName} 👋</p>
+                  <p className="text-base font-medium">Comparte tu enlace y empieza a ganar comisiones.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    onClick={() => void shareLink(mainCaptureUrl, 'Calcula tu ahorro de luz')}
+                    className="bg-emerald-600 hover:bg-emerald-700"
+                  >
+                    <Share2 className="h-4 w-4 mr-2" />
+                    Compartir mi enlace
+                  </Button>
+                  <Button variant="outline" onClick={() => void copyLink(mainCaptureUrl)}>
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copiar
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => void downloadQr(mainCaptureUrl, `qr-${collaborator.code}-auto`)}
+                  >
+                    <QrCode className="h-4 w-4 mr-2" />
+                    QR
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Card className="bg-muted/40">
+                <CardContent className="pt-4">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <BadgeEuro className="h-3.5 w-3.5" />
+                    Pendiente de cobro
+                  </p>
+                  <p className="text-2xl font-semibold">{totalPendingEur.toFixed(2)} €</p>
+                  <p className="text-xs text-muted-foreground">
+                    {pending_payouts.length} liquidación{pending_payouts.length === 1 ? '' : 'es'}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card className="bg-muted/40">
+                <CardContent className="pt-4">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1.5">
+                    <Users className="h-3.5 w-3.5" />
+                    Clientes en proceso
+                  </p>
+                  <p className="text-2xl font-semibold">{clientsInProcess}</p>
+                  <p className="text-xs text-muted-foreground">de {stats.leads_total} captados</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-muted-foreground">¿Qué quieres hacer?</p>
+
+              {pendingInvoiceCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('payouts')}
+                  className="w-full flex items-center justify-between rounded-lg border border-amber-300 bg-amber-50 p-3 text-left hover:bg-amber-100 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <Upload className="h-5 w-5 text-amber-600" />
+                    <div>
+                      <p className="font-medium">Sube tu factura de comisión</p>
+                      <p className="text-xs text-muted-foreground">
+                        Tienes {pendingInvoiceCount} liquidación{pendingInvoiceCount === 1 ? '' : 'es'} lista{pendingInvoiceCount === 1 ? '' : 's'} para facturar y cobrar.
+                      </p>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('client')}
+                className="w-full flex items-center justify-between rounded-lg border bg-background p-3 text-left hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <UserPlus className="h-5 w-5 text-primary" />
+                  <div>
+                    <p className="font-medium">Registrar un cliente</p>
+                    <p className="text-xs text-muted-foreground">Para clientes que no usan tu enlace.</p>
+                  </div>
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('clientes')}
+                className="w-full flex items-center justify-between rounded-lg border bg-background p-3 text-left hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <Users className="h-5 w-5 text-primary" />
+                  <div>
+                    <p className="font-medium">Ver mis clientes</p>
+                    <p className="text-xs text-muted-foreground">Estado de tus referidos y su ahorro estimado.</p>
+                  </div>
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('links')}
+                className="w-full flex items-center justify-between rounded-lg border bg-background p-3 text-left hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <Link2 className="h-5 w-5 text-primary" />
+                  <div>
+                    <p className="font-medium">Mis enlaces y QR</p>
+                    <p className="text-xs text-muted-foreground">Enlace de captación y otras opciones.</p>
+                  </div>
+                </div>
+                <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+              </button>
+            </div>
+          </TabsContent>
 
           <TabsContent value="links" className="space-y-3 mt-4">
             <Card className="bg-muted/40">
