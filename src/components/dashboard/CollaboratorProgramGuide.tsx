@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Megaphone, Rocket, Users, Wallet, ArrowRight, Inbox, HelpCircle, Link2 } from 'lucide-react';
 import { RECRUITMENT_CAMPAIGNS } from '@/components/colaboradores/colaboradores-config';
+import { PENDING_RECRUITMENT_STATUSES } from '@/lib/collaborators/pending-leads';
 
 export type CollaboratorTab = 'inicio' | 'colaboradores' | 'reclutamiento' | 'ajustes';
 
@@ -147,7 +148,8 @@ export function CollaboratorProgramGuide({ collaboratorCount, onNavigate }: Prop
       .select('id', { count: 'exact', head: true })
       .eq('source', 'web_form')
       .in('campaign', [...RECRUITMENT_CAMPAIGNS])
-      .eq('status', 'new');
+      .in('status', [...PENDING_RECRUITMENT_STATUSES])
+      .is('collaborator_id', null);
     setPendingRecruitment(count ?? 0);
   }, []);
 

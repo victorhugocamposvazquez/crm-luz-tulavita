@@ -65,7 +65,7 @@ export default function CollaboratorsManagement() {
   const [convertOpen, setConvertOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<CollaboratorTab>('inicio');
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const { recruitment: pendingRecruitment, captured: pendingCaptured } = usePendingCollaboratorLeads();
+  const { recruitment: pendingRecruitment } = usePendingCollaboratorLeads();
 
   const baseUrl = useMemo(() => {
     if (typeof window === 'undefined') return '';
@@ -257,7 +257,6 @@ export default function CollaboratorsManagement() {
           <TabsTrigger value="colaboradores" className="gap-2">
             <Users className="h-4 w-4" />
             Colaboradores
-            <TabBadge count={pendingCaptured} />
           </TabsTrigger>
           <TabsTrigger value="reclutamiento" className="gap-2">
             <Megaphone className="h-4 w-4" />

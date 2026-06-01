@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { RECRUITMENT_CAMPAIGNS } from '@/components/colaboradores/colaboradores-config';
+import {
+  PENDING_CAPTURED_STATUS,
+  PENDING_RECRUITMENT_STATUSES,
+} from '@/lib/collaborators/pending-leads';
 
 export type PendingCollaboratorLeadCounts = {
-  /** Candidatos a colaborador nuevos (funnel de reclutamiento). */
+  /** Candidatos a colaborador pendientes (funnel reclutamiento, sin convertir). */
   recruitment: number;
-  /** Clientes captados nuevos por un colaborador (funnel de captación). */
+  /** Clientes captados nuevos por un colaborador (funnel captación). */
   captured: number;
   /** Suma de ambos: lo que se muestra en el menú lateral. */
   total: number;
@@ -14,8 +18,10 @@ export type PendingCollaboratorLeadCounts = {
 const EMPTY: PendingCollaboratorLeadCounts = { recruitment: 0, captured: 0, total: 0 };
 
 /**
- * Cuenta leads "para revisar" (status = 'new') de los dos funnels de colaboradores.
- * El badge se vacía solo a medida que el responsable los atiende (cambian de estado).
+ * Cuenta leads "para revisar" en los dos funnels de colaboradores.
+ *
+ * - Reclutamiento: prospectos de /hazte-colaborador aún no convertidos a colaborador.
+ * - Captación: clientes referidos (collaborator_referral) en estado nuevo.
  *
  * @param enabled normalmente solo para admins; evita queries innecesarias.
  */
@@ -39,12 +45,15 @@ export function usePendingCollaboratorLeads(enabled = true): PendingCollaborator
           .select('id', { count: 'exact', head: true })
           .eq('source', 'web_form')
           .in('campaign', [...RECRUITMENT_CAMPAIGNS])
-          .eq('status', 'new'),
+          .in('status', [...PENDING_RECRUITMENT_STATUSES])
+          // Sin collaborator_id: no es un cliente captado, es candidato a colaborador.
+          .is('collaborator_id', null),
         supabase
           .from('leads')
           .select('id', { count: 'exact', head: true })
           .eq('source', 'collaborator_referral')
-          .eq('status', 'new'),
+          .eq('status', PENDING_CAPTURED_STATUS)
+          .not('collaborator_id', 'is', null),
       ]);
 
       const recruitment = recruitmentRes.count ?? 0;
@@ -61,7 +70,6 @@ export function usePendingCollaboratorLeads(enabled = true): PendingCollaborator
     void refetch();
   }, [refetch]);
 
-  // Mantener el contador fresco: realtime sobre leads + refresco al volver a la pestaña.
   useEffect(() => {
     if (!enabled) return;
     const channel = supabase
