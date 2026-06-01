@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -40,24 +40,39 @@ type ConvertLeadDialogProps = {
 export function ConvertLeadDialog({ lead, open, onOpenChange, onCreated }: ConvertLeadDialogProps) {
   const [name, setName] = useState('');
   const [code, setCode] = useState('');
+  const [codeEdited, setCodeEdited] = useState(false);
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [commission, setCommission] = useState('30');
   const [saving, setSaving] = useState(false);
   const [createdCollab, setCreatedCollab] = useState<{ id: string; code: string; name: string } | null>(null);
 
-  const resetFromLead = () => {
-    if (!lead) return;
+  // Prefill con los datos que ya conocemos del lead al abrir el diálogo. Se hace
+  // en un efecto (y no solo en onOpenChange) porque el padre abre el diálogo
+  // cambiando la prop `open` directamente, y Radix no dispara onOpenChange en ese caso.
+  useEffect(() => {
+    if (!open || !lead) return;
     setName(lead.name ?? '');
     setCode(slugifyCode(lead.name ?? ''));
+    setCodeEdited(false);
     setEmail(lead.email ?? '');
     setPhone(lead.phone ?? '');
     setCommission('30');
     setCreatedCollab(null);
+  }, [open, lead?.id]);
+
+  const handleNameChange = (value: string) => {
+    setName(value);
+    // El código URL sigue al nombre automáticamente mientras no se edite a mano.
+    if (!codeEdited) setCode(slugifyCode(value));
+  };
+
+  const handleCodeChange = (value: string) => {
+    setCodeEdited(true);
+    setCode(slugifyCode(value));
   };
 
   const handleOpenChange = (next: boolean) => {
-    if (next && lead) resetFromLead();
     if (!next) setCreatedCollab(null);
     onOpenChange(next);
   };
@@ -147,11 +162,14 @@ export function ConvertLeadDialog({ lead, open, onOpenChange, onCreated }: Conve
             <div className="grid gap-3 py-2">
               <div className="space-y-1">
                 <Label>Nombre</Label>
-                <Input value={name} onChange={(e) => setName(e.target.value)} />
+                <Input value={name} onChange={(e) => handleNameChange(e.target.value)} />
               </div>
               <div className="space-y-1">
                 <Label>Código URL</Label>
-                <Input value={code} onChange={(e) => setCode(slugifyCode(e.target.value))} />
+                <Input value={code} onChange={(e) => handleCodeChange(e.target.value)} />
+                <p className="text-xs text-muted-foreground">
+                  Se genera automáticamente desde el nombre. Se usa en sus enlaces de captación.
+                </p>
               </div>
               <div className="space-y-1">
                 <Label>Email</Label>
