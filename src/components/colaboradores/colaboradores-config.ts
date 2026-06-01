@@ -15,17 +15,16 @@ export function waLink(message: string): string {
   return `https://wa.me/${WA_NUMBER}?text=${encodeURIComponent(message)}`;
 }
 
-/** Única landing activa de reclutamiento de colaboradores. */
+/** Única landing/campaña de reclutamiento de colaboradores. */
 export const COLABORADORES_RECRUITMENT_CAMPAIGN = 'hazte_colaborador';
 export const COLABORADORES_RECRUITMENT_ROUTE = '/hazte-colaborador';
 
-/** Campañas legacy (consultas históricas tras migración de datos). */
-export const RECRUITMENT_CAMPAIGNS_LEGACY = ['colaboradores_compacta', 'colaboradores_hibrida'] as const;
-
-export const RECRUITMENT_CAMPAIGNS = [
-  COLABORADORES_RECRUITMENT_CAMPAIGN,
-  ...RECRUITMENT_CAMPAIGNS_LEGACY,
-] as const;
+/**
+ * Las campañas legacy (colaboradores_compacta/hibrida) se migraron a
+ * 'hazte_colaborador' (ver 20260520130000_rename_hibrida_campaign.sql), por lo
+ * que solo existe una campaña de reclutamiento.
+ */
+export const RECRUITMENT_CAMPAIGNS = [COLABORADORES_RECRUITMENT_CAMPAIGN] as const;
 
 export function isRecruitmentCampaign(campaign: string | null | undefined): boolean {
   if (typeof campaign !== 'string') return false;

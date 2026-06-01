@@ -6,7 +6,7 @@ Landing pública única de reclutamiento de colaboradores.
 
 | Landing | URL | Componente |
 |---------|-----|------------|
-| Hazte colaborador | `/hazte-colaborador` | `src/pages/ColaboradoresHibrida.tsx` |
+| Hazte colaborador | `/hazte-colaborador` | `src/pages/HazteColaborador.tsx` |
 
 Redirecciones legacy: `/colaboradores` y `/colaboradores/hibrida` → `/hazte-colaborador`.
 

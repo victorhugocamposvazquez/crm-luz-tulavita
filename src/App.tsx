@@ -12,7 +12,7 @@ import LeadLanding from "./pages/LeadLanding";
 import AhorroLuz from "./pages/AhorroLuz";
 import NotFound from "./pages/NotFound";
 
-const ColaboradoresHibrida = lazy(() => import("./pages/ColaboradoresHibrida"));
+const HazteColaborador = lazy(() => import("./pages/HazteColaborador"));
 const ColaboradorPortalAcceso = lazy(() => import("./pages/ColaboradorPortalAcceso"));
 const ColaboradorPortalPanel = lazy(() => import("./pages/ColaboradorPortal"));
 
@@ -35,7 +35,7 @@ const App = () => (
               path="/hazte-colaborador"
               element={
                 <Suspense fallback={null}>
-                  <ColaboradoresHibrida />
+                  <HazteColaborador />
                 </Suspense>
               }
             />

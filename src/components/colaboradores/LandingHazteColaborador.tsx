@@ -13,7 +13,7 @@ import {
 
 const TvBot = lazy(() => import('./TvBot').then((m) => ({ default: m.TvBot })));
 
-export function LandingHibrida() {
+export function LandingHazteColaborador() {
   const [open, setOpen] = useState(0);
   const faqs = [
     {
@@ -35,7 +35,7 @@ export function LandingHibrida() {
   ];
 
   return (
-    <div className="tv-root" data-screen-label="02 Híbrida" style={{ position: 'relative' }}>
+    <div className="tv-root" data-screen-label="Hazte colaborador" style={{ position: 'relative' }}>
       <TvNav cta="Colaborar" />
 
       {/* ───── ABOVE THE FOLD (de V1) ───── */}

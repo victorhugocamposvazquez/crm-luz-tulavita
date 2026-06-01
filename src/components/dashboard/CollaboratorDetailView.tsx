@@ -78,7 +78,7 @@ function formFromCollaborator(c: CollaboratorRow): CollaboratorFormState {
 }
 
 export function CollaboratorDetailView({ collaborator, onBack, onUpdated }: CollaboratorDetailViewProps) {
-  const [stats, setStats] = useState({ total: 0, contacted: 0, qualified: 0, converted: 0, lost: 0 });
+  const [stats, setStats] = useState({ total: 0, contacted: 0, qualified: 0, converted: 0, lost: 0, commissionable: 0 });
   const [statsLoading, setStatsLoading] = useState(false);
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
@@ -102,7 +102,7 @@ export function CollaboratorDetailView({ collaborator, onBack, onUpdated }: Coll
     try {
       let query = supabase
         .from('leads')
-        .select('status, created_at')
+        .select('status, created_at, commission_eligible_at')
         .eq('source', 'collaborator_referral')
         .eq('collaborator_id', collaborator.id);
 
@@ -112,13 +112,14 @@ export function CollaboratorDetailView({ collaborator, onBack, onUpdated }: Coll
       const { data, error } = await query;
       if (error) throw error;
 
-      const next = { total: 0, contacted: 0, qualified: 0, converted: 0, lost: 0 };
+      const next = { total: 0, contacted: 0, qualified: 0, converted: 0, lost: 0, commissionable: 0 };
       for (const lead of data ?? []) {
         next.total += 1;
         if (lead.status === 'contacted') next.contacted += 1;
         if (lead.status === 'qualified') next.qualified += 1;
         if (lead.status === 'converted') next.converted += 1;
         if (lead.status === 'lost') next.lost += 1;
+        if (lead.commission_eligible_at) next.commissionable += 1;
       }
       setStats(next);
     } catch (err) {
@@ -221,35 +222,38 @@ export function CollaboratorDetailView({ collaborator, onBack, onUpdated }: Coll
   const createPendingPayout = async () => {
     setCreatingPayout(true);
     try {
+      // Fuente de verdad de comisión: commission_eligible_at (venta cerrada),
+      // no el status del pipeline. El rango de fechas acota por la fecha en que
+      // se marcó la venta como comisionable.
       let leadsQuery = supabase
         .from('leads')
-        .select('id, created_at')
+        .select('id, commission_eligible_at')
         .eq('collaborator_id', collaborator.id)
-        .eq('status', 'converted');
+        .not('commission_eligible_at', 'is', null);
 
-      if (dateFrom) leadsQuery = leadsQuery.gte('created_at', `${dateFrom}T00:00:00.000Z`);
-      if (dateTo) leadsQuery = leadsQuery.lte('created_at', `${dateTo}T23:59:59.999Z`);
+      if (dateFrom) leadsQuery = leadsQuery.gte('commission_eligible_at', `${dateFrom}T00:00:00.000Z`);
+      if (dateTo) leadsQuery = leadsQuery.lte('commission_eligible_at', `${dateTo}T23:59:59.999Z`);
 
-      const { data: convertedLeads, error: convertedError } = await leadsQuery;
-      if (convertedError) throw convertedError;
+      const { data: eligibleLeads, error: eligibleError } = await leadsQuery;
+      if (eligibleError) throw eligibleError;
 
-      const convertedIds = (convertedLeads ?? []).map((lead) => lead.id);
-      if (convertedIds.length === 0) {
-        toast({ title: 'Sin convertidos pendientes para este rango' });
+      const eligibleIds = (eligibleLeads ?? []).map((lead) => lead.id);
+      if (eligibleIds.length === 0) {
+        toast({ title: 'Sin ventas cerradas pendientes para este rango' });
         return;
       }
 
       const { data: alreadyPaidRows, error: paidError } = await supabase
         .from('collaborator_payout_leads')
         .select('lead_id')
-        .in('lead_id', convertedIds);
+        .in('lead_id', eligibleIds);
       if (paidError) throw paidError;
 
       const alreadyPaid = new Set((alreadyPaidRows ?? []).map((row) => row.lead_id));
-      const pendingLeadIds = convertedIds.filter((id) => !alreadyPaid.has(id));
+      const pendingLeadIds = eligibleIds.filter((id) => !alreadyPaid.has(id));
 
       if (pendingLeadIds.length === 0) {
-        toast({ title: 'Todo liquidado', description: 'No hay convertidos pendientes de pago.' });
+        toast({ title: 'Todo liquidado', description: 'No hay ventas cerradas pendientes de pago.' });
         return;
       }
 
@@ -288,7 +292,7 @@ export function CollaboratorDetailView({ collaborator, onBack, onUpdated }: Coll
 
       toast({
         title: 'Liquidación generada',
-        description: `${pendingLeadIds.length} convertidos · ${totalAmount.toFixed(2)} €. El colaborador puede subir su factura desde el portal.`,
+        description: `${pendingLeadIds.length} ventas cerradas · ${totalAmount.toFixed(2)} €. El colaborador puede subir su factura desde el portal.`,
       });
       setPaymentsRefreshKey((k) => k + 1);
     } catch (err) {
@@ -299,8 +303,8 @@ export function CollaboratorDetailView({ collaborator, onBack, onUpdated }: Coll
     }
   };
 
-  const conversion = stats.total > 0 ? ((stats.converted / stats.total) * 100).toFixed(1) : '0.0';
-  const estimatedCommission = stats.converted * collaborator.commission_per_converted_eur;
+  const conversion = stats.total > 0 ? ((stats.commissionable / stats.total) * 100).toFixed(1) : '0.0';
+  const estimatedCommission = stats.commissionable * collaborator.commission_per_converted_eur;
 
   return (
     <div className="space-y-6">
@@ -479,7 +483,7 @@ export function CollaboratorDetailView({ collaborator, onBack, onUpdated }: Coll
 
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
                 <div className="rounded-lg border p-3">
-                  <p className="text-xs text-muted-foreground">Leads</p>
+                  <p className="text-xs text-muted-foreground">Clientes captados</p>
                   <p className="text-xl font-semibold">{stats.total}</p>
                 </div>
                 <div className="rounded-lg border p-3">
@@ -491,13 +495,14 @@ export function CollaboratorDetailView({ collaborator, onBack, onUpdated }: Coll
                   <p className="text-xl font-semibold">{stats.qualified}</p>
                 </div>
                 <div className="rounded-lg border p-3">
-                  <p className="text-xs text-muted-foreground">Convertidos</p>
-                  <p className="text-xl font-semibold">{stats.converted}</p>
+                  <p className="text-xs text-muted-foreground">Ventas cerradas</p>
+                  <p className="text-xl font-semibold">{stats.commissionable}</p>
+                  <p className="text-[11px] text-muted-foreground">Comisionables</p>
                 </div>
                 <div className="rounded-lg border p-3">
                   <p className="text-xs text-muted-foreground">Comisión estimada</p>
                   <p className="text-xl font-semibold">{estimatedCommission.toFixed(2)} €</p>
-                  <p className="text-[11px] text-muted-foreground">Conv. {conversion}%</p>
+                  <p className="text-[11px] text-muted-foreground">Tasa cierre {conversion}%</p>
                 </div>
               </div>
             </CardContent>

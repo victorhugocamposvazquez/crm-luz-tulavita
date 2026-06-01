@@ -13,7 +13,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, MessageSquarePlus, User, Mail, Phone, FileText, History, ExternalLink, MessageCircle, Expand, Tag, Pencil, Trash2, Handshake, UserPlus, Zap } from 'lucide-react';
+import { Loader2, MessageSquarePlus, User, Mail, Phone, FileText, History, ExternalLink, MessageCircle, Expand, Tag, Pencil, Trash2, Handshake, UserPlus, Zap, BadgeEuro } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -236,6 +236,8 @@ export default function LeadDetailSheet({
   const [convertOpen, setConvertOpen] = useState(false);
   const [energyComparison, setEnergyComparison] = useState<EnergyComparisonSummary | null>(null);
   const [comparisonLoading, setComparisonLoading] = useState(false);
+  const [commissionEligibleAt, setCommissionEligibleAt] = useState<string | null>(null);
+  const [commissionLoading, setCommissionLoading] = useState(false);
 
   const {
     timeline,
@@ -368,6 +370,9 @@ export default function LeadDetailSheet({
     setEditName(lead.name ?? '');
     setEditPhone(lead.phone ?? '');
     setEditEmail(lead.email ?? '');
+    setCommissionEligibleAt(
+      (lead as LeadRow & { commission_eligible_at?: string | null }).commission_eligible_at ?? null,
+    );
   }, [open, lead?.id]);
 
   useEffect(() => {
@@ -449,6 +454,63 @@ export default function LeadDetailSheet({
       cancelled = true;
     };
   }, [open, lead?.id]);
+
+  useEffect(() => {
+    if (!open || !lead?.id || lead.source !== 'collaborator_referral') return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase
+        .from('leads')
+        .select('commission_eligible_at')
+        .eq('id', lead.id)
+        .maybeSingle();
+      if (!cancelled && data) {
+        setCommissionEligibleAt(
+          (data as { commission_eligible_at?: string | null }).commission_eligible_at ?? null,
+        );
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, lead?.id, lead?.source]);
+
+  const toggleCommissionEligible = async () => {
+    if (!lead?.id) return;
+    const nextValue = commissionEligibleAt ? null : new Date().toISOString();
+    setCommissionLoading(true);
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .update({ commission_eligible_at: nextValue, updated_at: new Date().toISOString() })
+        .eq('id', lead.id);
+      if (error) throw error;
+      await supabase.from('lead_events').insert({
+        lead_id: lead.id,
+        type: 'lead_updated',
+        content: nextValue
+          ? { commissionEligible: true }
+          : { commissionEligible: false, removed: true },
+      });
+      setCommissionEligibleAt(nextValue);
+      onLeadUpdated?.();
+      toast({
+        title: nextValue ? 'Venta cerrada marcada' : 'Marca de comisión retirada',
+        description: nextValue
+          ? 'Este cliente ya cuenta para liquidar comisión.'
+          : 'Este cliente deja de contar para comisión.',
+      });
+    } catch (e) {
+      console.error(e);
+      toast({
+        title: 'Error',
+        description: 'No se pudo actualizar el estado de comisión',
+        variant: 'destructive',
+      });
+    } finally {
+      setCommissionLoading(false);
+    }
+  };
 
   const handleSaveContact = async () => {
     if (!lead?.id) return;
@@ -778,6 +840,51 @@ export default function LeadDetailSheet({
                 </SelectContent>
               </Select>
             </section>
+
+            {/* Comisión (solo clientes captados por colaborador) */}
+            {lead.source === 'collaborator_referral' && (
+              <section>
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-muted-foreground mb-2">
+                  <BadgeEuro className="h-4 w-4" />
+                  Comisión del colaborador
+                </h3>
+                <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {commissionEligibleAt ? (
+                      <Badge className="gap-1.5 bg-emerald-100 text-emerald-800 hover:bg-emerald-100 border border-emerald-200">
+                        <BadgeEuro className="h-3.5 w-3.5" />
+                        Comisionable
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline">Aún no comisionable</Badge>
+                    )}
+                    {commissionEligibleAt && (
+                      <span className="text-xs text-muted-foreground">
+                        Venta cerrada el {format(new Date(commissionEligibleAt), "d MMM yyyy", { locale: es })}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Marca «venta cerrada» cuando este cliente se convierta en contrato: así contará para la
+                    liquidación de comisión del colaborador (independiente del estado del pipeline).
+                  </p>
+                  <Button
+                    variant={commissionEligibleAt ? 'outline' : 'default'}
+                    size="sm"
+                    className="gap-2"
+                    disabled={commissionLoading}
+                    onClick={toggleCommissionEligible}
+                  >
+                    {commissionLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <BadgeEuro className="h-4 w-4" />
+                    )}
+                    {commissionEligibleAt ? 'Quitar venta cerrada' : 'Marcar venta cerrada'}
+                  </Button>
+                </div>
+              </section>
+            )}
 
             {/* Etiquetas */}
             <section>

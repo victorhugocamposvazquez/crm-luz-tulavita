@@ -51,7 +51,7 @@ type PortalData = {
     email: string | null;
     phone: string | null;
   };
-  stats: { leads_total: number; leads_converted: number };
+  stats: { leads_total: number; leads_converted: number; leads_commissionable: number };
   pending_payouts: Array<{
     id: string;
     amount_total_eur: number;
@@ -73,6 +73,7 @@ type PortalData = {
     email: string | null;
     status: string;
     created_at: string;
+    commission_eligible?: boolean;
     has_invoice: boolean;
     comparison_status: string | null;
     estimated_savings_percentage: number | null;
@@ -133,6 +134,7 @@ export default function ColaboradorPortalPanel() {
   const [manualTotal, setManualTotal] = useState('');
   const [submittingClient, setSubmittingClient] = useState(false);
 
+  const [showAdvancedLinks, setShowAdvancedLinks] = useState(false);
   const [invoicePayoutId, setInvoicePayoutId] = useState('');
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [invoiceFile, setInvoiceFile] = useState<File | null>(null);
@@ -429,67 +431,63 @@ export default function ColaboradorPortalPanel() {
           </Card>
           <Card>
             <CardContent className="pt-4">
-              <p className="text-xs text-muted-foreground">Convertidos</p>
-              <p className="text-2xl font-semibold">{stats.leads_converted}</p>
+              <p className="text-xs text-muted-foreground">Ventas cerradas</p>
+              <p className="text-2xl font-semibold">{stats.leads_commissionable ?? 0}</p>
             </CardContent>
           </Card>
           <Card>
             <CardContent className="pt-4">
-              <p className="text-xs text-muted-foreground">Comisión / convertido</p>
+              <p className="text-xs text-muted-foreground">Comisión / venta</p>
               <p className="text-2xl font-semibold">{collaborator.commission_per_converted_eur.toFixed(2)} €</p>
             </CardContent>
           </Card>
         </div>
 
         <Tabs defaultValue="links">
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5 h-auto">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto">
             <TabsTrigger value="links">Enlaces</TabsTrigger>
             <TabsTrigger value="clientes">Mis clientes</TabsTrigger>
-            <TabsTrigger value="client">Nuevo cliente</TabsTrigger>
-            <TabsTrigger value="payouts">Liquidaciones</TabsTrigger>
-            <TabsTrigger value="qr">QR</TabsTrigger>
+            <TabsTrigger value="client">Registrar cliente</TabsTrigger>
+            <TabsTrigger value="payouts">Mis pagos</TabsTrigger>
           </TabsList>
 
           <TabsContent value="links" className="space-y-3 mt-4">
             <Card className="bg-muted/40">
               <CardContent className="pt-4 text-sm text-muted-foreground space-y-1">
-                <p className="font-medium text-foreground">Cómo usar tus enlaces</p>
+                <p className="font-medium text-foreground">Cómo usar tu enlace</p>
                 <p>
                   Comparte tu enlace por WhatsApp o redes. Cuando un cliente lo abra y suba su factura,
                   el lead se te atribuye automáticamente y lo verás en «Mis clientes».
                 </p>
-                <p className="text-xs">
-                  <strong>Subir factura</strong>: el cliente solo adjunta su factura.{' '}
-                  <strong>Captación completa</strong>: el cliente ve el ahorro estimado al instante.
-                </p>
               </CardContent>
             </Card>
-            {ALL_ENTRY_MODES.map((mode) => {
-              const url = getLinkForMode(mode);
+
+            {/* Enlace principal: captación completa */}
+            {(() => {
+              const url = getLinkForMode('auto');
               return (
-                <Card key={mode}>
+                <Card>
                   <CardContent className="pt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="font-medium">{ENTRY_MODE_LABELS[mode]}</p>
-                      <p className="text-xs text-muted-foreground break-all">{url}</p>
+                      <p className="font-medium">Enlace de captación</p>
+                      <p className="text-xs text-muted-foreground">
+                        Recomendado: el cliente sube su factura y ve su ahorro al instante.
+                      </p>
+                      <p className="text-xs text-muted-foreground break-all mt-1">{url}</p>
                     </div>
                     <div className="flex shrink-0 flex-wrap gap-2">
                       <Button variant="outline" size="sm" onClick={() => void copyLink(url)}>
                         <Copy className="h-3.5 w-3.5 mr-1" />
                         Copiar
                       </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => void shareLink(url, ENTRY_MODE_LABELS[mode])}
-                      >
+                      <Button variant="outline" size="sm" onClick={() => void shareLink(url, 'Calcula tu ahorro de luz')}>
                         <Share2 className="h-3.5 w-3.5 mr-1" />
                         Compartir
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => void downloadQr(url, `qr-${collaborator.code}-${mode}`)}
+                        onClick={() => void downloadQr(url, `qr-${collaborator.code}-auto`)}
                       >
                         <QrCode className="h-3.5 w-3.5 mr-1" />
                         QR
@@ -498,7 +496,53 @@ export default function ColaboradorPortalPanel() {
                   </CardContent>
                 </Card>
               );
-            })}
+            })()}
+
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+              onClick={() => setShowAdvancedLinks((v) => !v)}
+            >
+              {showAdvancedLinks ? '− Ocultar opciones avanzadas' : '+ Opciones avanzadas (otros modos)'}
+            </Button>
+
+            {showAdvancedLinks &&
+              ALL_ENTRY_MODES.filter((mode) => mode !== 'auto').map((mode) => {
+                const url = getLinkForMode(mode);
+                return (
+                  <Card key={mode}>
+                    <CardContent className="pt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-medium">{ENTRY_MODE_LABELS[mode]}</p>
+                        <p className="text-xs text-muted-foreground break-all">{url}</p>
+                      </div>
+                      <div className="flex shrink-0 flex-wrap gap-2">
+                        <Button variant="outline" size="sm" onClick={() => void copyLink(url)}>
+                          <Copy className="h-3.5 w-3.5 mr-1" />
+                          Copiar
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void shareLink(url, ENTRY_MODE_LABELS[mode])}
+                        >
+                          <Share2 className="h-3.5 w-3.5 mr-1" />
+                          Compartir
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => void downloadQr(url, `qr-${collaborator.code}-${mode}`)}
+                        >
+                          <QrCode className="h-3.5 w-3.5 mr-1" />
+                          QR
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
           </TabsContent>
 
           <TabsContent value="clientes" className="mt-4">
@@ -526,9 +570,16 @@ export default function ColaboradorPortalPanel() {
                               {[client.phone, client.email].filter(Boolean).join(' · ') || '—'}
                             </p>
                           </div>
-                          <Badge variant="secondary">
-                            {CLIENT_STATUS_LABELS[client.status] ?? client.status}
-                          </Badge>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {client.commission_eligible && (
+                              <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 border border-emerald-200">
+                                Venta cerrada
+                              </Badge>
+                            )}
+                            <Badge variant="secondary">
+                              {CLIENT_STATUS_LABELS[client.status] ?? client.status}
+                            </Badge>
+                          </div>
                         </div>
                         <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                           <span>
@@ -659,7 +710,7 @@ export default function ColaboradorPortalPanel() {
                           <div>
                             <p className="font-medium">{Number(p.amount_total_eur).toFixed(2)} €</p>
                             <p className="text-xs text-muted-foreground">
-                              {p.leads_count} convertidos ·{' '}
+                              {p.leads_count} ventas cerradas ·{' '}
                               {format(new Date(p.created_at), 'd MMM yyyy', { locale: es })}
                             </p>
                             {linkedInvoice && (
@@ -801,31 +852,6 @@ export default function ColaboradorPortalPanel() {
             )}
           </TabsContent>
 
-          <TabsContent value="qr" className="mt-4 space-y-3">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <QrCode className="h-5 w-5" />
-                  Descargar QR
-                </CardTitle>
-                <CardDescription>QR apuntando a tu enlace preferido (subir factura).</CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => void downloadQr(getLinkForMode('upload'), `qr-${collaborator.code}-upload`)}
-                >
-                  QR subir factura
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => void downloadQr(getLinkForMode('auto'), `qr-${collaborator.code}-auto`)}
-                >
-                  QR captación completa
-                </Button>
-              </CardContent>
-            </Card>
-          </TabsContent>
         </Tabs>
 
         <p className="text-center text-xs text-muted-foreground">

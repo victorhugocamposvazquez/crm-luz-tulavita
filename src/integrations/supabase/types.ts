@@ -814,6 +814,7 @@ export type Database = {
           owner_id: string | null
           collaborator_id: string | null
           referred_by_collaborator_id: string | null
+          commission_eligible_at: string | null
           tags: string[]
           custom_fields: Json
           created_at: string
@@ -832,6 +833,7 @@ export type Database = {
           owner_id?: string | null
           collaborator_id?: string | null
           referred_by_collaborator_id?: string | null
+          commission_eligible_at?: string | null
           tags?: string[]
           custom_fields?: Json
           created_at?: string
@@ -850,6 +852,7 @@ export type Database = {
           owner_id?: string | null
           collaborator_id?: string | null
           referred_by_collaborator_id?: string | null
+          commission_eligible_at?: string | null
           tags?: string[]
           custom_fields?: Json
           created_at?: string

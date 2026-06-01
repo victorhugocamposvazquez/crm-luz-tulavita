@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { toast } from '@/hooks/use-toast';
-import { Link2, QrCode, Copy, ExternalLink, KeyRound, ChevronDown, UserPlus } from 'lucide-react';
+import { Link2, QrCode, Copy, ExternalLink, KeyRound, ChevronDown, ChevronRight, UserPlus, Share2 } from 'lucide-react';
 import {
   ALL_ENTRY_MODES,
   ENTRY_MODE_LABELS,
@@ -34,6 +34,7 @@ type CollaboratorKitMenuProps = {
 
 export function CollaboratorKitMenu({ collaboratorId, code, name, compact }: CollaboratorKitMenuProps) {
   const [busy, setBusy] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const baseUrl = getAppBaseUrl();
 
   const copyText = async (value: string, label = 'Enlace copiado') => {
@@ -98,6 +99,33 @@ export function CollaboratorKitMenu({ collaboratorId, code, name, compact }: Col
       toast({
         title: 'Error',
         description: e instanceof Error ? e.message : 'No se pudo generar el enlace',
+        variant: 'destructive',
+      });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleShareSigned = async (mode: CollaboratorEntryMode) => {
+    setBusy(`share-${mode}`);
+    try {
+      const url = await createSignedLink(mode);
+      const shareData = {
+        title: 'Ahorra en tu factura de luz',
+        text: `Calcula tu ahorro de luz con ${name}`,
+        url,
+      };
+      if (typeof navigator !== 'undefined' && navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await copyText(url, 'Enlace copiado (compartir no disponible)');
+      }
+    } catch (e) {
+      // El usuario puede cancelar el diálogo de compartir; no lo tratamos como error.
+      if (e instanceof DOMException && e.name === 'AbortError') return;
+      toast({
+        title: 'Error',
+        description: e instanceof Error ? e.message : 'No se pudo compartir el enlace',
         variant: 'destructive',
       });
     } finally {
@@ -226,62 +254,97 @@ export function CollaboratorKitMenu({ collaboratorId, code, name, compact }: Col
       <DropdownMenuContent align="end" className="w-72">
         <DropdownMenuLabel>{name}</DropdownMenuLabel>
         <div className="px-2 pb-1 text-[11px] leading-snug text-muted-foreground">
-          Enlaces para que este colaborador capte clientes. Comparte uno (copiar) o descarga su QR.
+          Lo esencial para que capte clientes y acceda a su portal. Lo demás está en «Opciones avanzadas».
         </div>
         <DropdownMenuSeparator />
+
+        {/* 1) Enlace principal de captación (firmado, modo auto) */}
         <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-          Enlaces firmados (recomendado · token único, revocable)
+          Enlace de captación de clientes
         </DropdownMenuLabel>
-        {ALL_ENTRY_MODES.map((mode) => (
-          <DropdownMenuItem key={`signed-${mode}`} onClick={() => void handleCopySigned(mode)} disabled={!!busy}>
-            <Copy className="h-3.5 w-3.5 mr-2" />
-            {ENTRY_MODE_LABELS[mode]}
-          </DropdownMenuItem>
-        ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-          Enlace directo ?collaborator={code}
-        </DropdownMenuLabel>
-        {ALL_ENTRY_MODES.map((mode) => (
-          <DropdownMenuItem key={`direct-${mode}`} onClick={() => void handleCopyDirect(mode)}>
-            <ExternalLink className="h-3.5 w-3.5 mr-2" />
-            Directo · {ENTRY_MODE_LABELS[mode]}
-          </DropdownMenuItem>
-        ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">QR (enlace firmado)</DropdownMenuLabel>
-        <DropdownMenuItem onClick={() => void handleQr('upload', true)}>
+        <DropdownMenuItem onClick={() => void handleCopySigned('auto')} disabled={!!busy}>
+          <Copy className="h-3.5 w-3.5 mr-2" />
+          Copiar enlace
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => void handleShareSigned('auto')} disabled={!!busy}>
+          <Share2 className="h-3.5 w-3.5 mr-2" />
+          Compartir
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => void handleQr('auto', true)} disabled={!!busy}>
           <QrCode className="h-3.5 w-3.5 mr-2" />
-          QR subir factura
+          Descargar QR
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => void handleQr('auto', true)}>
-          <QrCode className="h-3.5 w-3.5 mr-2" />
-          QR captación completa
-        </DropdownMenuItem>
+
         <DropdownMenuSeparator />
+
+        {/* 2) Acceso al portal */}
         <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-          Reclutar colaboradores (su referido)
+          Acceso al portal del colaborador
         </DropdownMenuLabel>
-        <DropdownMenuItem onClick={() => void handleCopyRecruit()} disabled={!!busy}>
-          <UserPlus className="h-3.5 w-3.5 mr-2" />
-          Copiar enlace de reclutamiento
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => void handleQrRecruit()} disabled={!!busy}>
-          <QrCode className="h-3.5 w-3.5 mr-2" />
-          QR de reclutamiento
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-          Portal autoservicio (magic link)
-        </DropdownMenuLabel>
-        <DropdownMenuItem onClick={() => void handlePortalLink()}>
+        <DropdownMenuItem onClick={() => void handlePortalLink()} disabled={!!busy}>
           <KeyRound className="h-3.5 w-3.5 mr-2" />
           Copiar enlace de acceso
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => void handlePortalLink(24)}>
-          <KeyRound className="h-3.5 w-3.5 mr-2" />
-          Portal 24h (temporal)
+
+        <DropdownMenuSeparator />
+
+        {/* 3) Opciones avanzadas (colapsable) */}
+        <DropdownMenuItem
+          onSelect={(e) => {
+            e.preventDefault();
+            setShowAdvanced((v) => !v);
+          }}
+          className="text-xs text-muted-foreground"
+        >
+          {showAdvanced ? (
+            <ChevronDown className="h-3.5 w-3.5 mr-2" />
+          ) : (
+            <ChevronRight className="h-3.5 w-3.5 mr-2" />
+          )}
+          Opciones avanzadas
         </DropdownMenuItem>
+
+        {showAdvanced && (
+          <>
+            <DropdownMenuLabel className="text-[11px] font-normal text-muted-foreground">
+              Otros modos de captación (enlace firmado)
+            </DropdownMenuLabel>
+            {ALL_ENTRY_MODES.filter((mode) => mode !== 'auto').map((mode) => (
+              <DropdownMenuItem key={`signed-${mode}`} onClick={() => void handleCopySigned(mode)} disabled={!!busy}>
+                <Copy className="h-3.5 w-3.5 mr-2" />
+                {ENTRY_MODE_LABELS[mode]}
+              </DropdownMenuItem>
+            ))}
+
+            <DropdownMenuLabel className="text-[11px] font-normal text-muted-foreground">
+              Enlace directo (?collaborator={code})
+            </DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => void handleCopyDirect('auto')}>
+              <ExternalLink className="h-3.5 w-3.5 mr-2" />
+              Copiar enlace directo
+            </DropdownMenuItem>
+
+            <DropdownMenuLabel className="text-[11px] font-normal text-muted-foreground">
+              Reclutar colaboradores (su referido)
+            </DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => void handleCopyRecruit()} disabled={!!busy}>
+              <UserPlus className="h-3.5 w-3.5 mr-2" />
+              Copiar enlace de reclutamiento
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => void handleQrRecruit()} disabled={!!busy}>
+              <QrCode className="h-3.5 w-3.5 mr-2" />
+              QR de reclutamiento
+            </DropdownMenuItem>
+
+            <DropdownMenuLabel className="text-[11px] font-normal text-muted-foreground">
+              Portal temporal
+            </DropdownMenuLabel>
+            <DropdownMenuItem onClick={() => void handlePortalLink(24)} disabled={!!busy}>
+              <KeyRound className="h-3.5 w-3.5 mr-2" />
+              Acceso al portal 24h
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

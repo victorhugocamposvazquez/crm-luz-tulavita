@@ -69,6 +69,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       .eq('collaborator_id', collaborator.id)
       .eq('status', 'converted');
 
+    const { count: commissionableCount } = await supabase
+      .from('leads')
+      .select('*', { count: 'exact', head: true })
+      .eq('collaborator_id', collaborator.id)
+      .not('commission_eligible_at', 'is', null);
+
     const { data: pendingPayouts } = await supabase
       .from('collaborator_payouts')
       .select('id, amount_total_eur, leads_count, status, created_at')
@@ -93,7 +99,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     const { data: capturedClients } = await supabase
       .from('leads')
       .select(
-        'id, name, phone, email, status, created_at, custom_fields, energy_comparisons(id, status, estimated_savings_percentage, estimated_savings_amount, error_message, created_at)',
+        'id, name, phone, email, status, created_at, commission_eligible_at, custom_fields, energy_comparisons(id, status, estimated_savings_percentage, estimated_savings_amount, error_message, created_at)',
       )
       .eq('collaborator_id', collaborator.id)
       .eq('source', 'collaborator_referral')
@@ -114,6 +120,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       stats: {
         leads_total: leadsCount ?? 0,
         leads_converted: convertedCount ?? 0,
+        leads_commissionable: commissionableCount ?? 0,
       },
       pending_payouts: pendingPayouts ?? [],
       commission_invoices: commissionInvoices ?? [],
@@ -141,6 +148,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           email: row.email,
           status: row.status,
           created_at: row.created_at,
+          commission_eligible: row.commission_eligible_at != null,
           has_invoice: hasInvoice,
           comparison_status: latest?.status ?? null,
           estimated_savings_percentage: latest?.estimated_savings_percentage ?? null,

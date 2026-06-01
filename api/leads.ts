@@ -320,10 +320,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     // si no llega un owner explícito.
     let defaultOwnerId = body.default_owner_id as string | undefined;
     if (!input.owner_id && !defaultOwnerId) {
-      const RECRUITMENT_CAMPAIGNS = ['hazte_colaborador', 'colaboradores_compacta', 'colaboradores_hibrida'];
+      // Campaña única de reclutamiento (las legacy se migraron a hazte_colaborador).
       const isCollaboratorLead = !!input.collaborator_id || !!input.referred_by_collaborator_id;
-      const isRecruitmentLead =
-        typeof input.campaign === 'string' && RECRUITMENT_CAMPAIGNS.includes(input.campaign);
+      const isRecruitmentLead = input.campaign === 'hazte_colaborador';
       if (isCollaboratorLead || isRecruitmentLead) {
         const { data: settings } = await supabase
           .from('collaborator_settings')

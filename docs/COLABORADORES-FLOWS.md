@@ -2,9 +2,51 @@
 
 Documentación de los dos funnels principales y las APIs involucradas.
 
+## Terminología única
+
+Se usa el **mismo vocabulario** en panel, portal, landings y docs:
+
+| Término | Significado |
+|---------|-------------|
+| **Reclutamiento** | Captar colaboradores (`/hazte-colaborador`). |
+| **Captación** | Captar clientes (`/ahorra-factura-luz` con `collaborator_id`). |
+| **Cliente captado** | Lead con `collaborator_id` (`source = collaborator_referral`). |
+| **Venta cerrada (comisionable)** | Estado explícito `leads.commission_eligible_at`, **no** el `status` del pipeline. |
+| **Liquidación** | `collaborator_payouts`. |
+| **Factura de comisión** | `collaborator_invoices`. |
+| **Kit** | Enlace de captación + QR + acceso al portal. |
+| **Responsable** | `collaborator_settings.collaborator_manager_id`. |
+
+### Convertido ≠ comisionable
+
+Antes `leads.status = 'converted'` significaba dos cosas (en reclutamiento "ya es colaborador";
+en captación "venta cerrada"). Ahora se separan:
+
+- **Reclutamiento**: "Convertir a colaborador" sigue usando `ConvertLeadDialog` (sin cambios).
+- **Captación**: la comisión depende **solo** de `leads.commission_eligible_at` (marca de venta cerrada).
+  La generación de liquidaciones usa `commission_eligible_at IS NOT NULL`, nunca `status`.
+
+### Ciclo de vida de un cliente captado
+
+```mermaid
+flowchart LR
+  captado["Captado (lead, collaborator_id)"] --> contactado[Contactado]
+  contactado --> ventaCerrada["Venta cerrada (commission_eligible_at)"]
+  ventaCerrada --> liquidado["En liquidacion (payout)"]
+  liquidado --> pagado["Pagado (factura aprobada)"]
+  captado --> perdido[Perdido]
+```
+
+Se marca/quita "venta cerrada" desde la lista de **Clientes captados** o desde **LeadDetailSheet**.
+
+---
+
 ## Funnel 1 — Reclutamiento de colaboradores
 
 **Ruta:** `/hazte-colaborador` (redirecciones legacy: `/colaboradores`, `/colaboradores/hibrida`)
+
+> Las campañas legacy `colaboradores_compacta` y `colaboradores_hibrida` se migraron a
+> `hazte_colaborador` (única campaña activa de reclutamiento).
 
 **Objetivo:** Captar prospectos que quieren unirse al programa de colaboradores.
 
@@ -43,6 +85,7 @@ Documentación de los dos funnels principales y las APIs involucradas.
 | `source` | `collaborator_referral` |
 | `campaign` | `collaborator:{code}` |
 | `collaborator_id` | UUID del colaborador activo |
+| `commission_eligible_at` | `timestamptz` · marca de **venta cerrada** (fuente de verdad de comisión) |
 
 **Modos (`entry_mode`):**
 
@@ -148,6 +191,7 @@ Respuesta: `{ "success": true, "collaborator": { "id", "code", "name" }, "entry_
 | `collaborator_payouts` | Liquidaciones |
 | `collaborator_invoices` | Facturas de comisión del colaborador |
 | `leads.referred_by_collaborator_id` | Referidor en reclutamiento |
+| `leads.commission_eligible_at` | Venta cerrada / comisionable (fuente de verdad para liquidar) |
 
 ---
 
@@ -158,6 +202,8 @@ Respuesta: `{ "success": true, "collaborator": { "id", "code", "name" }, "entry_
 | Admin | `src/components/dashboard/CollaboratorsManagement.tsx` |
 | Kit / QR | `src/lib/collaborators/*`, `src/components/dashboard/CollaboratorKitMenu.tsx` |
 | Portal | `src/pages/ColaboradorPortal.tsx` |
-| Landings reclutamiento | `src/hooks/useColaboradoresLeadSubmit.ts` |
+| Clientes captados / comisión | `src/components/dashboard/CollaboratorCapturedClientsSection.tsx` |
+| Pagos guiados / liquidación | `src/components/dashboard/CollaboratorPaymentsSection.tsx`, `CollaboratorDetailView.tsx` |
+| Landings reclutamiento | `src/pages/HazteColaborador.tsx`, `src/hooks/useColaboradoresLeadSubmit.ts` |
 | Captación cliente | `src/hooks/useCollaboratorReferral.ts`, `src/pages/AhorroLuz.tsx` |
 | CRM leads | `src/components/dashboard/LeadsManagement.tsx`, `LeadDetailSheet.tsx` |
