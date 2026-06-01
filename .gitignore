@@ -16,6 +16,7 @@ scripts/config/ventas-tulavita.agentes.json
 csvs/import-report-*.txt
 csvs/import-clientes-xlsx-*.txt
 csvs/import-iberdrola-*.txt
+csvs/import-clientes-contratos-*.txt
 csvs/iberdrola-export-*.csv
 
 
@@ -36,3 +37,6 @@ csvs/iberdrola-export-*.csv
 .env.production.local
 OPTIMIZACION_N1_RESUMEN.md
 RECORDATORIOS_OPTIMIZACION_COMPLETA.md
+
+# Documentación de clientes (PII, no versionar)
+/clientes-contratos/

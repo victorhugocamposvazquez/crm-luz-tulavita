@@ -328,6 +328,7 @@ export type Database = {
           note: string | null
           prospect: boolean
           status: string
+          tags: string[]
           telefono1: string | null
           telefono2: string | null
           updated_at: string
@@ -352,6 +353,7 @@ export type Database = {
           note?: string | null
           prospect?: boolean
           status?: string
+          tags?: string[]
           telefono1?: string | null
           telefono2?: string | null
           updated_at?: string
@@ -376,6 +378,7 @@ export type Database = {
           note?: string | null
           prospect?: boolean
           status?: string
+          tags?: string[]
           telefono1?: string | null
           telefono2?: string | null
           updated_at?: string

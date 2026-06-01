@@ -11,7 +11,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
-import { ExternalLink, FileText, IdCard, Loader2, Receipt, Trash2, Upload, CheckCircle2 } from 'lucide-react';
+import { ExternalLink, FileText, FileSignature, IdCard, Loader2, Receipt, Trash2, Upload, CheckCircle2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import {
@@ -39,7 +39,7 @@ const ALLOWED_MIME = new Set([
 ]);
 
 type ClientDocRow = Database['public']['Tables']['client_documents']['Row'];
-type DocKind = 'dni' | 'invoice';
+type DocKind = 'dni' | 'invoice' | 'contract';
 
 function isDocumentImage(doc: ClientDocRow): boolean {
   if (doc.mime_type === 'application/pdf') return false;
@@ -199,6 +199,7 @@ export default function ClientDocumentsCard({ clientId }: ClientDocumentsCardPro
   const [uploadKind, setUploadKind] = useState<DocKind | null>(null);
   const dniInputRef = useRef<HTMLInputElement>(null);
   const invoiceInputRef = useRef<HTMLInputElement>(null);
+  const contractInputRef = useRef<HTMLInputElement>(null);
   const [deleteTarget, setDeleteTarget] = useState<ClientDocRow | null>(null);
   const [previewDoc, setPreviewDoc] = useState<ClientDocRow | null>(null);
   const [markingProcessedId, setMarkingProcessedId] = useState<string | null>(null);
@@ -401,6 +402,7 @@ export default function ClientDocumentsCard({ clientId }: ClientDocumentsCardPro
   };
 
   const dniDocs = docs.filter((d) => d.doc_type === 'dni');
+  const contractDocs = docs.filter((d) => d.doc_type === 'contract');
 
   return (
     <>
@@ -411,7 +413,7 @@ export default function ClientDocumentsCard({ clientId }: ClientDocumentsCardPro
             Documentación del cliente
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            DNI y facturas (PDF o imagen). Los archivos se guardan en almacenamiento seguro; aquí solo hay referencias ligeras.
+            DNI, facturas y contratos (PDF o imagen). Los archivos se guardan en almacenamiento seguro; aquí solo hay referencias ligeras.
           </p>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -510,6 +512,45 @@ export default function ClientDocumentsCard({ clientId }: ClientDocumentsCardPro
                 />
                 {renderList(pendingInvoiceDocs, { showMarkProcessed: true })}
               </div>
+            </div>
+
+            <div className="rounded-lg border bg-card p-4 space-y-3 md:col-span-2">
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="flex items-center gap-2 text-sm font-semibold">
+                  <FileSignature className="h-4 w-4" />
+                  Contratos
+                </h4>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5"
+                  disabled={loading || uploadKind !== null}
+                  onClick={() => contractInputRef.current?.click()}
+                >
+                  {uploadKind === 'contract' ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Upload className="h-3.5 w-3.5" />
+                  )}
+                  Subir
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Contratos firmados, escrituras, CIF y otra documentación contractual.
+              </p>
+              <input
+                ref={contractInputRef}
+                type="file"
+                accept=".pdf,image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = '';
+                  if (f) void handleFile(f, 'contract');
+                }}
+              />
+              {renderList(contractDocs)}
             </div>
           </div>
           )}

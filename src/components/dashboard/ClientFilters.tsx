@@ -15,14 +15,16 @@ interface ClientFiltersProps {
     email: string;
     cups: string;
     comercializadora: string;
+    tags: string;
     status: string;
     prospect: boolean;
   };
+  availableTags?: string[];
   onFilterChange: (key: string, value: string | boolean) => void;
   onClearFilters: () => void;
 }
 
-export default function ClientFilters({ filters, onFilterChange, onClearFilters }: ClientFiltersProps) {
+export default function ClientFilters({ filters, availableTags = [], onFilterChange, onClearFilters }: ClientFiltersProps) {
   const hasActiveFilters = Object.entries(filters).some(([key, value]) => {
     if (typeof value === 'boolean') return value;
     return value.trim() !== '';
@@ -111,6 +113,25 @@ export default function ClientFilters({ filters, onFilterChange, onClearFilters 
             <SelectItem value="inactive">Inactivo</SelectItem>
           </SelectContent>
         </Select>
+
+        {availableTags.length > 0 && (
+          <Select
+            value={filters.tags || 'all'}
+            onValueChange={(value) => onFilterChange('tags', value === 'all' ? '' : value)}
+          >
+            <SelectTrigger className="h-8 text-sm col-span-2">
+              <SelectValue placeholder="Etiqueta..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas las etiquetas</SelectItem>
+              {availableTags.map((tag) => (
+                <SelectItem key={tag} value={tag}>
+                  {tag}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         <div className="flex items-center space-x-2 col-span-2">
           <input

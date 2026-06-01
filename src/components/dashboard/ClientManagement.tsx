@@ -90,6 +90,7 @@ interface Client {
     email: string;
   } | null;
   comercializadora?: string | null;
+  tags?: string[] | null;
 }
 
 export default function ClientManagement() {
@@ -123,9 +124,12 @@ export default function ClientManagement() {
     email: '',
     cups: '',
     comercializadora: '',
+    tags: '',
     status: '',
     prospect: false
   });
+
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
 
   // Conversion dialog state
   const [convertDialogOpen, setConvertDialogOpen] = useState(false);
@@ -155,6 +159,7 @@ export default function ClientManagement() {
   const tableColCount = isAdmin ? 10 : 9;
 
   const [formComercializadora, setFormComercializadora] = useState<string | null>(null);
+  const [formTags, setFormTags] = useState<string>('');
 
   const [assignedCommercialId, setAssignedCommercialId] = useState<string>('__none__');
   const [commercialUsers, setCommercialUsers] = useState<Array<{ id: string; label: string }>>([]);
@@ -183,6 +188,24 @@ export default function ClientManagement() {
   }, [isAdmin]);
 
   useEffect(() => {
+    void (async () => {
+      const { data, error } = await supabase.from('clients').select('tags').limit(5000);
+      if (error) {
+        console.warn('No se pudieron cargar las etiquetas de clientes:', error);
+        return;
+      }
+      const set = new Set<string>();
+      for (const row of (data ?? []) as { tags: string[] | null }[]) {
+        for (const t of row.tags ?? []) {
+          const v = t.trim();
+          if (v) set.add(v);
+        }
+      }
+      setAvailableTags([...set].sort((a, b) => a.localeCompare(b, 'es')));
+    })();
+  }, []);
+
+  useEffect(() => {
     if (!dialogOpen || !isAdmin) return;
     if (editingClient?.assigned_commercial_id) {
       setAssignedCommercialId(editingClient.assigned_commercial_id);
@@ -194,7 +217,8 @@ export default function ClientManagement() {
   useEffect(() => {
     if (!dialogOpen) return;
     setFormComercializadora(editingClient?.comercializadora ?? null);
-  }, [dialogOpen, editingClient?.id, editingClient?.comercializadora]);
+    setFormTags((editingClient?.tags ?? []).join(', '));
+  }, [dialogOpen, editingClient?.id, editingClient?.comercializadora, editingClient?.tags]);
 
   const commercialSelectOptions = useMemo(() => {
     const byId = new Map(commercialUsers.map((u) => [u.id, u]));
@@ -336,6 +360,9 @@ export default function ClientManagement() {
         if (clientIdRestriction) {
           q = q.in('id', clientIdRestriction);
         }
+        if (filters.tags.trim()) {
+          q = q.contains('tags', [filters.tags.trim()]);
+        }
         if (filters.status.trim()) {
           q = q.eq('status', filters.status.trim());
         }
@@ -445,9 +472,18 @@ export default function ClientManagement() {
     console.log('Raw nombre before normalization:', rawClientData.nombre_apellidos);
     
     const clientData = normalizeClientData(rawClientData);
+    const parsedTags = Array.from(
+      new Set(
+        formTags
+          .split(',')
+          .map((t) => t.trim())
+          .filter((t) => t.length > 0),
+      ),
+    );
     const payload: ClientTableUpdate = {
       ...clientData,
       comercializadora: formComercializadora,
+      tags: parsedTags,
     };
     if (isAdmin) {
       const chosen =
@@ -724,6 +760,7 @@ export default function ClientManagement() {
       email: '',
       cups: '',
       comercializadora: '',
+      tags: '',
       status: '',
       prospect: false
     });
@@ -920,6 +957,7 @@ export default function ClientManagement() {
       {/* Filters */}
       <ClientFilters
         filters={filters}
+        availableTags={availableTags}
         onFilterChange={handleFilterChange}
         onClearFilters={handleClearFilters}
       />
@@ -1001,7 +1039,24 @@ export default function ClientManagement() {
 
                    return (
                     <TableRow key={client.id} className={getRowClasses()}>
-                       <TableCell className="font-medium">{client.nombre_apellidos}</TableCell>
+                       <TableCell className="font-medium">
+                         <div className="flex flex-col gap-1">
+                           <span>{client.nombre_apellidos}</span>
+                           {client.tags && client.tags.length > 0 && (
+                             <div className="flex flex-wrap gap-1">
+                               {client.tags.map((tag) => (
+                                 <Badge
+                                   key={tag}
+                                   variant="secondary"
+                                   className="px-2 py-0.5 text-[10px] font-medium leading-none"
+                                 >
+                                   {tag}
+                                 </Badge>
+                               ))}
+                             </div>
+                           )}
+                         </div>
+                       </TableCell>
                        <TableCell>{client.dni || '-'}</TableCell>
                        <TableCell className="whitespace-nowrap align-middle">
                          <Badge className={cn('px-3 py-1 text-xs font-semibold leading-none', tipoBadge.className)}>
@@ -1410,6 +1465,19 @@ export default function ClientManagement() {
                   />
                   <p className="text-xs text-muted-foreground">
                     Listado basado en el censo de comercializadoras de electricidad (CNMC). Busca por nombre.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="client-tags">Etiquetas</Label>
+                  <Input
+                    id="client-tags"
+                    value={formTags}
+                    onChange={(e) => setFormTags(e.target.value)}
+                    placeholder="KO, Liquidado, en trámite…"
+                    autoComplete="off"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Separadas por comas. P. ej. estados comerciales (KO, Liquidado, en trámite, Baja…).
                   </p>
                 </div>
                 <div className="space-y-2">
