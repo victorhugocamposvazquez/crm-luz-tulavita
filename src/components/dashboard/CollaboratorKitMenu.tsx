@@ -223,11 +223,14 @@ export function CollaboratorKitMenu({ collaboratorId, code, name, compact }: Col
           <ChevronDown className="h-3.5 w-3.5 ml-1 opacity-60" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
+      <DropdownMenuContent align="end" className="w-72">
         <DropdownMenuLabel>{name}</DropdownMenuLabel>
+        <div className="px-2 pb-1 text-[11px] leading-snug text-muted-foreground">
+          Enlaces para que este colaborador capte clientes. Comparte uno (copiar) o descarga su QR.
+        </div>
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-          Enlaces firmados (recomendado)
+          Enlaces firmados (recomendado · token único, revocable)
         </DropdownMenuLabel>
         {ALL_ENTRY_MODES.map((mode) => (
           <DropdownMenuItem key={`signed-${mode}`} onClick={() => void handleCopySigned(mode)} disabled={!!busy}>

@@ -3,12 +3,13 @@
  * (Captar → Activar → Operar → Liquidar) y da accesos directos a cada paso.
  * El KPI destacado es el de leads de reclutamiento pendientes de revisar.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Megaphone, Rocket, Users, Wallet, ArrowRight, Inbox } from 'lucide-react';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Megaphone, Rocket, Users, Wallet, ArrowRight, Inbox, HelpCircle, Link2 } from 'lucide-react';
 import { RECRUITMENT_CAMPAIGNS } from '@/components/colaboradores/colaboradores-config';
 
 export type CollaboratorTab = 'inicio' | 'colaboradores' | 'reclutamiento' | 'ajustes';
@@ -58,6 +59,77 @@ const STEPS: Step[] = [
     icon: Wallet,
     cta: 'Ver colaboradores',
     tab: 'colaboradores',
+  },
+];
+
+type Faq = { q: string; a: ReactNode };
+
+const FAQS: Faq[] = [
+  {
+    q: 'Hay tres tipos de enlace. ¿Cuál es cuál?',
+    a: (
+      <ul className="ml-4 list-disc space-y-1.5">
+        <li>
+          <strong>Landing «Hazte colaborador»</strong> (pestaña Reclutamiento): para que entren{' '}
+          <em>colaboradores nuevos</em>. Es pública; quien la rellena aparece como lead de reclutamiento.
+        </li>
+        <li>
+          <strong>Kit de captación del colaborador</strong> (ficha del colaborador → Accesos y kit): para que el
+          colaborador capte <em>clientes</em>. Cada cliente que entra queda atribuido a ese colaborador.
+        </li>
+        <li>
+          <strong>Enlace de reclutamiento del colaborador</strong> (dentro del kit): es su enlace de{' '}
+          <em>referido</em> para que él traiga <em>otros colaboradores</em>.
+        </li>
+      </ul>
+    ),
+  },
+  {
+    q: '¿Cómo se atribuye un cliente a un colaborador?',
+    a: (
+      <p>
+        Cuando el cliente entra por el enlace del kit (lleva el código o un token firmado del colaborador), el lead se
+        guarda con <code className="rounded bg-muted px-1">collaborator_id</code> de ese colaborador. Por eso es
+        importante que el colaborador comparta SU enlace y no la landing genérica.
+      </p>
+    ),
+  },
+  {
+    q: '¿Qué es el «responsable de colaboradores» y por qué configurarlo?',
+    a: (
+      <p>
+        Es la persona del equipo a la que se asignan automáticamente los leads de reclutamiento y los clientes captados
+        por colaboradores. Si no lo configuras (pestaña Ajustes), esos leads entran sin responsable y nadie los gestiona.
+      </p>
+    ),
+  },
+  {
+    q: 'Enlace firmado vs enlace directo, ¿qué diferencia hay?',
+    a: (
+      <p>
+        El <strong>firmado</strong> usa un token único (se puede revocar y medir). El <strong>directo</strong> lleva el
+        código del colaborador en la URL (más simple pero no revocable). Para campañas y QR, usa el firmado.
+      </p>
+    ),
+  },
+  {
+    q: '¿Cómo se paga al colaborador?',
+    a: (
+      <p>
+        Defines una <strong>comisión por cliente convertido</strong> en su ficha. Cuando tenga clientes convertidos,
+        desde la ficha (pestaña Pagos y facturas) generas una <strong>liquidación</strong> con los convertidos aún no
+        pagados. El colaborador puede subir su factura desde el portal para que la valides.
+      </p>
+    ),
+  },
+  {
+    q: '¿Qué es el portal del colaborador?',
+    a: (
+      <p>
+        Una zona de autoservicio (acceso por enlace mágico/token) donde el colaborador ve sus enlaces, sus clientes y
+        sube facturas. Generas su acceso desde la ficha → Accesos y kit.
+      </p>
+    ),
   },
 ];
 
@@ -158,6 +230,36 @@ export function CollaboratorProgramGuide({ collaboratorCount, onNavigate }: Prop
           </div>
         </button>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <HelpCircle className="h-5 w-5" />
+            Conceptos clave y preguntas frecuentes
+          </CardTitle>
+          <CardDescription>
+            Lo esencial para manejar el programa sin liarte con los enlaces, la atribución y los pagos.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Accordion type="single" collapsible className="w-full">
+            {FAQS.map((faq, i) => (
+              <AccordionItem key={i} value={`faq-${i}`}>
+                <AccordionTrigger className="text-left text-sm">{faq.q}</AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground">{faq.a}</AccordionContent>
+              </AccordionItem>
+            ))}
+          </Accordion>
+          <div className="mt-4 flex items-start gap-2 rounded-lg border border-dashed bg-muted/30 p-3 text-xs text-muted-foreground">
+            <Link2 className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              Regla rápida: la <strong>landing</strong> capta colaboradores; el <strong>kit</strong> de cada
+              colaborador capta clientes. Para que un cliente cuente para un colaborador, debe entrar por el enlace de
+              su kit.
+            </span>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
