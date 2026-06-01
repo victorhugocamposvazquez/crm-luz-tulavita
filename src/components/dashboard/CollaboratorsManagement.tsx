@@ -8,11 +8,12 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/hooks/use-toast';
-import { Plus, RefreshCw, Users, Link2, ExternalLink, ChevronRight, Megaphone } from 'lucide-react';
+import { Plus, RefreshCw, Users, Link2, ExternalLink, ChevronRight, Megaphone, Home, Settings } from 'lucide-react';
 import { RecruitmentLeadsSection } from './RecruitmentLeadsSection';
 import { RecruitmentChannelLinks } from './RecruitmentChannelLinks';
 import { CollaboratorManagerSetting } from './CollaboratorManagerSetting';
 import { CollaboratorKitMenu } from './CollaboratorKitMenu';
+import { CollaboratorProgramGuide, type CollaboratorTab } from './CollaboratorProgramGuide';
 import { ConvertLeadDialog } from './ConvertLeadDialog';
 import { CollaboratorDetailView, type CollaboratorRow } from './CollaboratorDetailView';
 import { COLABORADORES_RECRUITMENT_ROUTE } from '@/components/colaboradores/colaboradores-config';
@@ -49,6 +50,8 @@ export default function CollaboratorsManagement() {
   const [createdCollaborator, setCreatedCollaborator] = useState<{ id: string; code: string; name: string } | null>(null);
   const [convertLead, setConvertLead] = useState<RecruitmentLeadRow | null>(null);
   const [convertOpen, setConvertOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<CollaboratorTab>('inicio');
+  const [showCreateForm, setShowCreateForm] = useState(false);
 
   const baseUrl = useMemo(() => {
     if (typeof window === 'undefined') return '';
@@ -227,23 +230,35 @@ export default function CollaboratorsManagement() {
           Colaboradores
         </h2>
         <p className="text-sm text-muted-foreground mt-1">
-          Gestiona colaboradores activos o captación y reclutamiento desde las pestañas inferiores.
+          Empieza en <strong>Inicio</strong> para ver el flujo del programa: captar, activar, operar y liquidar.
         </p>
       </div>
 
-      <Tabs defaultValue="listado" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="listado" className="gap-2">
-            <Users className="h-4 w-4" />
-            Listado
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as CollaboratorTab)} className="space-y-4">
+        <TabsList className="flex h-auto flex-wrap justify-start gap-1">
+          <TabsTrigger value="inicio" className="gap-2">
+            <Home className="h-4 w-4" />
+            Inicio
           </TabsTrigger>
-          <TabsTrigger value="marketing" className="gap-2">
+          <TabsTrigger value="colaboradores" className="gap-2">
+            <Users className="h-4 w-4" />
+            Colaboradores
+          </TabsTrigger>
+          <TabsTrigger value="reclutamiento" className="gap-2">
             <Megaphone className="h-4 w-4" />
-            Marketing
+            Reclutamiento
+          </TabsTrigger>
+          <TabsTrigger value="ajustes" className="gap-2">
+            <Settings className="h-4 w-4" />
+            Ajustes
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="listado">
+        <TabsContent value="inicio">
+          <CollaboratorProgramGuide collaboratorCount={rows.length} onNavigate={setActiveTab} />
+        </TabsContent>
+
+        <TabsContent value="colaboradores" className="space-y-6">
           <Card>
             <CardHeader>
               <div className="flex items-center justify-between gap-2">
@@ -254,10 +269,20 @@ export default function CollaboratorsManagement() {
                     Entra en cada ficha para ver clientes, liquidaciones y facturas.
                   </CardDescription>
                 </div>
-                <Button type="button" variant="outline" size="sm" onClick={() => void fetchCollaborators()} disabled={loading}>
-                  <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-                  Recargar
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button type="button" variant="outline" size="sm" onClick={() => void fetchCollaborators()} disabled={loading}>
+                    <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                    Recargar
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => setShowCreateForm((v) => !v)}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nuevo colaborador
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent>
@@ -335,16 +360,14 @@ export default function CollaboratorsManagement() {
               </Table>
             </CardContent>
           </Card>
-        </TabsContent>
 
-        <TabsContent value="marketing" className="space-y-6">
-          <CollaboratorManagerSetting />
-
+          {(showCreateForm || createdCollaborator) && (
           <Card>
             <CardHeader>
               <CardTitle>Nuevo colaborador</CardTitle>
               <CardDescription>
-                Alta manual de un colaborador con código propio para atribuir leads y compartir enlaces.
+                Alta manual con código propio para atribuir leads y compartir enlaces. También puedes crear uno
+                convirtiendo un lead desde la pestaña Reclutamiento.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -425,15 +448,19 @@ export default function CollaboratorsManagement() {
               )}
             </CardContent>
           </Card>
+          )}
+        </TabsContent>
 
+        <TabsContent value="reclutamiento" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Link2 className="h-5 w-5" />
-                Reclutamiento de colaboradores
+                Bandeja de reclutamiento
               </CardTitle>
               <CardDescription>
-                Prospectos desde la landing pública /hazte-colaborador. Convierte un lead en colaborador activo cuando proceda.
+                Prospectos que llegan desde la landing pública «Hazte colaborador». Revísalos y conviértelos en
+                colaborador activo cuando proceda.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -461,13 +488,20 @@ export default function CollaboratorsManagement() {
 
           <RecruitmentChannelLinks />
         </TabsContent>
+
+        <TabsContent value="ajustes" className="space-y-6">
+          <CollaboratorManagerSetting />
+        </TabsContent>
       </Tabs>
 
       <ConvertLeadDialog
         lead={convertLead}
         open={convertOpen}
         onOpenChange={setConvertOpen}
-        onCreated={() => void fetchCollaborators()}
+        onCreated={() => {
+          void fetchCollaborators();
+          setActiveTab('colaboradores');
+        }}
       />
     </div>
   );

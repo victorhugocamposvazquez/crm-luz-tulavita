@@ -497,19 +497,6 @@ export function CollaboratorDetailView({ collaborator, onBack, onUpdated }: Coll
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Kit de captación</CardTitle>
-              <CardDescription>Genera enlaces firmados, QR y acceso al portal para este colaborador.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <CollaboratorKitMenu
-                collaboratorId={collaborator.id}
-                code={collaborator.code}
-                name={collaborator.name}
-              />
-            </CardContent>
-          </Card>
         </TabsContent>
 
         <TabsContent value="clientes">
@@ -531,11 +518,30 @@ export function CollaboratorDetailView({ collaborator, onBack, onUpdated }: Coll
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5" />
-                Tokens y enlaces
+                <Link2 className="h-5 w-5" />
+                Kit de captación
               </CardTitle>
               <CardDescription>
-                Enlaces de captación y accesos al portal generados para {collaborator.name}.
+                Genera enlaces firmados, QR y acceso al portal para que {collaborator.name} capte clientes.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <CollaboratorKitMenu
+                collaboratorId={collaborator.id}
+                code={collaborator.code}
+                name={collaborator.name}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                Tokens y enlaces generados
+              </CardTitle>
+              <CardDescription>
+                Histórico de enlaces de captación y accesos al portal de {collaborator.name}.
               </CardDescription>
             </CardHeader>
             <CardContent>
