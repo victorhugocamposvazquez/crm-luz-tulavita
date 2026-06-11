@@ -103,9 +103,3 @@ export function buildRecruitmentChannelUrl(
 export function buildPortalLoginUrl(baseUrl: string): string {
   return new URL('/colaborador/acceso', baseUrl || 'https://crm.virvita.es').toString();
 }
-
-export function buildPortalUrl(baseUrl: string, accessToken: string): string {
-  const url = new URL('/colaborador/acceso', baseUrl || 'https://crm.virvita.es');
-  url.searchParams.set('token', accessToken);
-  return url.toString();
-}

@@ -3,7 +3,7 @@ import {
   buildClientCaptureUrl,
   buildRecruitmentUrl,
   buildRecruitmentChannelUrl,
-  buildPortalUrl,
+  buildPortalLoginUrl,
   RECRUITMENT_CHANNELS,
 } from './links';
 
@@ -71,10 +71,10 @@ describe('buildRecruitmentChannelUrl', () => {
   });
 });
 
-describe('buildPortalUrl', () => {
-  it('genera la ruta de acceso con el token', () => {
-    const url = new URL(buildPortalUrl(BASE, 'acc1'));
+describe('buildPortalLoginUrl', () => {
+  it('genera la ruta de acceso al portal sin token', () => {
+    const url = new URL(buildPortalLoginUrl(BASE));
     expect(url.pathname).toBe('/colaborador/acceso');
-    expect(url.searchParams.get('token')).toBe('acc1');
+    expect([...url.searchParams.keys()]).toHaveLength(0);
   });
 });

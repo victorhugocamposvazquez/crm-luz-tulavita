@@ -4,17 +4,11 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createClient } from '@supabase/supabase-js';
 import { resolvePortalToken } from '../server-lib/collaborators/portal-auth.js';
+import { applyPortalCors, createPortalServiceClient } from '../server-lib/collaborators/portal-http.js';
 
 const LEAD_BUCKET = 'lead-attachments';
 const MAX_BASE64_BYTES = 8 * 1024 * 1024;
-
-function cors(res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-}
 
 function getClientIp(req: VercelRequest): string {
   const forwarded = req.headers['x-forwarded-for'];
@@ -57,6 +51,7 @@ export const config = {
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const cors = (r: VercelResponse) => applyPortalCors(req, r);
   if (req.method === 'OPTIONS') {
     cors(res);
     res.status(200).end();
@@ -68,9 +63,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return;
   }
 
-  const supabaseUrl = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.VITE_SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !supabaseKey) {
+  const supabase = createPortalServiceClient();
+  if (!supabase) {
     cors(res);
     res.status(500).json({ success: false, error: 'Configuración Supabase incompleta' });
     return;
@@ -92,7 +86,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return;
   }
 
-  const supabase = createClient(supabaseUrl, supabaseKey);
   const resolved = await resolvePortalToken(supabase, accessToken);
   if (!resolved) {
     cors(res);

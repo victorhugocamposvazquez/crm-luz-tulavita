@@ -9,8 +9,8 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createClient } from '@supabase/supabase-js';
 import { createAccessToken } from '../server-lib/collaborators/portal-links.js';
+import { applyPortalCors, createPortalServiceClient } from '../server-lib/collaborators/portal-http.js';
 import { sendResendEmail } from '../server-lib/email/resend.js';
 import {
   OTP_TTL_MS,
@@ -22,12 +22,6 @@ import {
   safeEqual,
   normalizeOtpInput,
 } from '../server-lib/collaborators/portal-otp.js';
-
-function cors(res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-}
 
 function normalizeEmail(value: unknown): string {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
@@ -61,6 +55,7 @@ function getClientIp(req: VercelRequest): string | null {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const cors = (r: VercelResponse) => applyPortalCors(req, r);
   if (req.method === 'OPTIONS') {
     cors(res);
     res.status(200).end();
@@ -72,9 +67,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return;
   }
 
-  const supabaseUrl = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.VITE_SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !supabaseKey) {
+  const supabase = createPortalServiceClient();
+  if (!supabase) {
     cors(res);
     res.status(500).json({ success: false, error: 'Configuración Supabase incompleta' });
     return;
@@ -91,7 +85,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   const action = typeof body.action === 'string' ? body.action : '';
   const email = normalizeEmail(body.email);
-  const supabase = createClient(supabaseUrl, supabaseKey);
 
   try {
     if (action === 'request') {
@@ -221,6 +214,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         .from('collaborator_otp_codes')
         .update({ consumed_at: new Date().toISOString() })
         .eq('id', otpRow.id);
+
+      // Rotación: cada login invalida las sesiones anteriores del colaborador.
+      await supabase
+        .from('collaborator_access_tokens')
+        .update({ is_active: false })
+        .eq('collaborator_id', otpRow.collaborator_id)
+        .eq('is_active', true);
 
       const token = createAccessToken();
       const sessionExpiry = new Date(Date.now() + SESSION_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();

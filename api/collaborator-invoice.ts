@@ -5,19 +5,14 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { resolvePortalToken } from '../server-lib/collaborators/portal-auth.js';
+import { applyPortalCors, createPortalServiceClient } from '../server-lib/collaborators/portal-http.js';
 
 const BUCKET = 'collaborator-documents';
 const MAX_BASE64_BYTES = 8 * 1024 * 1024;
 
 type InvoiceAction = 'upload' | 'file' | 'delete';
-
-function cors(res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-}
 
 function parseBase64(raw: string): { buffer: Buffer; mime: string } | null {
   const match = raw.match(/^data:([^;]+);base64,(.+)$/);
@@ -52,14 +47,12 @@ async function handleUpload(
   const amountEur = typeof body.amount_eur === 'number' ? body.amount_eur : Number.parseFloat(String(body.amount_eur ?? ''));
 
   if (!accessToken || !payoutId || !fileBase64) {
-    cors(res);
     res.status(400).json({ success: false, error: 'access_token, payout_id y file_base64 son requeridos' });
     return;
   }
 
   const resolved = await resolvePortalToken(supabase, accessToken);
   if (!resolved) {
-    cors(res);
     res.status(401).json({ success: false, error: 'Token inválido o expirado' });
     return;
   }
@@ -74,13 +67,11 @@ async function handleUpload(
     .maybeSingle();
 
   if (payoutErr || !payout) {
-    cors(res);
     res.status(404).json({ success: false, error: 'Liquidación no encontrada' });
     return;
   }
 
   if (payout.status !== 'pending') {
-    cors(res);
     res.status(400).json({ success: false, error: 'Solo se pueden subir facturas para liquidaciones pendientes' });
     return;
   }
@@ -93,7 +84,6 @@ async function handleUpload(
     .maybeSingle();
 
   if (activeInvoice) {
-    cors(res);
     res.status(400).json({
       success: false,
       error: 'Ya hay una factura activa para esta liquidación. Anúlala antes de subir otra.',
@@ -103,7 +93,6 @@ async function handleUpload(
 
   const parsed = parseBase64(fileBase64);
   if (!parsed) {
-    cors(res);
     res.status(400).json({ success: false, error: 'Archivo inválido o demasiado grande' });
     return;
   }
@@ -136,7 +125,6 @@ async function handleUpload(
     throw invErr;
   }
 
-  cors(res);
   res.status(200).json({ success: true, invoice });
 }
 
@@ -149,14 +137,12 @@ async function handleFile(
   const invoiceId = typeof body.invoice_id === 'string' ? body.invoice_id.trim() : '';
 
   if (!accessToken || !invoiceId) {
-    cors(res);
     res.status(400).json({ success: false, error: 'access_token e invoice_id son requeridos' });
     return;
   }
 
   const resolved = await resolvePortalToken(supabase, accessToken);
   if (!resolved) {
-    cors(res);
     res.status(401).json({ success: false, error: 'Token inválido o expirado' });
     return;
   }
@@ -169,13 +155,11 @@ async function handleFile(
     .maybeSingle();
 
   if (error || !invoice?.file_path) {
-    cors(res);
     res.status(404).json({ success: false, error: 'Factura no encontrada' });
     return;
   }
 
   if (invoice.status === 'cancelled') {
-    cors(res);
     res.status(400).json({ success: false, error: 'Esta factura fue anulada' });
     return;
   }
@@ -185,12 +169,10 @@ async function handleFile(
     .createSignedUrl(invoice.file_path, 3600);
 
   if (signErr || !signed?.signedUrl) {
-    cors(res);
     res.status(500).json({ success: false, error: 'No se pudo abrir el archivo' });
     return;
   }
 
-  cors(res);
   res.status(200).json({ success: true, signed_url: signed.signedUrl });
 }
 
@@ -204,19 +186,16 @@ async function handleDelete(
   const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
 
   if (!accessToken || !invoiceId) {
-    cors(res);
     res.status(400).json({ success: false, error: 'access_token e invoice_id son requeridos' });
     return;
   }
   if (reason.length < 5) {
-    cors(res);
     res.status(400).json({ success: false, error: 'Indica el motivo de la anulación (mínimo 5 caracteres)' });
     return;
   }
 
   const resolved = await resolvePortalToken(supabase, accessToken);
   if (!resolved) {
-    cors(res);
     res.status(401).json({ success: false, error: 'Token inválido o expirado' });
     return;
   }
@@ -231,13 +210,11 @@ async function handleDelete(
     .maybeSingle();
 
   if (invErr || !invoice) {
-    cors(res);
     res.status(404).json({ success: false, error: 'Factura no encontrada' });
     return;
   }
 
   if (!['submitted', 'rejected'].includes(invoice.status)) {
-    cors(res);
     res.status(400).json({
       success: false,
       error: 'Solo puedes anular facturas recibidas o rechazadas que aún no están pagadas',
@@ -260,7 +237,6 @@ async function handleDelete(
 
   if (updateErr) throw updateErr;
 
-  cors(res);
   res.status(200).json({ success: true });
 }
 
@@ -269,21 +245,18 @@ export const config = {
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
+  applyPortalCors(req, res);
   if (req.method === 'OPTIONS') {
-    cors(res);
     res.status(200).end();
     return;
   }
   if (req.method !== 'POST') {
-    cors(res);
     res.status(405).json({ success: false, error: 'Method not allowed' });
     return;
   }
 
-  const supabaseUrl = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.VITE_SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !supabaseKey) {
-    cors(res);
+  const supabase = createPortalServiceClient();
+  if (!supabase) {
     res.status(500).json({ success: false, error: 'Configuración Supabase incompleta' });
     return;
   }
@@ -292,13 +265,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   try {
     body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body as Record<string, unknown>) ?? {};
   } catch {
-    cors(res);
     res.status(400).json({ success: false, error: 'JSON inválido' });
     return;
   }
 
   const action = resolveAction(req, body);
-  const supabase = createClient(supabaseUrl, supabaseKey);
 
   try {
     if (action === 'file') {
@@ -313,7 +284,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   } catch (e) {
     const err = e instanceof Error ? e : new Error(String(e));
     console.error(`[api/collaborator-invoice:${action}]`, err.message);
-    cors(res);
     res.status(500).json({ success: false, error: err.message });
   }
 }

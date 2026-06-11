@@ -1,16 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createClient } from '@supabase/supabase-js';
 import { resolvePortalToken } from '../server-lib/collaborators/portal-auth.js';
+import { applyPortalCors, createPortalServiceClient } from '../server-lib/collaborators/portal-http.js';
 
 type EntryMode = 'auto' | 'upload' | 'manual' | 'callback';
 
-function cors(res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-}
-
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const cors = (r: VercelResponse) => applyPortalCors(req, r);
   if (req.method === 'OPTIONS') {
     cors(res);
     res.status(200).end();
@@ -22,9 +17,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return;
   }
 
-  const supabaseUrl = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.VITE_SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !supabaseKey) {
+  const supabase = createPortalServiceClient();
+  if (!supabase) {
     cors(res);
     res.status(500).json({ success: false, error: 'Configuración Supabase incompleta' });
     return;
@@ -46,8 +40,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return;
   }
 
-  const supabase = createClient(supabaseUrl, supabaseKey);
-
   try {
     const resolved = await resolvePortalToken(supabase, token);
     if (!resolved) {
@@ -63,12 +55,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       .select('*', { count: 'exact', head: true })
       .eq('collaborator_id', collaborator.id);
 
-    const { count: convertedCount } = await supabase
-      .from('leads')
-      .select('*', { count: 'exact', head: true })
-      .eq('collaborator_id', collaborator.id)
-      .eq('status', 'converted');
-
+    // Única fuente de verdad de "venta cerrada": commission_eligible_at.
     const { count: commissionableCount } = await supabase
       .from('leads')
       .select('*', { count: 'exact', head: true })
@@ -119,7 +106,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       },
       stats: {
         leads_total: leadsCount ?? 0,
-        leads_converted: convertedCount ?? 0,
         leads_commissionable: commissionableCount ?? 0,
       },
       pending_payouts: pendingPayouts ?? [],

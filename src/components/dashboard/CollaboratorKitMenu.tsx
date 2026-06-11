@@ -18,11 +18,11 @@ import {
 } from '@/lib/collaborators/types';
 import {
   buildClientCaptureUrl,
-  buildPortalUrl,
+  buildPortalLoginUrl,
   buildRecruitmentUrl,
   getAppBaseUrl,
 } from '@/lib/collaborators/links';
-import { createReferralToken, createAccessToken } from '@/lib/collaborators/tokens';
+import { createReferralToken } from '@/lib/collaborators/tokens';
 import { downloadQrPng, generateQrDataUrl } from '@/lib/collaborators/qr';
 
 type CollaboratorKitMenuProps = {
@@ -194,52 +194,10 @@ export function CollaboratorKitMenu({ collaboratorId, code, name, compact }: Col
     }
   };
 
-  const handlePortalLink = async (expiresInDays?: number) => {
-    setBusy('portal');
-    try {
-      let token: string | null = null;
-      // El enlace de portal permanente se reutiliza; los temporales siempre son nuevos.
-      if (expiresInDays == null) {
-        const nowIso = new Date().toISOString();
-        const { data: existing } = await supabase
-          .from('collaborator_access_tokens')
-          .select('token, expires_at')
-          .eq('collaborator_id', collaboratorId)
-          .eq('label', 'Portal permanente')
-          .eq('is_active', true)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (existing?.token && (existing.expires_at == null || existing.expires_at > nowIso)) {
-          token = existing.token;
-        }
-      }
-      if (!token) {
-        token = createAccessToken();
-        const expiresAt =
-          expiresInDays != null
-            ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000).toISOString()
-            : null;
-        const { error } = await supabase.from('collaborator_access_tokens').insert({
-          collaborator_id: collaboratorId,
-          token,
-          is_active: true,
-          expires_at: expiresAt,
-          label: expiresInDays ? `Portal ${expiresInDays}d` : 'Portal permanente',
-        });
-        if (error) throw error;
-      }
-      const url = buildPortalUrl(baseUrl, token);
-      await copyText(url, 'Enlace de portal copiado');
-    } catch (e) {
-      toast({
-        title: 'Error',
-        description: e instanceof Error ? e.message : 'No se pudo generar el portal',
-        variant: 'destructive',
-      });
-    } finally {
-      setBusy(null);
-    }
+  const handleCopyPortalLogin = async () => {
+    // El colaborador entra al portal con su email (código OTP); aquí solo se
+    // comparte la URL de la página de acceso.
+    await copyText(buildPortalLoginUrl(baseUrl), 'Enlace de acceso al portal copiado');
   };
 
   return (
@@ -281,9 +239,9 @@ export function CollaboratorKitMenu({ collaboratorId, code, name, compact }: Col
         <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
           Acceso al portal del colaborador
         </DropdownMenuLabel>
-        <DropdownMenuItem onClick={() => void handlePortalLink()} disabled={!!busy}>
+        <DropdownMenuItem onClick={() => void handleCopyPortalLogin()} disabled={!!busy}>
           <KeyRound className="h-3.5 w-3.5 mr-2" />
-          Copiar enlace de acceso
+          Copiar enlace de acceso (entra con su email)
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
@@ -334,14 +292,6 @@ export function CollaboratorKitMenu({ collaboratorId, code, name, compact }: Col
             <DropdownMenuItem onClick={() => void handleQrRecruit()} disabled={!!busy}>
               <QrCode className="h-3.5 w-3.5 mr-2" />
               QR de reclutamiento
-            </DropdownMenuItem>
-
-            <DropdownMenuLabel className="text-[11px] font-normal text-muted-foreground">
-              Portal temporal
-            </DropdownMenuLabel>
-            <DropdownMenuItem onClick={() => void handlePortalLink(24)} disabled={!!busy}>
-              <KeyRound className="h-3.5 w-3.5 mr-2" />
-              Acceso al portal 24h
             </DropdownMenuItem>
           </>
         )}

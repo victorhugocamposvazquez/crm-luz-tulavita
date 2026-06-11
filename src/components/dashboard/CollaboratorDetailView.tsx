@@ -13,7 +13,6 @@ import { ArrowLeft, RefreshCw, Shield, Link2, Save } from 'lucide-react';
 import { CollaboratorKitMenu } from './CollaboratorKitMenu';
 import { CollaboratorCapturedClientsSection } from './CollaboratorCapturedClientsSection';
 import { CollaboratorPaymentsSection } from './CollaboratorPaymentsSection';
-import { CollaboratorPortalAccessCard } from './CollaboratorPortalAccessCard';
 import { CollaboratorTokenManager } from './CollaboratorTokenManager';
 import { buildClientCaptureUrl, getAppBaseUrl } from '@/lib/collaborators/links';
 
@@ -331,12 +330,10 @@ export function CollaboratorDetailView({ collaborator, onBack, onUpdated }: Coll
         </div>
       </div>
 
-      <CollaboratorPortalAccessCard collaboratorId={collaborator.id} collaboratorName={collaborator.name} />
-
       <p className="text-xs text-muted-foreground">
         <strong>Resumen</strong>: datos y métricas · <strong>Clientes captados</strong>: leads que trajo ·{' '}
         <strong>Pagos y facturas</strong>: liquida comisiones y valida facturas · <strong>Accesos y kit</strong>:
-        genera sus enlaces, QR y acceso al portal.
+        genera sus enlaces y QR. El colaborador entra al portal con su email (código de un solo uso).
       </p>
 
       <Tabs defaultValue="resumen" className="space-y-4">

@@ -179,7 +179,7 @@ export function CollaboratorTokenManager({ collaboratorId, embedded = false }: {
       <div>
         <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
           <KeyRound className="h-4 w-4" />
-          Tokens de portal
+          Sesiones del portal (se crean al entrar con email)
         </h4>
         <Table>
           <TableHeader>
@@ -239,7 +239,7 @@ export function CollaboratorTokenManager({ collaboratorId, embedded = false }: {
               <Shield className="h-5 w-5" />
               Gestión de tokens
             </CardTitle>
-            <CardDescription>Revocar enlaces de captación y accesos al portal. Establecer expiración.</CardDescription>
+            <CardDescription>Revocar enlaces de captación y sesiones del portal. Establecer expiración.</CardDescription>
           </div>
           <Button variant="outline" size="sm" onClick={() => void fetchAll()} disabled={loading}>
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />

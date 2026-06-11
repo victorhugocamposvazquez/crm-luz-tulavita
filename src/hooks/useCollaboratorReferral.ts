@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import type { CollaboratorEntryMode } from '@/lib/collaborators/types';
+
+export type { CollaboratorEntryMode };
 
 export interface CollaboratorReferral {
   id: string;
@@ -27,8 +30,6 @@ function readCollaboratorRefTokenFromUrl(): string | null {
   const params = new URLSearchParams(window.location.search);
   return normalizeCode(params.get('ref') ?? params.get('collab_ref'));
 }
-
-export type CollaboratorEntryMode = 'auto' | 'upload' | 'manual' | 'callback';
 
 export function useCollaboratorReferral() {
   const [collaborator, setCollaborator] = useState<CollaboratorReferral | null>(null);

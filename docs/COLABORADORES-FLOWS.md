@@ -107,15 +107,31 @@ Se marca/quita "venta cerrada" desde la lista de **Clientes captados** o desde *
 
 ## Funnel 3 — Portal colaborador (autoservicio)
 
-**Ruta:** `/colaborador/acceso?token={access_token}`
+**Ruta:** `/colaborador/acceso`
 
 **Objetivo:** Colaborador activo copia enlaces/QR, registra clientes off-landing y sube facturas de comisión.
 
+**Acceso (única vía):** email registrado → código OTP de 6 dígitos → token de sesión
+(`collaborator_access_tokens`, 60 días, con expiración obligatoria). Cada login nuevo
+revoca las sesiones anteriores del colaborador. No existen magic links de portal.
+
+**Seguridad:**
+
+- Las tablas de tokens (`collaborator_access_tokens`, `collaborator_referral_links`) **no** son
+  legibles con la anon key: solo admin (RLS `has_role`) y `service_role` desde las APIs.
+- Las APIs de colaborador exigen `SUPABASE_SERVICE_ROLE_KEY` (sin fallback a anon) y limitan
+  CORS al propio origen (`server-lib/collaborators/portal-http.ts`).
+
+**Secciones del panel (`/colaborador/panel`):** Inicio (compartir enlace + QR + resumen),
+Registrar cliente, Mis clientes, Mis pagos. Las stats usan `commission_eligible_at` como única
+fuente de verdad de "venta cerrada".
+
 **APIs:**
 
-- `POST /api/resolve-collaborator-portal` — valida token y devuelve datos del colaborador.
+- `POST /api/collaborator-portal-otp` — `{ action: 'request' | 'verify' }` login por código de email.
+- `POST /api/resolve-collaborator-portal` — valida token de sesión y devuelve datos del portal.
 - `POST /api/collaborator-submit-lead` — nuevo cliente atribuido (contacto + factura opcional).
-- `POST /api/collaborator-invoice` — factura de comisión vinculada a liquidación.
+- `POST /api/collaborator-invoice` — factura de comisión vinculada a liquidación (`upload | file | delete`).
 
 ---
 
@@ -187,7 +203,8 @@ Respuesta: `{ "success": true, "collaborator": { "id", "code", "name" }, "entry_
 |-------|-----|
 | `collaborators` | Colaboradores activos |
 | `collaborator_referral_links` | Tokens de captación cliente |
-| `collaborator_access_tokens` | Tokens de portal autoservicio |
+| `collaborator_access_tokens` | Tokens de sesión del portal (creados solo por OTP verify) |
+| `collaborator_otp_codes` | Códigos OTP de login (hash, solo service_role) |
 | `collaborator_payouts` | Liquidaciones |
 | `collaborator_invoices` | Facturas de comisión del colaborador |
 | `leads.referred_by_collaborator_id` | Referidor en reclutamiento |
@@ -201,7 +218,8 @@ Respuesta: `{ "success": true, "collaborator": { "id", "code", "name" }, "entry_
 |------|----------|
 | Admin | `src/components/dashboard/CollaboratorsManagement.tsx` |
 | Kit / QR | `src/lib/collaborators/*`, `src/components/dashboard/CollaboratorKitMenu.tsx` |
-| Portal | `src/pages/ColaboradorPortal.tsx` |
+| Portal | `src/pages/ColaboradorPortal.tsx`, `src/components/colaboradores/portal/*` |
+| Login portal (OTP) | `src/components/colaboradores/ColaboradorPortalLogin.tsx`, `api/collaborator-portal-otp.ts` |
 | Clientes captados / comisión | `src/components/dashboard/CollaboratorCapturedClientsSection.tsx` |
 | Pagos guiados / liquidación | `src/components/dashboard/CollaboratorPaymentsSection.tsx`, `CollaboratorDetailView.tsx` |
 | Landings reclutamiento | `src/pages/HazteColaborador.tsx`, `src/hooks/useColaboradoresLeadSubmit.ts` |

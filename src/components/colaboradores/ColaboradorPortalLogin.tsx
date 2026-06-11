@@ -3,17 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Loader2,
-  Link2,
-  ShieldCheck,
-  Mail,
-  MessageCircle,
-  ArrowLeft,
-  KeyRound,
-} from 'lucide-react';
-import { extractPortalToken } from '@/lib/collaborators/portal-session';
+import { Loader2, ShieldCheck, Mail, MessageCircle, ArrowLeft, KeyRound } from 'lucide-react';
 import { ColaboradorPortalBrandHeader } from './ColaboradorPortalBrandHeader';
+import { InstallPwaPrompt } from './InstallPwaPrompt';
 import { waLink } from './colaboradores-config';
 
 type ColaboradorPortalLoginProps = {
@@ -21,13 +13,12 @@ type ColaboradorPortalLoginProps = {
   initialError?: string | null;
 };
 
-type Step = 'email' | 'code' | 'link';
+type Step = 'email' | 'code';
 
 export function ColaboradorPortalLogin({ onAuthenticated, initialError }: ColaboradorPortalLoginProps) {
   const [step, setStep] = useState<Step>('email');
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
-  const [linkInput, setLinkInput] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(initialError ?? null);
   const [info, setInfo] = useState<string | null>(null);
@@ -86,31 +77,6 @@ export function ColaboradorPortalLogin({ onAuthenticated, initialError }: Colabo
     }
   };
 
-  const submitLink = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    const token = extractPortalToken(linkInput);
-    if (!token) {
-      setError('Pega el enlace de acceso completo o el token que te envió Tulavita.');
-      return;
-    }
-    setSubmitting(true);
-    try {
-      const res = await fetch('/api/resolve-collaborator-portal', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token }),
-      });
-      const json = (await res.json()) as { success?: boolean; error?: string };
-      if (!res.ok || !json.success) throw new Error(json.error ?? 'Enlace de acceso inválido o expirado');
-      onAuthenticated(token);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'No se pudo validar el acceso');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   const whatsappHref = waLink(
     `Hola Tulavita, soy colaborador/a y no consigo acceder al portal. Mi email es ${email || '...'}.`,
   );
@@ -127,54 +93,35 @@ export function ColaboradorPortalLogin({ onAuthenticated, initialError }: Colabo
           <CardDescription>
             {step === 'code'
               ? 'Introduce el código de 6 dígitos que te hemos enviado por email.'
-              : step === 'link'
-                ? 'Pega el enlace personal (magic link) que te envió Tulavita.'
-                : 'Entra con tu email registrado. Te enviaremos un código de un solo uso para acceder.'}
+              : 'Entra con tu email registrado. Te enviaremos un código de un solo uso para acceder.'}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {step === 'email' && (
-            <>
-              <form className="space-y-4" onSubmit={(e) => void requestCode(e)}>
-                <div className="space-y-2">
-                  <Label htmlFor="portal-email">Email registrado</Label>
-                  <Input
-                    id="portal-email"
-                    type="email"
-                    inputMode="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="tu@email.com"
-                    autoComplete="email"
-                    autoFocus
-                  />
-                  <p className="text-xs text-muted-foreground flex items-start gap-1.5">
-                    <Mail className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                    Usa el email que diste al registrarte como colaborador.
-                  </p>
-                </div>
-                {error && <p className="text-sm text-destructive">{error}</p>}
-                <Button type="submit" className="w-full" disabled={submitting || !email.trim()}>
-                  {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Mail className="h-4 w-4 mr-2" />}
-                  Enviar código de acceso
-                </Button>
-              </form>
-
-              <div className="border-t pt-4 space-y-2">
-                <Button
-                  variant="link"
-                  className="h-auto p-0 text-sm"
-                  onClick={() => {
-                    setError(null);
-                    setInfo(null);
-                    setStep('link');
-                  }}
-                >
-                  <Link2 className="h-3.5 w-3.5 mr-1.5" />
-                  Tengo un enlace de acceso
-                </Button>
+            <form className="space-y-4" onSubmit={(e) => void requestCode(e)}>
+              <div className="space-y-2">
+                <Label htmlFor="portal-email">Email registrado</Label>
+                <Input
+                  id="portal-email"
+                  type="email"
+                  inputMode="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="tu@email.com"
+                  autoComplete="email"
+                  autoFocus
+                />
+                <p className="text-xs text-muted-foreground flex items-start gap-1.5">
+                  <Mail className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  Usa el email que diste al registrarte como colaborador.
+                </p>
               </div>
-            </>
+              {error && <p className="text-sm text-destructive">{error}</p>}
+              <Button type="submit" className="w-full" disabled={submitting || !email.trim()}>
+                {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Mail className="h-4 w-4 mr-2" />}
+                Enviar código de acceso
+              </Button>
+            </form>
           )}
 
           {step === 'code' && (
@@ -236,48 +183,6 @@ export function ColaboradorPortalLogin({ onAuthenticated, initialError }: Colabo
             </>
           )}
 
-          {step === 'link' && (
-            <>
-              <form className="space-y-4" onSubmit={(e) => void submitLink(e)}>
-                <div className="space-y-2">
-                  <Label htmlFor="portal-magic-link">Enlace o token de acceso</Label>
-                  <Input
-                    id="portal-magic-link"
-                    value={linkInput}
-                    onChange={(e) => setLinkInput(e.target.value)}
-                    placeholder="https://…/colaborador/acceso?token=portal_…"
-                    autoComplete="off"
-                    autoFocus
-                  />
-                  <p className="text-xs text-muted-foreground flex items-start gap-1.5">
-                    <Link2 className="h-3.5 w-3.5 mt-0.5 shrink-0" />
-                    Abre el enlace del email o WhatsApp, o pégalo aquí para iniciar sesión.
-                  </p>
-                </div>
-                {error && <p className="text-sm text-destructive">{error}</p>}
-                <Button type="submit" className="w-full" disabled={submitting || !linkInput.trim()}>
-                  {submitting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                  Acceder con enlace
-                </Button>
-              </form>
-
-              <div className="border-t pt-4">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-auto p-0 text-sm"
-                  onClick={() => {
-                    setError(null);
-                    setStep('email');
-                  }}
-                >
-                  <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
-                  Acceder con email
-                </Button>
-              </div>
-            </>
-          )}
-
           <div className="border-t pt-4">
             <Button variant="outline" size="sm" className="w-full" asChild>
               <a href={whatsappHref} target="_blank" rel="noopener noreferrer">
@@ -288,6 +193,8 @@ export function ColaboradorPortalLogin({ onAuthenticated, initialError }: Colabo
           </div>
         </CardContent>
       </Card>
+
+      <InstallPwaPrompt className="max-w-md w-full mt-4" />
     </div>
   );
 }
