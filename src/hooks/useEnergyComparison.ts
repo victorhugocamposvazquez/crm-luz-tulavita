@@ -1,6 +1,6 @@
 /**
  * Procesa factura y obtiene comparación de ahorro (polling hasta completed/failed).
- * Opcional: minLoaderMs, pdf_text del cliente para acelerar extracción en servidor.
+ * Opcional: minLoaderMs para mantener el loader un tiempo mínimo en pantalla.
  */
 
 import { useState, useCallback, useRef } from 'react';
@@ -35,8 +35,6 @@ export interface ManualExtractionInput {
 export interface RunEnergyComparisonOptions {
   /** Tiempo mínimo en pantalla de “procesando” antes de mostrar resultado. */
   minLoaderMs?: number;
-  /** Texto PDF extraído en cliente (misma vía que el simulador del backoffice). */
-  attachmentPdfText?: string | null;
 }
 
 export function useEnergyComparison() {
@@ -59,11 +57,6 @@ export function useEnergyComparison() {
     options?: RunEnergyComparisonOptions,
   ) => {
     const minLoaderMs = options?.minLoaderMs ?? DEFAULT_MIN_LOADER_MS;
-    const pdfText =
-      typeof options?.attachmentPdfText === 'string' && options.attachmentPdfText.trim() !== ''
-        ? options.attachmentPdfText.trim()
-        : undefined;
-
     const startedAt = Date.now();
     clearPendingTimer();
     setStatus('processing');
@@ -95,7 +88,6 @@ export function useEnergyComparison() {
         body: JSON.stringify({
           lead_id: leadId,
           attachment_path: attachmentPath,
-          ...(pdfText ? { pdf_text: pdfText } : {}),
         }),
       });
       const processData = await processRes.json().catch(() => ({}));

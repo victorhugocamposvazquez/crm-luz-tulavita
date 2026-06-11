@@ -520,7 +520,13 @@ function UploadStep({
       form.append('file', uploadFile);
       if (pdfText) form.append('pdfText', pdfText);
       const tFetch = Date.now();
-      const res = await fetch(SIMULATE_API, { method: 'POST', body: form });
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token;
+      const res = await fetch(SIMULATE_API, {
+        method: 'POST',
+        body: form,
+        headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : undefined,
+      });
       const elapsedMs = Date.now() - tFetch;
       const raw = await res.text();
       let data: { success?: boolean; error?: string; extraction?: InvoiceExtraction; debug?: SimulateExtractionDebug };

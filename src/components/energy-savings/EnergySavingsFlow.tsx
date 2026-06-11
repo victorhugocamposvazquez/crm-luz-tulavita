@@ -18,7 +18,6 @@ export function EnergySavingsFlow({
   onReset,
   compactLoader = false,
   fixedResultLoaderMs,
-  attachmentPdfText,
 }: {
   leadId: string;
   attachmentPath: string;
@@ -27,8 +26,6 @@ export function EnergySavingsFlow({
   compactLoader?: boolean;
   /** Tiempo mínimo mostrando el loader antes del resultado. */
   fixedResultLoaderMs?: number;
-  /** Texto del PDF extraído en cliente al subir (acelera extracción en servidor). */
-  attachmentPdfText?: string | null;
 }) {
   const { status, comparison, error, run, runWithManual, reset } = useEnergyComparison();
   const [manualConsumption, setManualConsumption] = useState('');
@@ -39,10 +36,9 @@ export function EnergySavingsFlow({
   useEffect(() => {
     run(leadId, attachmentPath, {
       minLoaderMs: fixedResultLoaderMs ?? 0,
-      attachmentPdfText: attachmentPdfText ?? null,
     });
     return () => reset();
-  }, [leadId, attachmentPath, fixedResultLoaderMs, attachmentPdfText, run, reset]);
+  }, [leadId, attachmentPath, fixedResultLoaderMs, run, reset]);
 
   if (status === 'processing') {
     return (

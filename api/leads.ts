@@ -4,8 +4,8 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createClient } from '@supabase/supabase-js';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { applySameOriginCors, createServiceClient, getClientIp } from '../server-lib/http.js';
 
 // --- Normalizer (inline) ---
 function normalizePhone(phone: string | undefined | null): string | null {
@@ -62,34 +62,38 @@ function parseEnvInt(name: string, fallback: number): number {
   return Number.isFinite(n) && n >= 0 ? n : fallback;
 }
 
-function getClientIp(req: VercelRequest): string {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string') return forwarded.split(',')[0].trim();
-  const real = req.headers['x-real-ip'];
-  if (typeof real === 'string') return real.trim();
-  return 'unknown';
-}
-
-const COLLAB_RATE_LIMIT_ENABLED =
+// Rate limit por IP para TODOS los POST públicos (no solo los de colaborador).
+const RATE_LIMIT_ENABLED =
   process.env.COLLAB_LEAD_RATE_LIMIT_ENABLED !== 'false' &&
   process.env.COLLAB_LEAD_RATE_LIMIT_ENABLED !== '0';
-const COLLAB_RATE_LIMIT_PER_IP_PER_HOUR = parseEnvInt('COLLAB_LEAD_RATE_LIMIT_PER_IP_PER_HOUR', 30);
+const RATE_LIMIT_PER_IP_PER_HOUR = parseEnvInt('COLLAB_LEAD_RATE_LIMIT_PER_IP_PER_HOUR', 30);
+
+type ExistingLeadRow = {
+  id: string;
+  source: string | null;
+  campaign: string | null;
+  collaborator_id: string | null;
+  referred_by_collaborator_id: string | null;
+  custom_fields: Record<string, unknown> | null;
+};
+
+const EXISTING_LEAD_COLUMNS = 'id, source, campaign, collaborator_id, referred_by_collaborator_id, custom_fields';
 
 // --- Deduplicator (inline) ---
 async function findExistingLead(
   supabase: SupabaseClient,
   phone: string | null,
   email: string | null
-): Promise<{ existingId: string | null; matchBy: 'phone' | 'email' | null }> {
+): Promise<{ existing: ExistingLeadRow | null; matchBy: 'phone' | 'email' | null }> {
   if (phone) {
-    const { data } = await supabase.from('leads').select('id').eq('phone', phone).limit(1).maybeSingle();
-    if (data?.id) return { existingId: data.id, matchBy: 'phone' };
+    const { data } = await supabase.from('leads').select(EXISTING_LEAD_COLUMNS).eq('phone', phone).limit(1).maybeSingle();
+    if (data?.id) return { existing: data as ExistingLeadRow, matchBy: 'phone' };
   }
   if (email) {
-    const { data } = await supabase.from('leads').select('id').eq('email', email).limit(1).maybeSingle();
-    if (data?.id) return { existingId: data.id, matchBy: 'email' };
+    const { data } = await supabase.from('leads').select(EXISTING_LEAD_COLUMNS).eq('email', email).limit(1).maybeSingle();
+    if (data?.id) return { existing: data as ExistingLeadRow, matchBy: 'email' };
   }
-  return { existingId: null, matchBy: null };
+  return { existing: null, matchBy: null };
 }
 
 // --- createLead (inline) ---
@@ -120,23 +124,37 @@ async function createLead(
 
   const name = normalizeName(input.name);
   const source = input.collaborator_id ? 'collaborator_referral' : normalizeSource(input.source);
-  const { existingId, matchBy } = await findExistingLead(supabase, phone, email);
+  const { existing, matchBy } = await findExistingLead(supabase, phone, email);
 
-  if (existingId) {
+  if (existing) {
+    const existingId = existing.id;
+
+    // No degradar atribución en reenvíos: si el lead ya estaba atribuido a un
+    // colaborador y este envío no trae colaborador, se conservan source/campaign
+    // y collaborator_id originales.
+    const preserveCollabAttribution = !!existing.collaborator_id && !input.collaborator_id;
+
+    // custom_fields se fusionan (las claves nuevas ganan) en vez de pisarse:
+    // un reenvío sin factura no debe borrar los datos de factura previos.
+    const mergedCustomFields = input.custom_fields
+      ? { ...(existing.custom_fields ?? {}), ...input.custom_fields }
+      : undefined;
+
     const { data: updated, error } = await supabase
       .from('leads')
       .update({
         name: name ?? undefined,
         phone: phone ?? undefined,
         email: email ?? undefined,
-        source,
-        campaign: input.campaign ?? undefined,
+        source: preserveCollabAttribution ? undefined : source,
+        campaign: preserveCollabAttribution ? undefined : input.campaign ?? undefined,
         adset: input.adset ?? undefined,
         ad: input.ad ?? undefined,
-        collaborator_id: input.collaborator_id ?? undefined,
-        referred_by_collaborator_id: input.referred_by_collaborator_id ?? undefined,
+        collaborator_id: existing.collaborator_id ?? input.collaborator_id ?? undefined,
+        referred_by_collaborator_id:
+          existing.referred_by_collaborator_id ?? input.referred_by_collaborator_id ?? undefined,
         tags: input.tags ?? undefined,
-        custom_fields: input.custom_fields ?? undefined,
+        custom_fields: mergedCustomFields,
         updated_at: new Date().toISOString(),
       })
       .eq('id', existingId)
@@ -224,7 +242,7 @@ async function createLead(
 
 // --- Handler ---
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
-  const cors = () => res.setHeader('Access-Control-Allow-Origin', '*');
+  const cors = () => applySameOriginCors(req, res);
 
   if (req.method === 'OPTIONS') {
     cors();
@@ -238,16 +256,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return;
   }
 
-  const supabaseUrl = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.VITE_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseKey) {
+  const supabase = createServiceClient();
+  if (!supabase) {
     cors();
     res.status(500).json({ error: 'Configuración de Supabase incompleta' });
     return;
   }
-
-  const supabase = createClient(supabaseUrl, supabaseKey);
 
   try {
     let body: Record<string, unknown>;
@@ -289,7 +303,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       return;
     }
 
-    if (COLLAB_RATE_LIMIT_ENABLED && input.collaborator_id) {
+    if (RATE_LIMIT_ENABLED) {
       const ip = getClientIp(req);
       const windowStart = new Date(Date.now() - 60 * 60 * 1000).toISOString();
       const { count } = await supabase
@@ -297,7 +311,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         .select('*', { count: 'exact', head: true })
         .eq('ip', ip)
         .gte('created_at', windowStart);
-      if ((count ?? 0) >= COLLAB_RATE_LIMIT_PER_IP_PER_HOUR) {
+      if ((count ?? 0) >= RATE_LIMIT_PER_IP_PER_HOUR) {
         cors();
         res.status(429).json({
           success: false,
@@ -308,7 +322,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       }
       await supabase.from('collaborator_lead_rate_log').insert({
         ip,
-        collaborator_id: input.collaborator_id,
+        collaborator_id: input.collaborator_id ?? null,
       });
       await supabase
         .from('collaborator_lead_rate_log')

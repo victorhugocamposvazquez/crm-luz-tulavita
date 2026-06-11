@@ -86,10 +86,10 @@ function TvForm({ compact = false, dark = false }: { compact?: boolean; dark?: b
   }
   return (
     <form onSubmit={submit} style={{ display: 'grid', gap: 10 }}>
-      <input className="tv-input" placeholder="Tu nombre"
+      <input className="tv-input" placeholder="Tu nombre" required
         value={state.nombre} onChange={(e) => setState({ ...state, nombre: e.target.value })} />
       <div style={{ display: 'grid', gridTemplateColumns: compact ? '1fr 1fr' : '1fr', gap: 10 }}>
-        <input className="tv-input" type="tel" placeholder="Teléfono"
+        <input className="tv-input" type="tel" placeholder="Teléfono" required
           value={state.tel} onChange={(e) => setState({ ...state, tel: e.target.value })} />
         <input className="tv-input" type="email" placeholder="Email (opcional)"
           value={state.email} onChange={(e) => setState({ ...state, email: e.target.value })} />

@@ -4,7 +4,10 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createClient } from '@supabase/supabase-js';
+import { applySameOriginCors, createServiceClient } from '../server-lib/http.js';
+
+/** Ventana de deduplicación: reenvíos/reintentos del mismo lead no duplican entrada ni conversación. */
+const DEDUP_WINDOW_MINUTES = 10;
 
 const SOURCES = new Set(['web_form', 'meta_lead_ads', 'meta_ads_web', 'csv_import', 'manual', 'collaborator_referral']);
 function normalizeSource(source: string | undefined | null): string {
@@ -20,7 +23,7 @@ function isUuid(value: string | undefined): boolean {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
-  const cors = () => res.setHeader('Access-Control-Allow-Origin', '*');
+  const cors = () => applySameOriginCors(req, res);
 
   if (req.method === 'OPTIONS') {
     cors();
@@ -34,15 +37,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return;
   }
 
-  const supabaseUrl = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.VITE_SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !supabaseKey) {
+  const supabase = createServiceClient();
+  if (!supabase) {
     cors();
     res.status(500).json({ success: false, error: 'Configuración de Supabase incompleta', code: 'CONFIG_ERROR' });
     return;
   }
-
-  const supabase = createClient(supabaseUrl, supabaseKey);
 
   try {
     let body: Record<string, unknown>;
@@ -77,40 +77,73 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         ? (body.custom_fields as Record<string, unknown>)
         : {};
 
-    const { data: entry, error: entryError } = await supabase
+    // Dedup: si hay una entrada reciente del mismo lead con la misma fuente/campaña
+    // (reintento del cliente o doble submit), se reutiliza en lugar de duplicar.
+    const dedupSince = new Date(Date.now() - DEDUP_WINDOW_MINUTES * 60 * 1000).toISOString();
+    const { data: recentEntry } = await supabase
       .from('lead_entries')
-      .insert({
-        lead_id,
-        source,
-        collaborator_id: collaborator_id ?? null,
-        campaign: campaign || null,
-        adset: adset || null,
-        ad: ad || null,
-        custom_fields,
-      })
-      .select()
-      .single();
+      .select('*')
+      .eq('lead_id', lead_id)
+      .eq('source', source)
+      .gte('created_at', dedupSince)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (entryError) {
-      cors();
-      res.status(400).json({ success: false, error: entryError.message, code: 'INSERT_ENTRY_ERROR' });
-      return;
+    let entry = recentEntry ?? null;
+    if (!entry) {
+      const { data: insertedEntry, error: entryError } = await supabase
+        .from('lead_entries')
+        .insert({
+          lead_id,
+          source,
+          collaborator_id: collaborator_id ?? null,
+          campaign: campaign || null,
+          adset: adset || null,
+          ad: ad || null,
+          custom_fields,
+        })
+        .select()
+        .single();
+
+      if (entryError) {
+        cors();
+        res.status(400).json({ success: false, error: entryError.message, code: 'INSERT_ENTRY_ERROR' });
+        return;
+      }
+      entry = insertedEntry;
     }
 
-    const { data: conversation, error: convError } = await supabase
+    // Conversación: reutilizar la abierta de WhatsApp si existe (evita abrir varias
+    // conversaciones para el mismo lead en reenvíos).
+    const { data: openConversation } = await supabase
       .from('lead_conversations')
-      .insert({
-        lead_id,
-        channel: 'whatsapp',
-        status: 'open',
-      })
-      .select()
-      .single();
+      .select('*')
+      .eq('lead_id', lead_id)
+      .eq('channel', 'whatsapp')
+      .eq('status', 'open')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (convError) {
-      cors();
-      res.status(400).json({ success: false, error: convError.message, code: 'INSERT_CONVERSATION_ERROR' });
-      return;
+    let conversation = openConversation ?? null;
+    if (!conversation) {
+      const { data: insertedConv, error: convError } = await supabase
+        .from('lead_conversations')
+        .insert({
+          lead_id,
+          channel: 'whatsapp',
+          status: 'open',
+        })
+        .select()
+        .single();
+
+      if (convError) {
+        cors();
+        res.status(400).json({ success: false, error: convError.message, code: 'INSERT_CONVERSATION_ERROR' });
+        return;
+      }
+      conversation = insertedConv;
     }
 
     cors();

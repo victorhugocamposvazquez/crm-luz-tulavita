@@ -31,19 +31,43 @@ function readCollaboratorRefTokenFromUrl(): string | null {
   return normalizeCode(params.get('ref') ?? params.get('collab_ref'));
 }
 
-export function useCollaboratorReferral() {
-  const [collaborator, setCollaborator] = useState<CollaboratorReferral | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [requestedCode, setRequestedCode] = useState<string | null>(() => readCollaboratorCodeFromUrl());
-  const [requestedRef, setRequestedRef] = useState<string | null>(() => readCollaboratorRefTokenFromUrl());
-  const [entryMode, setEntryMode] = useState<CollaboratorEntryMode>('auto');
+/**
+ * Persistencia en sessionStorage (misma idea que la atribución Meta): si el usuario
+ * recarga o navega y la URL pierde el ?ref=/?colaborador=, la atribución no se pierde
+ * durante la sesión.
+ */
+const REFERRAL_STORAGE_KEY = 'crm_luz_collaborator_referral';
 
-  useEffect(() => {
-    const code = readCollaboratorCodeFromUrl();
-    const ref = readCollaboratorRefTokenFromUrl();
-    setRequestedCode(code);
-    setRequestedRef(ref);
-  }, []);
+function resolveInitialReferral(): { code: string | null; ref: string | null } {
+  const code = readCollaboratorCodeFromUrl();
+  const ref = readCollaboratorRefTokenFromUrl();
+  if (code || ref) {
+    try {
+      sessionStorage.setItem(REFERRAL_STORAGE_KEY, JSON.stringify({ code, ref }));
+    } catch {
+      /* sessionStorage no disponible */
+    }
+    return { code, ref };
+  }
+  try {
+    const raw = sessionStorage.getItem(REFERRAL_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as { code?: string | null; ref?: string | null };
+      return { code: normalizeCode(parsed.code ?? null), ref: normalizeCode(parsed.ref ?? null) };
+    }
+  } catch {
+    /* sessionStorage no disponible o JSON corrupto */
+  }
+  return { code: null, ref: null };
+}
+
+export function useCollaboratorReferral() {
+  const [initialReferral] = useState(resolveInitialReferral);
+  const [collaborator, setCollaborator] = useState<CollaboratorReferral | null>(null);
+  const [loading, setLoading] = useState(() => !!(initialReferral.code || initialReferral.ref));
+  const [requestedCode] = useState<string | null>(initialReferral.code);
+  const [requestedRef] = useState<string | null>(initialReferral.ref);
+  const [entryMode, setEntryMode] = useState<CollaboratorEntryMode>('auto');
 
   useEffect(() => {
     let cancelled = false;

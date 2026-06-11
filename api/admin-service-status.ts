@@ -9,6 +9,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createClient } from '@supabase/supabase-js';
+import { applySameOriginCors } from '../server-lib/http.js';
 
 type ServiceStatus = 'operational' | 'degraded' | 'down' | 'not_configured' | 'unknown';
 
@@ -23,11 +24,6 @@ type ServiceResult = {
   docsUrl?: string;
 };
 
-function cors(res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-}
 
 async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = 6000): Promise<Response> {
   const controller = new AbortController();
@@ -194,6 +190,8 @@ async function isAdminRequest(req: VercelRequest, url: string, serviceKey: strin
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
+  const cors = (r: VercelResponse) => applySameOriginCors(req, r);
+
   if (req.method === 'OPTIONS') {
     cors(res);
     res.status(200).end();

@@ -21,12 +21,10 @@ import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import imageCompression from 'browser-image-compression';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { extractPdfTextFromFile } from '@/lib/pdf-text-client';
 import {
   AHORRO_FORM_CONTROL_ACCENT,
   AHORRO_LUZ_CTA_GREEN,
 } from '@/lib/ahorro-luz-public-ui';
-const MAX_PDF_TEXT_CHARS = 350_000;
 const LEAD_ATTACHMENTS_BUCKET = 'lead-attachments';
 /** Sin espera artificial: el resultado aparece en cuanto responde la API. */
 const LANDING_POST_SUBMIT_LOADER_MS = 0;
@@ -74,6 +72,7 @@ const CONTACT_MANUAL: Question = {
 
 const CONTACT_CALLBACK: Question = {
   ...CONTACT_QUESTION_SHARED,
+  contactRequirement: 'phone_or_email',
   header: 'Déjanos tu teléfono o email y te llamamos lo antes posible.',
 };
 
@@ -156,6 +155,7 @@ function LandingFormSteps({
   leadCampaign,
   collaboratorMeta,
   collaboratorId,
+  collaboratorPending = false,
 }: {
   mode: LandingFormMode;
   initialFile: File | null;
@@ -167,6 +167,8 @@ function LandingFormSteps({
   leadCampaign?: string;
   collaboratorMeta?: Record<string, unknown>;
   collaboratorId?: string;
+  /** Hay ?ref= en la URL pero el colaborador aún se está resolviendo: no enviar todavía. */
+  collaboratorPending?: boolean;
 }) {
   const questions = useMemo(() => {
     if (mode === 'upload') return QUESTIONS_UPLOAD;
@@ -195,7 +197,7 @@ function LandingFormSteps({
   const skipHeroFileStep = mode === 'upload' && initialFile != null;
 
   const uploadLeadAttachment = useCallback(
-    async (file: File): Promise<{ name: string; path: string; pdf_text?: string }> => {
+    async (file: File): Promise<{ name: string; path: string }> => {
       let fileToUpload = file;
       if (file.type.startsWith('image/')) {
         try {
@@ -205,29 +207,16 @@ function LandingFormSteps({
         }
       }
 
-      const [rawPdfText, uploadPath] = await Promise.all([
-        extractPdfTextFromFile(file),
-        (async () => {
-          const p = `${crypto.randomUUID()}/${fileToUpload.name}`;
-          const { error } = await supabase.storage
-            .from(LEAD_ATTACHMENTS_BUCKET)
-            .upload(p, fileToUpload, { upsert: false });
-          if (error) {
-            toast({ title: 'Error al subir el archivo', description: error.message, variant: 'destructive' });
-            throw error;
-          }
-          return p;
-        })(),
-      ]);
+      const p = `${crypto.randomUUID()}/${fileToUpload.name}`;
+      const { error } = await supabase.storage
+        .from(LEAD_ATTACHMENTS_BUCKET)
+        .upload(p, fileToUpload, { upsert: false });
+      if (error) {
+        toast({ title: 'Error al subir el archivo', description: error.message, variant: 'destructive' });
+        throw error;
+      }
 
-      const pdfText =
-        rawPdfText && rawPdfText.length > 0
-          ? rawPdfText.length > MAX_PDF_TEXT_CHARS
-            ? rawPdfText.slice(0, MAX_PDF_TEXT_CHARS)
-            : rawPdfText
-          : undefined;
-
-      return { name: file.name, path: uploadPath, ...(pdfText ? { pdf_text: pdfText } : {}) };
+      return { name: file.name, path: p };
     },
     [],
   );
@@ -269,6 +258,8 @@ function LandingFormSteps({
   }, [answers.adjuntar_factura]);
 
   const heroUploadStillPending = skipHeroFileStep && !heroAttachmentReady;
+  const [heroUploadError, setHeroUploadError] = useState<string | null>(null);
+  const [heroUploadAttempt, setHeroUploadAttempt] = useState(0);
 
   useEffect(() => {
     if (heroAttachmentReady) setValidationError((e) => (e?.includes('subirse la factura') ? null : e));
@@ -286,15 +277,26 @@ function LandingFormSteps({
     (async () => {
       try {
         const result = await uploadLeadAttachment(initialFile);
-        if (!cancelled) setAnswer('adjuntar_factura', result);
+        if (!cancelled) {
+          setHeroUploadError(null);
+          setAnswer('adjuntar_factura', result);
+        }
       } catch {
         heroFileConsumedKey.current = null;
+        if (!cancelled) {
+          setHeroUploadError('No se pudo subir la factura. Comprueba tu conexión y reinténtalo.');
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [mode, initialFile, fileFingerprint, uploadLeadAttachment, setAnswer]);
+  }, [mode, initialFile, fileFingerprint, uploadLeadAttachment, setAnswer, heroUploadAttempt]);
+
+  const retryHeroUpload = useCallback(() => {
+    setHeroUploadError(null);
+    setHeroUploadAttempt((n) => n + 1);
+  }, []);
 
   const hasSelection = useMemo(() => {
     if (!currentQuestion) return false;
@@ -343,6 +345,10 @@ function LandingFormSteps({
         setValidationError('Espera un momento a que termine de subirse la factura.');
         return;
       }
+      if (isLast && collaboratorPending) {
+        setValidationError('Un momento, estamos validando tu enlace… vuelve a pulsar Enviar.');
+        return;
+      }
       setValidationError(null);
       setDirection('next');
       if (isLast) {
@@ -356,7 +362,7 @@ function LandingFormSteps({
       } else goNext();
       setTimeout(scrollToTop, 100);
     },
-    [currentQuestion, answers, isLast, submit, goNext, scrollToTop, setAnswer, heroUploadStillPending],
+    [currentQuestion, answers, isLast, submit, goNext, scrollToTop, setAnswer, heroUploadStillPending, collaboratorPending],
   );
 
   const backToHeroFromSkippedUpload =
@@ -416,11 +422,12 @@ function LandingFormSteps({
     return null;
   }
 
+  const heroUploadFailed = heroUploadStillPending && heroUploadError != null;
   const centerIsElegirArchivo =
     currentQuestion.type === 'file_upload' && !answers[currentQuestion.id];
   const greenCenterCta =
     submitStatus !== 'loading' &&
-    !(heroUploadStillPending && isLast) &&
+    !(heroUploadStillPending && isLast && !heroUploadFailed) &&
     !centerIsElegirArchivo;
   const widerEnviar =
     isLast && submitStatus !== 'loading' && !heroUploadStillPending;
@@ -489,6 +496,9 @@ function LandingFormSteps({
 
             {validationError && <p className="mt-3 text-sm text-red-500 text-center">{validationError}</p>}
             {submitError && <p className="mt-3 text-sm text-red-500 text-center">{submitError}</p>}
+            {heroUploadFailed && (
+              <p className="mt-3 text-sm text-red-500 text-center">{heroUploadError}</p>
+            )}
 
             <div className="mt-10 grid grid-cols-3 items-center gap-2 w-full max-w-full">
               <div className="flex justify-start min-w-0">
@@ -515,7 +525,9 @@ function LandingFormSteps({
                 <button
                   type="button"
                   onClick={() => {
-                    if (currentQuestion?.type === 'file_upload' && !answers[currentQuestion.id]) {
+                    if (heroUploadFailed) {
+                      retryHeroUpload();
+                    } else if (currentQuestion?.type === 'file_upload' && !answers[currentQuestion.id]) {
                       fileInputRef.current?.click();
                     } else {
                       handleNext();
@@ -523,8 +535,8 @@ function LandingFormSteps({
                   }}
                   disabled={
                     submitStatus === 'loading' ||
-                    heroUploadStillPending ||
-                    (currentQuestion?.type !== 'file_upload' && !hasSelection)
+                    (heroUploadStillPending && !heroUploadFailed) ||
+                    (!heroUploadFailed && currentQuestion?.type !== 'file_upload' && !hasSelection)
                   }
                   className={cn(
                     'flex max-w-full items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm transition-[filter] sm:text-base whitespace-nowrap',
@@ -541,6 +553,8 @@ function LandingFormSteps({
                       <Loader2 className="h-5 w-5 shrink-0 animate-spin text-neutral-900" />
                       Enviando...
                     </>
+                  ) : heroUploadFailed ? (
+                    'Reintentar subida'
                   ) : heroUploadStillPending && isLast ? (
                     <>
                       <Loader2 className="h-5 w-5 shrink-0 animate-spin text-neutral-900" />
@@ -614,7 +628,6 @@ export default function AhorroLuz() {
 
   const [lastLeadId, setLastLeadId] = useState<string | null>(null);
   const [lastFacturaPath, setLastFacturaPath] = useState<string | null>(null);
-  const [invoicePdfTextForFlow, setInvoicePdfTextForFlow] = useState<string | null>(null);
   const [successEntryPath, setSuccessEntryPath] = useState<string | null>(null);
 
   const { attribution, clearAttribution } = useMetaAttribution();
@@ -653,8 +666,6 @@ export default function AhorroLuz() {
         ? (adj as { path: string }).path
         : null;
     setLastFacturaPath(path);
-    const pdfAdj = adj && typeof adj === 'object' && adj !== null && 'pdf_text' in adj ? (adj as { pdf_text?: string }).pdf_text : undefined;
-    setInvoicePdfTextForFlow(typeof pdfAdj === 'string' && pdfAdj.trim() ? pdfAdj.trim() : null);
     const ep = payload.custom_fields?.landing_entry_path;
     setSuccessEntryPath(typeof ep === 'string' ? ep : null);
   }, []);
@@ -662,7 +673,6 @@ export default function AhorroLuz() {
   const handleReset = useCallback(() => {
     setLastLeadId(null);
     setLastFacturaPath(null);
-    setInvoicePdfTextForFlow(null);
     setSuccessEntryPath(null);
     setPhase(forcedEntryMode ? 'form' : 'hero');
     setFormMode(forcedEntryMode);
@@ -712,7 +722,6 @@ export default function AhorroLuz() {
                     onReset={handleReset}
                     compactLoader
                     fixedResultLoaderMs={LANDING_POST_SUBMIT_LOADER_MS}
-                    attachmentPdfText={invoicePdfTextForFlow}
                   />
                 </div>
               </div>
@@ -776,6 +785,7 @@ export default function AhorroLuz() {
           leadCampaign={leadCampaign}
           collaboratorMeta={collaboratorMeta}
           collaboratorId={collaborator?.id}
+          collaboratorPending={hasCollaboratorInUrl && collaboratorLoading}
         />
         {collaborator && (
           <p className="px-4 pb-2 text-center text-sm text-muted-foreground">

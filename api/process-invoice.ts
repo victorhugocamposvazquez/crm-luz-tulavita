@@ -8,12 +8,12 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createClient } from '@supabase/supabase-js';
 import { extractInvoiceFromBuffer } from '../server-lib/invoice/pipeline.js';
 import { getActiveOffers, runComparison, getComparisonFailureReason } from '../server-lib/energy/calculation.js';
 import { fetchInvoiceEstimateTaxConfig } from '../server-lib/energy/invoice-estimate-taxes.js';
 import { validateAttachmentPath } from '../server-lib/invoice/validate-path.js';
 import { emptyExtraction } from '../server-lib/invoice/types.js';
+import { applySameOriginCors, createServiceClient, getClientIp } from '../server-lib/http.js';
 import {
   getAttachmentAnalysisCache,
   upsertAttachmentAnalysisCache,
@@ -24,14 +24,6 @@ import {
 const BUCKET = 'lead-attachments';
 const TIMEOUT_MS = 55000;
 const RATE_LIMIT_WINDOW_HOURS = 1;
-const MAX_PDF_TEXT_BODY_CHARS = 400_000;
-
-function normalizeClientPdfText(raw: unknown): string | null {
-  if (typeof raw !== 'string') return null;
-  const t = raw.trim();
-  if (!t) return null;
-  return t.length > MAX_PDF_TEXT_BODY_CHARS ? t.slice(0, MAX_PDF_TEXT_BODY_CHARS) : t;
-}
 
 function parseEnvInt(name: string, fallback: number): number {
   const raw = process.env[name];
@@ -49,24 +41,12 @@ const RATE_LIMIT_ENABLED =
 const RATE_LIMIT_LEAD_PER_HOUR = parseEnvInt('PROCESS_INVOICE_RATE_LIMIT_LEAD_PER_HOUR', 5);
 const RATE_LIMIT_IP_PER_HOUR = parseEnvInt('PROCESS_INVOICE_RATE_LIMIT_IP_PER_HOUR', 120);
 
-function getClientIp(req: VercelRequest): string {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string') return forwarded.split(',')[0].trim();
-  const real = req.headers['x-real-ip'];
-  if (typeof real === 'string') return real.trim();
-  return 'unknown';
-}
-
 export const config = {
   api: { bodyParser: { sizeLimit: '1mb' } },
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
-  const cors = () => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  };
+  const cors = () => applySameOriginCors(req, res);
 
   if (req.method === 'OPTIONS') {
     cors();
@@ -80,15 +60,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return;
   }
 
-  const supabaseUrl = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.VITE_SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !supabaseKey) {
+  const supabase = createServiceClient();
+  if (!supabase) {
     cors();
     res.status(500).json({ error: 'Configuración Supabase incompleta', code: 'CONFIG_ERROR' });
     return;
   }
-
-  const supabase = createClient(supabaseUrl, supabaseKey);
 
   type ManualExtraction = {
     consumption_kwh?: number;
@@ -96,7 +73,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     period_months?: number;
     company_name?: string | null;
   };
-  let body: { lead_id?: string; attachment_path?: string; manual_extraction?: ManualExtraction; pdf_text?: unknown };
+  let body: { lead_id?: string; attachment_path?: string; manual_extraction?: ManualExtraction };
   try {
     body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body as Record<string, unknown>) ?? {};
   } catch {
@@ -107,7 +84,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   const lead_id = body.lead_id;
   const attachment_path = body.attachment_path;
-  const clientPdfText = normalizeClientPdfText(body.pdf_text);
   const manual_extraction = body.manual_extraction;
   const useManual = manual_extraction != null &&
     typeof manual_extraction.consumption_kwh === 'number' &&
@@ -136,6 +112,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const period_months = useManual
     ? Math.min(12, Math.max(1, Math.floor(Number(manual_extraction!.period_months)) || 1))
     : undefined;
+
+  // El lead debe existir y, si registró un adjunto al crearse, el path debe coincidir
+  // (evita procesar archivos ajenos contra un lead_id filtrado).
+  {
+    const { data: lead, error: leadError } = await supabase
+      .from('leads')
+      .select('id, custom_fields')
+      .eq('id', lead_id)
+      .maybeSingle();
+    if (leadError || !lead) {
+      cors();
+      res.status(404).json({ error: 'Lead no encontrado', code: 'LEAD_NOT_FOUND' });
+      return;
+    }
+    if (!useManual) {
+      const cf = lead.custom_fields as Record<string, unknown> | null;
+      const adj = cf?.adjuntar_factura as { path?: unknown } | undefined;
+      const recordedPath = typeof adj?.path === 'string' ? adj.path : null;
+      if (recordedPath && recordedPath !== attachment_path) {
+        cors();
+        res.status(403).json({ error: 'El archivo no pertenece a este lead', code: 'ATTACHMENT_MISMATCH' });
+        return;
+      }
+    }
+  }
 
   if (RATE_LIMIT_ENABLED) {
     const clientIp = getClientIp(req);
@@ -231,9 +232,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     }
   }
 
+  // Estado compartido para que solo se escriba UNA fila terminal en energy_comparisons
+  // aunque el trabajo siga ejecutándose tras un timeout (Promise.race no cancela).
+  const state = { timedOut: false, inserted: false };
+
   const runWithTimeout = async () => {
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Timeout procesando factura')), TIMEOUT_MS)
+      setTimeout(() => {
+        state.timedOut = true;
+        reject(new Error('Timeout procesando factura'));
+      }, TIMEOUT_MS)
     );
     const work = (async () => {
       const cached = await getAttachmentAnalysisCache(supabase, attachment_path!);
@@ -254,12 +262,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           raw_extraction: cached.raw_extraction,
           error_message: cached.error_message,
         };
+        if (state.timedOut) return null;
         const { data: inserted, error: insertError } = await supabase
           .from('energy_comparisons')
           .insert(rowFromCache)
           .select('id, lead_id, current_company, current_monthly_cost, best_offer_company, estimated_savings_amount, estimated_savings_percentage, status, ocr_confidence, prudent_mode, error_message, created_at')
           .single();
         if (insertError) throw insertError;
+        state.inserted = true;
         await pruneExpiredAttachmentCache(supabase);
         return inserted;
       }
@@ -272,11 +282,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       }
       const buffer = Buffer.from(await fileData.arrayBuffer());
       const mimeType = fileData.type || (attachment_path.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
-      const extractOpts =
-        mimeType === 'application/pdf' && clientPdfText ? { pdfText: clientPdfText } : undefined;
 
+      // El texto del PDF se extrae siempre en servidor: no se acepta pdf_text del
+      // cliente, que permitiría inflar consumos/importes manipulando el texto.
       const [extraction, offers, taxConfig] = await Promise.all([
-        extractInvoiceFromBuffer(buffer, mimeType, extractOpts),
+        extractInvoiceFromBuffer(buffer, mimeType),
         getActiveOffers(supabase),
         fetchInvoiceEstimateTaxConfig(supabase),
       ]);
@@ -329,6 +339,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         error_message: result ? null : getComparisonFailureReason(extraction, offers),
       };
 
+      if (state.timedOut) {
+        // La respuesta HTTP ya se cerró con timeout: no insertamos otra fila terminal,
+        // pero sí cacheamos el análisis para que el reintento sea inmediato.
+        await upsertAttachmentAnalysisCache(
+          supabase,
+          attachment_path!,
+          rowToCachePayload({
+            raw_text: row.raw_text,
+            current_company: row.current_company,
+            current_monthly_cost: row.current_monthly_cost,
+            best_offer_company: row.best_offer_company,
+            estimated_savings_amount: row.estimated_savings_amount,
+            estimated_savings_percentage: row.estimated_savings_percentage,
+            status: row.status,
+            ocr_confidence: row.ocr_confidence,
+            invoice_period_months: row.invoice_period_months,
+            prudent_mode: row.prudent_mode,
+            raw_extraction: row.raw_extraction,
+            error_message: row.error_message,
+          }),
+        );
+        return null;
+      }
+
       const { data: inserted, error: insertError } = await supabase
         .from('energy_comparisons')
         .insert(row)
@@ -336,6 +370,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
         .single();
 
       if (insertError) throw insertError;
+      state.inserted = true;
 
       await upsertAttachmentAnalysisCache(
         supabase,
@@ -372,15 +407,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Error procesando factura';
     console.error('[process-invoice]', message);
-    try {
-      await supabase.from('energy_comparisons').insert({
-        lead_id,
-        attachment_path: attachment_path ?? null,
-        status: 'failed',
-        error_message: message,
-      });
-    } catch {
-      /* ignore */
+    if (!state.inserted) {
+      try {
+        await supabase.from('energy_comparisons').insert({
+          lead_id,
+          attachment_path: attachment_path ?? null,
+          status: 'failed',
+          error_message: message,
+        });
+      } catch {
+        /* ignore */
+      }
     }
     cors();
     res.status(500).json({

@@ -92,6 +92,7 @@ export function QuestionStep({
   const id = `q-${question.id}`;
   const accent = accentColor;
   const [uploadLoading, setUploadLoading] = React.useState(false);
+  const [fileError, setFileError] = React.useState<string | null>(null);
   const isRequired = question.required !== false;
 
   const handleChange = (v: string | number | string[]) => {
@@ -305,14 +306,19 @@ export function QuestionStep({
       const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         e.target.value = '';
-        if (!file || file.size > maxSize) return;
+        if (!file) return;
+        if (file.size > maxSize) {
+          setFileError(`El archivo supera el límite de ${fileQ.maxSizeMb ?? 10} MB. Elige uno más pequeño.`);
+          return;
+        }
+        setFileError(null);
         if (onUploadFile) {
           setUploadLoading(true);
           try {
             const result = await onUploadFile(file);
             onChange(result);
           } catch {
-            // Error: el padre puede mostrar toast; no actualizamos valor
+            setFileError('No se pudo subir el archivo. Inténtalo de nuevo.');
           } finally {
             setUploadLoading(false);
           }
@@ -326,6 +332,7 @@ export function QuestionStep({
           {fileQ.description && (
             <p className="text-sm text-neutral-600 mb-2">{fileQ.description}</p>
           )}
+          {fileError && <p className="text-sm text-red-500 text-center">{fileError}</p>}
           <label className="flex min-h-[180px] w-full cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-neutral-300 bg-neutral-50/60 transition-colors hover:border-neutral-400 focus-within:border-[color:var(--form-accent)] focus-within:ring-2 focus-within:ring-[color:var(--form-accent)] focus-within:ring-offset-2 has-[:focus]:border-[color:var(--form-accent)] has-[:focus]:ring-2 has-[:focus]:ring-[color:var(--form-accent)]">
             <input
               ref={fileInputRef}
@@ -388,6 +395,7 @@ export function QuestionStep({
 
     case 'contact':
       const contactQ = question as import('./types').ContactQuestion;
+      const contactEither = contactQ.contactRequirement === 'phone_or_email';
       const contactVal = (value as Record<string, string>) ?? {};
       const updateContact = (field: string, v: string) => {
         onChange({ ...contactVal, [field]: v });
@@ -431,7 +439,9 @@ export function QuestionStep({
             </div>
             {/* Teléfono — línea inferior en un solo trazo (evita corte bajo el input al enfocar) */}
             <div className="flex flex-col">
-              <Label className="mb-1 text-sm font-medium text-neutral-900">Número de teléfono *</Label>
+              <Label className="mb-1 text-sm font-medium text-neutral-900">
+                {contactEither ? 'Número de teléfono' : 'Número de teléfono *'}
+              </Label>
               <div className="group relative flex w-full items-center">
                 <button
                   type="button"
@@ -464,7 +474,9 @@ export function QuestionStep({
             </div>
             {/* Email - Material style */}
             <div className="flex flex-col">
-              <Label className="mb-1 text-sm font-medium text-neutral-900">Correo electrónico *</Label>
+              <Label className="mb-1 text-sm font-medium text-neutral-900">
+                {contactEither ? 'Correo electrónico' : 'Correo electrónico *'}
+              </Label>
               <Input
                 type="email"
                 data-contact-field="email"
@@ -527,11 +539,22 @@ export function validateQuestion(
   const required = question.required !== false;
 
   if (question.type === 'contact') {
+    const requirement = question.contactRequirement ?? 'phone_and_email';
     const v = value as Record<string, string> | undefined;
-    const phone = (v?.phone ?? v?.telefono ?? '').toString().replace(/\s/g, '').replace(/\D/g, '');
-    if (!phone || phone.length < 9) return 'Introduce un teléfono válido (mínimo 9 dígitos)';
-    if (!v?.email?.trim()) return 'El email es obligatorio';
-    if (v.email && !isValidEmail(v.email)) return 'Email no válido';
+    const rawPhone = (v?.phone ?? v?.telefono ?? '').toString().trim();
+    const phoneDigits = rawPhone.replace(/\D/g, '');
+    const email = v?.email?.trim() ?? '';
+
+    if (requirement === 'phone_or_email') {
+      if (!rawPhone && !email) return 'Déjanos un teléfono o un email para contactarte';
+      if (rawPhone && phoneDigits.length < 9) return 'Introduce un teléfono válido (mínimo 9 dígitos)';
+      if (email && !isValidEmail(email)) return 'Email no válido';
+      return null;
+    }
+
+    if (!rawPhone || phoneDigits.length < 9) return 'Introduce un teléfono válido (mínimo 9 dígitos)';
+    if (!email) return 'El email es obligatorio';
+    if (!isValidEmail(email)) return 'Email no válido';
     return null;
   }
 

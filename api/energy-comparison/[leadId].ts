@@ -4,13 +4,10 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createClient } from '@supabase/supabase-js';
+import { applySameOriginCors, createServiceClient } from '../../server-lib/http.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
-  const cors = () => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  };
+  const cors = () => applySameOriginCors(req, res);
 
   if (req.method === 'OPTIONS') {
     cors();
@@ -31,15 +28,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return;
   }
 
-  const supabaseUrl = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.VITE_SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !supabaseKey) {
+  const supabase = createServiceClient();
+  if (!supabase) {
     cors();
     res.status(500).json({ error: 'Configuración Supabase incompleta', code: 'CONFIG_ERROR' });
     return;
   }
-
-  const supabase = createClient(supabaseUrl, supabaseKey);
 
   const { data, error } = await supabase
     .from('energy_comparisons')

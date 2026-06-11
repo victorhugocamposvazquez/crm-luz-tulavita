@@ -8,6 +8,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import Busboy from 'busboy';
 import { extractInvoiceFromBufferDetailed } from '../server-lib/invoice/pipeline.js';
+import { applySameOriginCors, createServiceClient, requireAdminUser } from '../server-lib/http.js';
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 const ALLOWED_MIMES = new Set([
@@ -79,9 +80,7 @@ function parseMultipart(
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
   const t0 = Date.now();
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  applySameOriginCors(req, res);
 
   if (req.method === 'OPTIONS') {
     res.status(200).end();
@@ -90,6 +89,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
 
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' });
+    return;
+  }
+
+  // Endpoint solo backoffice: dispara llamadas LLM con coste, exige sesión admin.
+  const supabase = createServiceClient();
+  if (!supabase) {
+    res.status(500).json({ error: 'Configuración Supabase incompleta', code: 'CONFIG_ERROR' });
+    return;
+  }
+  const auth = await requireAdminUser(req, supabase);
+  if (!auth.ok) {
+    res.status(auth.status).json({ error: auth.error, code: 'UNAUTHORIZED' });
     return;
   }
 

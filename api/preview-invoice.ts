@@ -6,11 +6,11 @@
  */
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { createClient } from '@supabase/supabase-js';
 import { extractInvoiceFromBuffer } from '../server-lib/invoice/pipeline.js';
 import { getActiveOffers, runComparison, getComparisonFailureReason } from '../server-lib/energy/calculation.js';
 import { fetchInvoiceEstimateTaxConfig } from '../server-lib/energy/invoice-estimate-taxes.js';
 import { validateAttachmentPath } from '../server-lib/invoice/validate-path.js';
+import { applySameOriginCors, createServiceClient, getClientIp } from '../server-lib/http.js';
 import {
   getAttachmentAnalysisCache,
   upsertAttachmentAnalysisCache,
@@ -22,14 +22,6 @@ import {
 const BUCKET = 'lead-attachments';
 const TIMEOUT_MS = 55000;
 const RATE_LIMIT_WINDOW_HOURS = 1;
-const MAX_PDF_TEXT_BODY_CHARS = 400_000;
-
-function normalizeClientPdfText(raw: unknown): string | null {
-  if (typeof raw !== 'string') return null;
-  const t = raw.trim();
-  if (!t) return null;
-  return t.length > MAX_PDF_TEXT_BODY_CHARS ? t.slice(0, MAX_PDF_TEXT_BODY_CHARS) : t;
-}
 
 const PLACEHOLDER_ID = '00000000-0000-4000-8000-000000000001';
 const PLACEHOLDER_LEAD_ID = '00000000-0000-4000-8000-000000000002';
@@ -46,14 +38,6 @@ const RATE_LIMIT_ENABLED =
   process.env.PROCESS_INVOICE_RATE_LIMIT_ENABLED !== '0';
 
 const RATE_LIMIT_IP_PER_HOUR = parseEnvInt('PROCESS_INVOICE_RATE_LIMIT_IP_PER_HOUR', 120);
-
-function getClientIp(req: VercelRequest): string {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string') return forwarded.split(',')[0].trim();
-  const real = req.headers['x-real-ip'];
-  if (typeof real === 'string') return real.trim();
-  return 'unknown';
-}
 
 function comparisonFromPayload(
   path: string,
@@ -81,11 +65,7 @@ export const config = {
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse): Promise<void> {
-  const cors = () => {
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  };
+  const cors = () => applySameOriginCors(req, res);
 
   if (req.method === 'OPTIONS') {
     cors();
@@ -99,17 +79,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     return;
   }
 
-  const supabaseUrl = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.VITE_SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !supabaseKey) {
+  const supabase = createServiceClient();
+  if (!supabase) {
     cors();
     res.status(500).json({ error: 'Configuración Supabase incompleta', code: 'CONFIG_ERROR' });
     return;
   }
 
-  const supabase = createClient(supabaseUrl, supabaseKey);
-
-  let body: { attachment_path?: string; pdf_text?: unknown };
+  let body: { attachment_path?: string };
   try {
     body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body as Record<string, unknown>) ?? {};
   } catch {
@@ -119,7 +96,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   }
 
   const attachment_path = body.attachment_path;
-  const clientPdfText = normalizeClientPdfText(body.pdf_text);
   if (!attachment_path || typeof attachment_path !== 'string') {
     cors();
     res.status(400).json({ error: 'attachment_path es obligatorio', code: 'VALIDATION_ERROR' });
@@ -177,11 +153,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       }
       const buffer = Buffer.from(await fileData.arrayBuffer());
       const mimeType = fileData.type || (attachment_path.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
-      const extractOpts =
-        mimeType === 'application/pdf' && clientPdfText ? { pdfText: clientPdfText } : undefined;
 
+      // Texto siempre extraído en servidor; no se acepta pdf_text del cliente.
       const [extraction, offers, taxConfig] = await Promise.all([
-        extractInvoiceFromBuffer(buffer, mimeType, extractOpts),
+        extractInvoiceFromBuffer(buffer, mimeType),
         getActiveOffers(supabase),
         fetchInvoiceEstimateTaxConfig(supabase),
       ]);

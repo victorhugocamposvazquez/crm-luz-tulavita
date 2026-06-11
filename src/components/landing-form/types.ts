@@ -82,6 +82,12 @@ export interface FileUploadQuestion extends BaseQuestion {
 
 export interface ContactQuestion extends BaseQuestion {
   type: 'contact';
+  /**
+   * Qué datos de contacto se exigen al validar.
+   * - 'phone_and_email' (por defecto): teléfono y email obligatorios.
+   * - 'phone_or_email': basta con uno de los dos válido (p. ej. "que me llamen").
+   */
+  contactRequirement?: 'phone_and_email' | 'phone_or_email';
   /** Texto de encabezado */
   header?: string;
   /** Puntos a revisar (con checkmark) */

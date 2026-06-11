@@ -2,7 +2,7 @@
  * Hook para manejar el estado del formulario multi-step
  */
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import type { FormAnswers, Question, LeadPayload, ContactValue, MetaAttribution } from './types';
 import { getUrlParams } from './utils';
 
@@ -131,7 +131,12 @@ export function useFormState({
     };
   }, [answers, questions, collaboratorId, source, campaign, adset, ad, extraCustomFields]);
 
+  // Guard anti doble envío: dos clicks rápidos en "Enviar" antes del re-render
+  // lanzarían dos POST paralelos (y con la dedupe del servidor, podrían duplicar el lead).
+  const submittingRef = useRef(false);
+
   const submit = useCallback(async () => {
+    if (submittingRef.current) return;
     const payload = buildPayload();
     if (!payload.email && !payload.phone) {
       setSubmitError('Se requiere al menos email o teléfono');
@@ -139,6 +144,7 @@ export function useFormState({
       return;
     }
 
+    submittingRef.current = true;
     setSubmitStatus('loading');
     setSubmitError(null);
 
@@ -162,22 +168,33 @@ export function useFormState({
 
       const leadId = data.lead?.id;
       if (leadEntryApiUrl && leadId && typeof leadId === 'string') {
-        try {
-          await fetch(leadEntryApiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              lead_id: leadId,
-              source: payload.source,
-              collaborator_id: payload.collaborator_id ?? null,
-              campaign: payload.campaign ?? null,
-              adset: payload.adset ?? null,
-              ad: payload.ad ?? null,
-              custom_fields: payload.custom_fields ?? {},
-            }),
-          });
-        } catch {
-          // No bloquear éxito del lead si falla la entrada CRM
+        // La entrada CRM no bloquea el éxito del lead, pero se comprueba la
+        // respuesta y se reintenta una vez para no perderla en silencio.
+        const entryBody = JSON.stringify({
+          lead_id: leadId,
+          source: payload.source,
+          collaborator_id: payload.collaborator_id ?? null,
+          campaign: payload.campaign ?? null,
+          adset: payload.adset ?? null,
+          ad: payload.ad ?? null,
+          custom_fields: payload.custom_fields ?? {},
+        });
+        let entryOk = false;
+        for (let attempt = 0; attempt < 2 && !entryOk; attempt++) {
+          if (attempt > 0) await new Promise((r) => setTimeout(r, 800));
+          try {
+            const entryRes = await fetch(leadEntryApiUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: entryBody,
+            });
+            entryOk = entryRes.ok;
+          } catch {
+            entryOk = false;
+          }
+        }
+        if (!entryOk) {
+          console.warn('[landing-form] No se pudo crear la entrada CRM para el lead', leadId);
         }
       }
 
@@ -189,6 +206,8 @@ export function useFormState({
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : 'Error de conexión');
       setSubmitStatus('error');
+    } finally {
+      submittingRef.current = false;
     }
   }, [buildPayload, clearAttribution, leadEntryApiUrl, onSuccess]);
 
