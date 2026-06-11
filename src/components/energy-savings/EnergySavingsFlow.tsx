@@ -76,6 +76,9 @@ export function EnergySavingsFlow({
   if (status === 'failed' && error) {
     return (
       <div className="space-y-6">
+        <p className="text-base font-semibold text-neutral-900">
+          Hemos recibido tu solicitud correctamente.
+        </p>
         <p className="text-lg text-neutral-600">{error}</p>
         <div className="rounded-xl border border-neutral-200 bg-neutral-50/80 p-4 sm:p-5">
           <p className="mb-3 font-medium text-neutral-900">

@@ -45,6 +45,16 @@ const PRUDENT_MIN_PERCENT = 8;
 const MIN_CONSUMPTION_KWH = 50;
 const MAX_CONSUMPTION_KWH = 5000;
 const MIN_OCR_CONFIDENCE = 0.8;
+/**
+ * Suelo duro: por debajo de esta confianza los números extraídos no son fiables
+ * y NO se genera comparación 'completed' (mejor revisión de asesor que cifra errónea).
+ * Entre este suelo y MIN_OCR_CONFIDENCE se completa pero en modo prudente.
+ */
+const MIN_COMPLETE_CONFIDENCE = Number(process.env.INVOICE_MIN_COMPLETE_CONFIDENCE ?? '0.5') || 0.5;
+
+function isConfidenceTooLow(extraction: InvoiceExtraction): boolean {
+  return extraction.confidence > 0 && extraction.confidence < MIN_COMPLETE_CONFIDENCE;
+}
 const DEFAULT_POWER_KW = 4.6;
 const FALLBACK_POWER_DAYS_PER_MONTH = 30;
 
@@ -191,6 +201,9 @@ export function getComparisonFailureReason(
   if (consumption == null || consumption <= 0 || totalFactura == null || totalFactura <= 0) {
     return 'No hemos podido leer todos los datos de esta factura de forma automática. Un asesor revisará tu factura y te contactará con una estimación personalizada.';
   }
+  if (isConfidenceTooLow(extraction)) {
+    return 'La lectura automática de esta factura no es lo bastante fiable. Hemos recibido tu solicitud y un asesor la revisará personalmente para darte una estimación exacta.';
+  }
   if (offers.length === 0) {
     return 'No hay ofertas configuradas para comparar.';
   }
@@ -220,6 +233,13 @@ export function runComparison(
   const currentCompany = extraction.company_name ? normalizeCompanyName(extraction.company_name) : null;
 
   if (consumption == null || consumption <= 0 || totalFactura == null || totalFactura <= 0) {
+    return null;
+  }
+
+  // Confianza por debajo del suelo: no presentar una cifra de ahorro que con alta
+  // probabilidad es errónea. El flujo cae a 'failed' → plan B manual / asesor.
+  if (isConfidenceTooLow(extraction)) {
+    console.warn(`[calculation] confianza ${extraction.confidence.toFixed(2)} < ${MIN_COMPLETE_CONFIDENCE} — comparación bloqueada para revisión`);
     return null;
   }
 

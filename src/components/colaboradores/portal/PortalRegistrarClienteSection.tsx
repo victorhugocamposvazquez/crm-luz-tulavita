@@ -7,6 +7,7 @@ import { toast } from '@/hooks/use-toast';
 import { Loader2, UserPlus, Upload } from 'lucide-react';
 import { ALL_ENTRY_MODES, ENTRY_MODE_LABELS, type CollaboratorEntryMode } from '@/lib/collaborators/types';
 import { fileToBase64 } from './portal-types';
+import { isValidSpanishPhone } from '@/hooks/useColaboradoresLeadSubmit';
 
 type PortalRegistrarClienteSectionProps = {
   sessionToken: string;
@@ -25,7 +26,15 @@ export function PortalRegistrarClienteSection({ sessionToken, onSubmitted }: Por
 
   const submitClient = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!clientName.trim() || !clientPhone.trim()) return;
+    if (!clientName.trim() || !clientPhone.trim() || submitting) return;
+    if (!isValidSpanishPhone(clientPhone)) {
+      toast({
+        title: 'Teléfono no válido',
+        description: 'Introduce un teléfono español de 9 dígitos (puede llevar +34).',
+        variant: 'destructive',
+      });
+      return;
+    }
     setSubmitting(true);
     try {
       const body: Record<string, unknown> = {
@@ -50,9 +59,21 @@ export function PortalRegistrarClienteSection({ sessionToken, onSubmitted }: Por
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
-      const json = (await res.json()) as { success?: boolean; error?: string };
+      const json = (await res.json()) as {
+        success?: boolean;
+        error?: string;
+        analysis_status?: 'completed' | 'failed' | 'error' | 'skipped';
+      };
       if (!res.ok || !json.success) throw new Error(json.error ?? 'Error al registrar cliente');
-      toast({ title: 'Cliente registrado', description: 'El lead aparecerá en el CRM.' });
+      if (json.analysis_status === 'failed' || json.analysis_status === 'error') {
+        toast({
+          title: 'Cliente registrado',
+          description:
+            'El cliente quedó registrado correctamente, pero el análisis automático de la factura no fue concluyente. El gestor lo revisará a mano.',
+        });
+      } else {
+        toast({ title: 'Cliente registrado', description: 'El lead aparecerá en el CRM.' });
+      }
       setClientName('');
       setClientPhone('');
       setClientEmail('');

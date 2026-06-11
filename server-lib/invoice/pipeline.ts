@@ -480,7 +480,7 @@ function quickDetectTarifa(text: string | null, buffer: Buffer, mimeType: string
 export async function extractInvoiceFromBufferDetailed(
   buffer: Buffer,
   mimeType: string,
-  opts?: { pdfText?: string | null },
+  opts?: { pdfText?: string | null; skipCache?: boolean },
 ): Promise<InvoiceExtractionDetailedResult> {
   const t0 = Date.now();
   const providedPdfText = opts?.pdfText?.trim() ? opts.pdfText.trim() : null;
@@ -522,7 +522,7 @@ export async function extractInvoiceFromBufferDetailed(
   }
 
   const hash = fileHash(buffer);
-  const cached = extractionCache.get(hash);
+  const cached = opts?.skipCache ? undefined : extractionCache.get(hash);
   if (cached && cached.pv === PROMPT_VERSION && Date.now() - cached.ts < CACHE_TTL_MS) {
     console.log(`[pipeline] Cache hit for ${hash} (pv=${cached.pv})`);
     debug.cacheHit = true;
@@ -750,7 +750,7 @@ export async function extractInvoiceFromBufferDetailed(
 export async function extractInvoiceFromBuffer(
   buffer: Buffer,
   mimeType: string,
-  opts?: { pdfText?: string | null },
+  opts?: { pdfText?: string | null; skipCache?: boolean },
 ): Promise<InvoiceExtraction> {
   const { extraction } = await extractInvoiceFromBufferDetailed(buffer, mimeType, opts);
   return extraction;

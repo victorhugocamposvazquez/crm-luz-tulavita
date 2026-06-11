@@ -220,7 +220,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       collaborator_id: collaborator.id,
     });
 
-    let processInvoiceResult = null;
+    // Análisis de factura: nunca bloquea la creación del lead, pero el resultado
+    // (o su fallo) se comunica al portal para que el colaborador sepa el estado.
+    let processInvoiceResult: { success?: boolean; comparison?: { status?: string; error_message?: string | null } } | null = null;
+    let analysisStatus: 'completed' | 'failed' | 'error' | 'skipped' = 'skipped';
     if (attachmentPath || manualExtraction) {
       const processBody: Record<string, unknown> = { lead_id: lead.id };
       if (attachmentPath) processBody.attachment_path = attachmentPath;
@@ -238,8 +241,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
           body: JSON.stringify(processBody),
         });
         processInvoiceResult = await procRes.json().catch(() => null);
-      } catch {
-        /* no bloquear creación del lead */
+        analysisStatus =
+          processInvoiceResult?.comparison?.status === 'completed' ? 'completed' : 'failed';
+        if (analysisStatus !== 'completed') {
+          console.warn(
+            `[collaborator-submit-lead] análisis no concluyente para lead ${lead.id}:`,
+            processInvoiceResult?.comparison?.error_message ?? `HTTP ${procRes.status}`,
+          );
+        }
+      } catch (procErr) {
+        analysisStatus = 'error';
+        console.error(
+          `[collaborator-submit-lead] fallo llamando a process-invoice para lead ${lead.id}:`,
+          procErr instanceof Error ? procErr.message : procErr,
+        );
       }
     }
 
@@ -249,6 +264,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       lead_id: lead.id,
       attachment_path: attachmentPath,
       process_invoice: processInvoiceResult,
+      analysis_status: analysisStatus,
     });
   } catch (e) {
     const err = e instanceof Error ? e : new Error(String(e));

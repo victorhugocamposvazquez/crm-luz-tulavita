@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge';
-import { Zap } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, RefreshCw, Zap } from 'lucide-react';
 import {
   formatEuro,
   formatSavingsPercent,
@@ -10,18 +11,33 @@ const STATUS_LABELS: Record<string, string> = {
   completed: 'Completada',
   failed: 'Fallida',
   pending: 'Pendiente',
+  processing: 'Pendiente',
 };
 
 type LeadEnergyComparisonCardProps = {
   comparison: EnergyComparisonSummary | null;
   loading?: boolean;
   compact?: boolean;
+  /** Si se proporciona, muestra "Reanalizar factura" (hay adjunto disponible). */
+  onReanalyze?: () => void;
+  reanalyzing?: boolean;
 };
+
+function ReanalyzeButton({ onReanalyze, reanalyzing }: { onReanalyze: () => void; reanalyzing?: boolean }) {
+  return (
+    <Button variant="outline" size="sm" onClick={onReanalyze} disabled={reanalyzing} className="gap-1.5">
+      {reanalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
+      {reanalyzing ? 'Analizando…' : 'Reanalizar factura'}
+    </Button>
+  );
+}
 
 export function LeadEnergyComparisonCard({
   comparison,
   loading,
   compact,
+  onReanalyze,
+  reanalyzing,
 }: LeadEnergyComparisonCardProps) {
   if (loading) {
     return (
@@ -33,8 +49,11 @@ export function LeadEnergyComparisonCard({
 
   if (!comparison) {
     return (
-      <div className="rounded-lg border border-dashed bg-muted/20 p-4 text-sm text-muted-foreground">
-        Sin comparativa de ahorro registrada para este lead.
+      <div className="rounded-lg border border-dashed bg-muted/20 p-4 space-y-2">
+        <p className="text-sm text-muted-foreground">
+          Sin comparativa de ahorro registrada para este lead.
+        </p>
+        {onReanalyze && <ReanalyzeButton onReanalyze={onReanalyze} reanalyzing={reanalyzing} />}
       </div>
     );
   }
@@ -52,19 +71,21 @@ export function LeadEnergyComparisonCard({
         {comparison.error_message && (
           <p className="text-sm text-muted-foreground">{comparison.error_message}</p>
         )}
+        {onReanalyze && <ReanalyzeButton onReanalyze={onReanalyze} reanalyzing={reanalyzing} />}
       </div>
     );
   }
 
   if (comparison.status !== 'completed') {
     return (
-      <div className="rounded-lg border bg-muted/30 p-4 space-y-1">
+      <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
         <div className="flex items-center gap-2">
           <Zap className="h-4 w-4 text-muted-foreground" />
           <span className="font-medium text-sm">Comparativa de ahorro</span>
           <Badge variant="secondary">{statusLabel}</Badge>
         </div>
         <p className="text-sm text-muted-foreground">El análisis aún no ha finalizado.</p>
+        {onReanalyze && <ReanalyzeButton onReanalyze={onReanalyze} reanalyzing={reanalyzing} />}
       </div>
     );
   }
@@ -109,6 +130,9 @@ export function LeadEnergyComparisonCard({
           </>
         )}
       </div>
+      {!compact && onReanalyze && (
+        <ReanalyzeButton onReanalyze={onReanalyze} reanalyzing={reanalyzing} />
+      )}
     </div>
   );
 }

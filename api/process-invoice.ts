@@ -73,7 +73,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
     period_months?: number;
     company_name?: string | null;
   };
-  let body: { lead_id?: string; attachment_path?: string; manual_extraction?: ManualExtraction };
+  let body: { lead_id?: string; attachment_path?: string; manual_extraction?: ManualExtraction; force?: boolean };
   try {
     body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body as Record<string, unknown>) ?? {};
   } catch {
@@ -85,6 +85,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
   const lead_id = body.lead_id;
   const attachment_path = body.attachment_path;
   const manual_extraction = body.manual_extraction;
+  /** force=true (reanálisis admin): ignora la caché de análisis del adjunto. */
+  const forceReanalysis = body.force === true;
   const useManual = manual_extraction != null &&
     typeof manual_extraction.consumption_kwh === 'number' &&
     manual_extraction.consumption_kwh > 0 &&
@@ -244,7 +246,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       }, TIMEOUT_MS)
     );
     const work = (async () => {
-      const cached = await getAttachmentAnalysisCache(supabase, attachment_path!);
+      const cached = forceReanalysis ? null : await getAttachmentAnalysisCache(supabase, attachment_path!);
       if (cached) {
         const rowFromCache = {
           lead_id,
@@ -286,7 +288,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse): 
       // El texto del PDF se extrae siempre en servidor: no se acepta pdf_text del
       // cliente, que permitiría inflar consumos/importes manipulando el texto.
       const [extraction, offers, taxConfig] = await Promise.all([
-        extractInvoiceFromBuffer(buffer, mimeType),
+        extractInvoiceFromBuffer(buffer, mimeType, forceReanalysis ? { skipCache: true } : undefined),
         getActiveOffers(supabase),
         fetchInvoiceEstimateTaxConfig(supabase),
       ]);

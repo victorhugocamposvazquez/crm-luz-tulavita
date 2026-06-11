@@ -236,6 +236,7 @@ export default function LeadDetailSheet({
   const [convertOpen, setConvertOpen] = useState(false);
   const [energyComparison, setEnergyComparison] = useState<EnergyComparisonSummary | null>(null);
   const [comparisonLoading, setComparisonLoading] = useState(false);
+  const [reanalyzing, setReanalyzing] = useState(false);
   const [commissionEligibleAt, setCommissionEligibleAt] = useState<string | null>(null);
   const [commissionLoading, setCommissionLoading] = useState(false);
 
@@ -421,6 +422,20 @@ export default function LeadDetailSheet({
     };
   }, [open, lead?.id, lead?.collaborator_id, lead?.custom_fields]);
 
+  const fetchEnergyComparison = useCallback(async (leadId: string) => {
+    const { data, error } = await supabase
+      .from('energy_comparisons')
+      .select(
+        'id, status, current_company, current_monthly_cost, best_offer_company, estimated_savings_amount, estimated_savings_percentage, prudent_mode, error_message, created_at',
+      )
+      .eq('lead_id', leadId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    return (data as EnergyComparisonSummary | null) ?? null;
+  }, []);
+
   useEffect(() => {
     if (!open || !lead?.id) {
       setEnergyComparison(null);
@@ -431,18 +446,8 @@ export default function LeadDetailSheet({
     setComparisonLoading(true);
     (async () => {
       try {
-        const { data, error } = await supabase
-          .from('energy_comparisons')
-          .select(
-            'id, status, current_company, current_monthly_cost, best_offer_company, estimated_savings_amount, estimated_savings_percentage, prudent_mode, error_message, created_at',
-          )
-          .eq('lead_id', lead.id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (cancelled) return;
-        if (error) throw error;
-        setEnergyComparison((data as EnergyComparisonSummary | null) ?? null);
+        const comparison = await fetchEnergyComparison(lead.id);
+        if (!cancelled) setEnergyComparison(comparison);
       } catch {
         if (!cancelled) setEnergyComparison(null);
       } finally {
@@ -453,7 +458,57 @@ export default function LeadDetailSheet({
     return () => {
       cancelled = true;
     };
-  }, [open, lead?.id]);
+  }, [open, lead?.id, fetchEnergyComparison]);
+
+  /** Path de la factura adjunta del lead (si existe) para poder reanalizarla. */
+  const leadAttachmentPath = (() => {
+    const cf = lead?.custom_fields;
+    if (!cf || typeof cf !== 'object' || Array.isArray(cf)) return null;
+    const adj = (cf as Record<string, unknown>).adjuntar_factura;
+    if (!adj || typeof adj !== 'object' || Array.isArray(adj)) return null;
+    const path = (adj as Record<string, unknown>).path;
+    return typeof path === 'string' && path.trim() ? path : null;
+  })();
+
+  const handleReanalyze = useCallback(async () => {
+    if (!lead?.id || !leadAttachmentPath || reanalyzing) return;
+    setReanalyzing(true);
+    try {
+      const apiUrl = import.meta.env.VITE_PROCESS_INVOICE_API_URL ?? '/api/process-invoice';
+      const res = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lead_id: lead.id, attachment_path: leadAttachmentPath, force: true }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(
+          res.status === 429
+            ? 'Límite de análisis por hora alcanzado para este lead. Inténtalo más tarde.'
+            : data.error || 'No se pudo reanalizar la factura',
+        );
+      }
+      const comparison = await fetchEnergyComparison(lead.id);
+      setEnergyComparison(comparison);
+      if (comparison?.status === 'completed') {
+        toast({ title: 'Factura reanalizada', description: 'Comparativa actualizada correctamente.' });
+      } else {
+        toast({
+          title: 'Análisis terminado sin resultado',
+          description: comparison?.error_message ?? 'La extracción no fue concluyente.',
+          variant: 'destructive',
+        });
+      }
+    } catch (e) {
+      toast({
+        title: 'Error al reanalizar',
+        description: e instanceof Error ? e.message : 'Error de conexión',
+        variant: 'destructive',
+      });
+    } finally {
+      setReanalyzing(false);
+    }
+  }, [lead?.id, leadAttachmentPath, reanalyzing, fetchEnergyComparison]);
 
   useEffect(() => {
     if (!open || !lead?.id || lead.source !== 'collaborator_referral') return;
@@ -973,7 +1028,12 @@ export default function LeadDetailSheet({
                 <Zap className="h-4 w-4" />
                 Comparativa de ahorro
               </h3>
-              <LeadEnergyComparisonCard comparison={energyComparison} loading={comparisonLoading} />
+              <LeadEnergyComparisonCard
+                comparison={energyComparison}
+                loading={comparisonLoading}
+                onReanalyze={leadAttachmentPath ? handleReanalyze : undefined}
+                reanalyzing={reanalyzing}
+              />
             </section>
 
             {/* Añadir nota */}

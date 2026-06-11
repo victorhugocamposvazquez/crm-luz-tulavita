@@ -16,6 +16,45 @@ const MODEL_FAST = 'gpt-4o-mini';
 const MODEL_FULL = 'gpt-4o';
 const CONFIDENCE_THRESHOLD = Number(process.env.INVOICE_LLM_CONFIDENCE_THRESHOLD ?? '0.7') || 0.7;
 
+/** Timeout por llamada a OpenAI; el presupuesto total de la función Vercel es ~55s. */
+const OPENAI_TIMEOUT_MS = Number(process.env.INVOICE_LLM_TIMEOUT_MS ?? '30000') || 30000;
+
+/**
+ * fetch a OpenAI con timeout y un reintento ante errores transitorios (429/5xx/red).
+ * No reintenta tras un timeout: el presupuesto de la función no da para dos intentos largos.
+ */
+async function fetchOpenAI(body: string, apiKey: string, label: string): Promise<Response | null> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), OPENAI_TIMEOUT_MS);
+    try {
+      const res = await fetch(OPENAI_RESPONSES_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body,
+        signal: controller.signal,
+      });
+      if (res.ok) return res;
+      const transient = res.status === 429 || res.status >= 500;
+      const errText = await res.text();
+      console.error(`[llm-extract] OpenAI ${label} HTTP ${res.status} (intento ${attempt + 1})`, errText.slice(0, 300));
+      if (!transient || attempt === 1) return null;
+      await new Promise((r) => setTimeout(r, 800));
+    } catch (e) {
+      const aborted = e instanceof Error && e.name === 'AbortError';
+      console.error(`[llm-extract] OpenAI ${label} ${aborted ? 'timeout' : 'error de red'} (intento ${attempt + 1})`);
+      if (aborted || attempt === 1) return null;
+      await new Promise((r) => setTimeout(r, 800));
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  return null;
+}
+
 const MAX_TOKENS_20TD = 400;
 const MAX_TOKENS_30TD = 2000;
 /** Tope de texto enviado al LLM en 2.0TD (menos tokens → menos latencia). */
@@ -391,26 +430,19 @@ async function callResponsesAPI(
   const prompt = opts?.systemPrompt ?? SYSTEM_PROMPT;
   const maxTokens = opts?.maxTokens ?? MAX_TOKENS_30TD;
 
-  const res = await fetch(OPENAI_RESPONSES_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
+  const res = await fetchOpenAI(
+    JSON.stringify({
       model,
       instructions: prompt,
       input: [{ role: 'user', content }],
       max_output_tokens: maxTokens,
       temperature: 0,
     }),
-  });
+    apiKey,
+    model,
+  );
 
-  if (!res.ok) {
-    const errText = await res.text();
-    console.error(`[llm-extract] OpenAI API error (${model})`, res.status, errText.slice(0, 500));
-    return emptyExtraction();
-  }
+  if (!res) return emptyExtraction();
 
   const data = (await res.json()) as {
     output?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>;
@@ -437,13 +469,8 @@ async function callResponsesAPIText(
   const maxTokens = opts?.maxTokens ?? MAX_TOKENS_30TD;
   const clippedText = text.length > 24_000 ? text.slice(0, 24_000) : text;
 
-  const res = await fetch(OPENAI_RESPONSES_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
+  const res = await fetchOpenAI(
+    JSON.stringify({
       model,
       instructions: prompt,
       input: [{
@@ -456,13 +483,11 @@ async function callResponsesAPIText(
       max_output_tokens: maxTokens,
       temperature: 0,
     }),
-  });
+    apiKey,
+    `${model}-text`,
+  );
 
-  if (!res.ok) {
-    const errText = await res.text();
-    console.error(`[llm-extract-text] OpenAI API error (${model})`, res.status, errText.slice(0, 500));
-    return emptyExtraction();
-  }
+  if (!res) return emptyExtraction();
 
   const data = (await res.json()) as {
     output?: Array<{ type?: string; content?: Array<{ type?: string; text?: string }> }>;
